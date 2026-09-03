@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "id": "demo-listening-01",
+  "testId": "demo-test-01",
+  "type": "listening",
+  "title": "Local Audio Playback Check",
+  "audioAssetId": "demo-audio-silence-01",
+  "sections": [
+    {
+      "id": "demo-listening-section-01",
+      "title": "Playback verification",
+      "startMs": 0,
+      "endMs": 4000,
+      "contentBlocks": [
+        {
+          "id": "demo-listening-instruction-01",
+          "kind": "instruction",
+          "text": "This original four-second track is intentionally silent. It exists only to verify local media loading, playback state, and exam-mode controls. The visible questions below test these instructions rather than listening ability."
+        }
+      ],
+      "questionGroups": [
+        {
+          "id": "demo-listening-group-01",
+          "title": "Local media check",
+          "instructions": "Use the visible verification note to answer both questions.",
+          "questions": [
+            {
+              "id": "demo-listening-q01",
+              "number": 1,
+              "type": "fill-blank",
+              "prompt": "Complete the sentence.",
+              "sentence": "The test track lasts {{blank}} seconds.",
+              "acceptableAnswers": ["four", "4"],
+              "maxWords": 1,
+              "explanation": "The verification note describes a four-second track."
+            },
+            {
+              "id": "demo-listening-q02",
+              "number": 2,
+              "type": "single-choice",
+              "prompt": "Why is the silent track included?",
+              "options": [
+                {
+                  "id": "demo-listening-q02-a",
+                  "label": "A",
+                  "text": "To verify local media playback"
+                },
+                {
+                  "id": "demo-listening-q02-b",
+                  "label": "B",
+                  "text": "To provide an official listening score"
+                },
+                {
+                  "id": "demo-listening-q02-c",
+                  "label": "C",
+                  "text": "To download a remote transcript"
+                }
+              ],
+              "correctOptionId": "demo-listening-q02-a",
+              "explanation": "The file is solely a local playback fixture."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

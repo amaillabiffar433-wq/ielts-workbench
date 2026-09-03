@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="IELTS Workbench icon">
+  <rect width="1024" height="1024" rx="208" fill="#F4F0E6"/>
+  <path d="M232 260c108-18 202 5 280 69v471c-78-64-172-87-280-69V260Z" fill="#1F4D3A"/>
+  <path d="M792 260c-108-18-202 5-280 69v471c78-64 172-87 280-69V260Z" fill="#2E6650"/>
+  <path d="M512 329v471" stroke="#D6B65A" stroke-width="34" stroke-linecap="round"/>
+  <path d="M307 391h125M307 481h125M307 571h125" stroke="#F4F0E6" stroke-width="28" stroke-linecap="round"/>
+  <path d="M592 391h125M592 481h125M592 571h125" stroke="#F4F0E6" stroke-width="28" stroke-linecap="round"/>
+</svg>

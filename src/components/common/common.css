@@ -1,0 +1,49 @@
+.segmented-control {
+  display: inline-flex;
+  padding: 3px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-raised);
+}
+
+.segmented-control button {
+  min-height: 30px;
+  padding: 5px 11px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.segmented-control button:hover:not(:disabled) {
+  color: var(--text-primary);
+}
+
+.segmented-control button.is-active {
+  background: var(--surface-panel);
+  color: var(--accent-strong);
+  box-shadow: 0 1px 4px rgb(28 38 31 / 10%);
+}
+
+.save-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.save-status--saved {
+  color: var(--success);
+}
+
+.save-status--error {
+  color: var(--danger);
+}
+
+.save-status__spinner {
+  animation: spin 0.8s linear infinite;
+}

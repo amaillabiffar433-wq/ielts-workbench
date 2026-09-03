@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "id": "demo-writing-01",
+  "testId": "demo-test-01",
+  "type": "writing",
+  "title": "Original Writing Prompts",
+  "sections": [
+    {
+      "id": "demo-writing-section-01",
+      "title": "Writing tasks",
+      "tasks": [
+        {
+          "id": "demo-writing-task-01",
+          "type": "task-1",
+          "title": "Community workshop attendance",
+          "prompt": "The table below shows attendance at three fictional community workshops in Alderwick. Repair café: January 42, February 55, March 61. Seed exchange: January 68, February 64, March 79. Bicycle skills: January 35, February 47, March 46. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
+          "minimumWords": 150,
+          "suggestedMinutes": 20
+        },
+        {
+          "id": "demo-writing-task-02",
+          "type": "task-2",
+          "title": "Shared public equipment",
+          "prompt": "Some people think towns should lend useful equipment, such as tools and sports items, through public libraries. Others believe individuals should buy or rent these items privately. Discuss both views and give your own opinion.",
+          "minimumWords": 250,
+          "suggestedMinutes": 40
+        }
+      ]
+    }
+  ]
+}

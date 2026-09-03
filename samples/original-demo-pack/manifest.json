@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "original-demo-pack",
+  "title": "Alderwick Skills Sampler",
+  "sourceLabel": "IELTS Workbench original demonstration material",
+  "edition": "2026.1",
+  "language": "en",
+  "modules": ["reading", "listening", "writing"],
+  "createdAt": "2026-09-01T00:00:00.000Z",
+  "attribution": "Written from scratch for IELTS Workbench. No third-party test content is included.",
+  "tests": [
+    {
+      "id": "demo-test-01",
+      "title": "Original Local Practice Test",
+      "moduleIds": ["demo-reading-01", "demo-listening-01", "demo-writing-01"]
+    }
+  ],
+  "mediaAssets": [
+    {
+      "id": "demo-audio-silence-01",
+      "type": "audio",
+      "relativePath": "media/audio/original-demo-silence.wav",
+      "mimeType": "audio/wav",
+      "durationMs": 4000,
+      "sha256": "bff9ae2d1c0defb0f2b9070f43439fcb723621dbeb1cca5e2dbadcd9bfb13c68"
+    }
+  ]
+}

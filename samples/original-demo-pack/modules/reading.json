@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "id": "demo-reading-01",
+  "testId": "demo-test-01",
+  "type": "reading",
+  "title": "The Lantern Library",
+  "sections": [
+    {
+      "id": "demo-reading-section-01",
+      "title": "The Lantern Library",
+      "contentBlocks": [
+        {
+          "id": "demo-reading-heading-01",
+          "kind": "heading",
+          "text": "The Lantern Library"
+        },
+        {
+          "id": "demo-reading-paragraph-01",
+          "kind": "paragraph",
+          "text": "In the fictional town of Alderwick, three unused bus shelters were turned into small lending cabinets for gardeners. The trial was called the Lantern Library because a warm lamp above each cabinet made the shelves easy to inspect on winter afternoons. Residents could borrow hand tools and packets of locally collected seeds without entering a staffed building."
+        },
+        {
+          "id": "demo-reading-paragraph-02",
+          "kind": "paragraph",
+          "text": "The organisers wanted to test whether shared equipment could be borrowed responsibly without a staffed desk. Each tool carried a simple numbered tag, but visitors did not have to register. Volunteers checked the inventory twice a week and moved rarely used items between the three shelters. Small solar panels powered the lamps, while the cabinet doors used ordinary mechanical locks."
+        },
+        {
+          "id": "demo-reading-paragraph-03",
+          "kind": "paragraph",
+          "text": "During the twelve-week trial, seed packets were taken more often than tools. The most frequently borrowed tool was a narrow hand fork, which residents said was useful for balcony pots. Several people donated clean envelopes and seeds from their own gardens. The project accepted these donations but did not sell plants or gardening supplies."
+        },
+        {
+          "id": "demo-reading-paragraph-04",
+          "kind": "paragraph",
+          "text": "At the end of the trial, the organisers kept two shelters open and converted the third into a weatherproof noticeboard. They also published an inventory template so that other neighbourhood groups could run a similar lending cabinet with their own materials."
+        }
+      ],
+      "questionGroups": [
+        {
+          "id": "demo-reading-group-01",
+          "title": "Questions 1–3",
+          "instructions": "Decide whether each statement is true, false, or not given according to the passage.",
+          "questions": [
+            {
+              "id": "demo-reading-q01",
+              "number": 1,
+              "type": "true-false-not-given",
+              "prompt": "The original trial used three bus shelters.",
+              "correctAnswer": "true",
+              "explanation": "The first paragraph says that three unused bus shelters were converted."
+            },
+            {
+              "id": "demo-reading-q02",
+              "number": 2,
+              "type": "true-false-not-given",
+              "prompt": "Visitors had to create an account before borrowing a tool.",
+              "correctAnswer": "false",
+              "explanation": "The passage states that visitors did not have to register."
+            },
+            {
+              "id": "demo-reading-q03",
+              "number": 3,
+              "type": "true-false-not-given",
+              "prompt": "The shelters were busiest during the rainiest week of the trial.",
+              "correctAnswer": "not-given",
+              "explanation": "The passage does not compare visitor numbers with rainfall."
+            }
+          ]
+        },
+        {
+          "id": "demo-reading-group-02",
+          "title": "Questions 4–6",
+          "instructions": "Choose or enter the answer supported by the passage.",
+          "questions": [
+            {
+              "id": "demo-reading-q04",
+              "number": 4,
+              "type": "single-choice",
+              "prompt": "What was the main purpose of the initial trial?",
+              "options": [
+                {
+                  "id": "demo-reading-q04-a",
+                  "label": "A",
+                  "text": "To sell locally grown plants"
+                },
+                {
+                  "id": "demo-reading-q04-b",
+                  "label": "B",
+                  "text": "To test unstaffed borrowing of shared gardening equipment"
+                },
+                {
+                  "id": "demo-reading-q04-c",
+                  "label": "C",
+                  "text": "To replace every bus shelter in the town"
+                }
+              ],
+              "correctOptionId": "demo-reading-q04-b",
+              "explanation": "The organisers were testing responsible borrowing without a staffed desk."
+            },
+            {
+              "id": "demo-reading-q05",
+              "number": 5,
+              "type": "short-answer",
+              "prompt": "What powered the lamps above the cabinets?",
+              "acceptableAnswers": ["small solar panels", "solar panels"],
+              "maxWords": 3,
+              "explanation": "The second paragraph identifies small solar panels as the power source."
+            },
+            {
+              "id": "demo-reading-q06",
+              "number": 6,
+              "type": "fill-blank",
+              "prompt": "Complete the sentence using no more than three words.",
+              "sentence": "Volunteers checked each cabinet's inventory {{blank}}.",
+              "acceptableAnswers": ["twice a week", "twice weekly"],
+              "maxWords": 3,
+              "explanation": "The inventory schedule appears in the second paragraph."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

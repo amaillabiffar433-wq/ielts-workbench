@@ -1,0 +1,14 @@
+{
+  "name": "IELTS Workbench Codex Starter Pack",
+  "created": "2026-09-01",
+  "files": [
+    "00_READ_ME_FIRST.md",
+    "01_CODEX_MASTER_PROMPT.md",
+    "AGENTS.md",
+    "PROJECT_SPEC.md",
+    "REFERENCE_AUDIT.md",
+    "02_NEXT_PHASE_PROMPTS.md"
+  ],
+  "recommended_source_path": "D:\\AI\\IELTS-Workbench",
+  "recommended_data_path": "D:\\IELTS-Workbench-Data"
+}

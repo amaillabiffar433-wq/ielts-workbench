@@ -1,0 +1,31 @@
+[package]
+name = "ielts-workbench"
+version = "0.1.0"
+description = "Local-first IELTS desktop workbench"
+authors = ["IELTS Workbench contributors"]
+edition = "2021"
+
+[lib]
+name = "ielts_workbench_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+base64 = "0.22"
+chrono = { version = "0.4", features = ["clock", "serde"] }
+mime_guess = "2"
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+thiserror = "2"
+uuid = { version = "1", features = ["serde", "v4"] }
+walkdir = "2"
+
+[dev-dependencies]
+tempfile = "3"
+
