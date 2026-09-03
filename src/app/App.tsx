@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw } from "lucide-react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./AppShell/AppShell";
 import { ImportCenterPage } from "../features/import-center/ImportCenterPage";
+import { PdfImportPage } from "../features/pdf-import/PdfImportPage";
 import { LibraryPage } from "../features/library/LibraryPage";
 import { OnboardingPage } from "../features/onboarding/OnboardingPage";
 import { ListeningPage } from "../features/practice/listening/ListeningPage";
@@ -76,6 +77,7 @@ export function App() {
         <Route element={<WorkspaceGate />}>
           <Route element={<LibraryPage />} path="/library" />
           <Route element={<ImportCenterPage />} path="/import" />
+          <Route element={<PdfImportPage />} path="/import/pdf" />
           <Route element={<ReadingPage />} path="/practice/reading" />
           <Route element={<ListeningPage />} path="/practice/listening" />
           <Route element={<WritingPage />} path="/practice/writing" />

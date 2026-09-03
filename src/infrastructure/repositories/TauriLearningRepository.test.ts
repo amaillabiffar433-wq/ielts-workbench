@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 
+import { parseIeltsPack } from "../../domain/pack/schemas";
+import { originalDemoPack } from "../demo/originalDemoPack";
 import { TauriLearningRepository, type TauriInvoke } from "./TauriLearningRepository";
 
 function mockInvoke(responses: Readonly<Record<string, unknown>>): TauriInvoke {
@@ -174,5 +176,27 @@ describe("TauriLearningRepository", () => {
 
     const bytes = await repository.readPackMedia("demo-pack", "media/audio/tiny.wav");
     expect(new TextDecoder().decode(bytes)).toBe("RIFF");
+  });
+
+  it("validates generated packs before invoking the native installer", async () => {
+    const pack = parseIeltsPack(originalDemoPack);
+    let receivedArgs: Record<string, unknown> | undefined;
+    const repository = new TauriLearningRepository(async <T>(command: string, args?: Record<string, unknown>) => {
+      expect(command).toBe("install_generated_pack");
+      receivedArgs = args;
+      return {
+        id: pack.manifest.id,
+        title: pack.manifest.title,
+        sourceLabel: pack.manifest.sourceLabel,
+        manifest: pack.manifest,
+        installedAt: "2026-09-03T06:00:00.000Z",
+      } as T;
+    });
+
+    await expect(repository.installImportedPack(pack)).resolves.toMatchObject({
+      id: pack.manifest.id,
+      modules: pack.manifest.modules,
+    });
+    expect(receivedArgs).toEqual({ pack });
   });
 });

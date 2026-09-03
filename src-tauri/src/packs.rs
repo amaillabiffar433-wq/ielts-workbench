@@ -28,6 +28,7 @@ use crate::{
 
 const MAX_MANIFEST_BYTES: u64 = 1024 * 1024;
 const MAX_MODULE_BYTES: u64 = 16 * 1024 * 1024;
+const MAX_GENERATED_PACK_JSON_BYTES: usize = 64 * 1024 * 1024;
 const MAX_MEDIA_READ_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_PACK_FILE_BYTES: u64 = MAX_MEDIA_READ_BYTES;
 const MAX_PACK_FILES: usize = 50_000;
@@ -104,6 +105,36 @@ struct PackManifestV1 {
     tests: Vec<PackTestDescriptorV1>,
     #[serde(default)]
     media_assets: Vec<MediaAssetV1>,
+    import_metadata: Option<PdfImportMetadataV1>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SourcePageRangeV1 {
+    start: u32,
+    end: u32,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PdfImportMetadataV1 {
+    source_file_name: String,
+    source_file_size: u64,
+    source_sha256: Option<String>,
+    source_fingerprint: String,
+    book_title: String,
+    test_number: String,
+    module: String,
+    passage_number: u32,
+    passage_page_range: SourcePageRangeV1,
+    question_page_range: SourcePageRangeV1,
+    answer_key_page_range: Option<SourcePageRangeV1>,
+    imported_at: String,
+    extraction_mode: String,
+    parser_version: String,
+    page_number_base: u32,
+    needs_review: bool,
+    dedupe_key: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -409,8 +440,9 @@ struct SingleChoiceQuestionV1 {
     #[serde(default = "default_question_points")]
     points: u32,
     explanation: Option<String>,
+    source: Option<QuestionSourceV1>,
     options: Vec<ChoiceOptionV1>,
-    correct_option_id: String,
+    correct_option_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -422,7 +454,8 @@ struct TrueFalseNotGivenQuestionV1 {
     #[serde(default = "default_question_points")]
     points: u32,
     explanation: Option<String>,
-    correct_answer: TrueFalseNotGivenAnswer,
+    source: Option<QuestionSourceV1>,
+    correct_answer: Option<TrueFalseNotGivenAnswer>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -442,6 +475,8 @@ struct ShortAnswerQuestionV1 {
     #[serde(default = "default_question_points")]
     points: u32,
     explanation: Option<String>,
+    source: Option<QuestionSourceV1>,
+    #[serde(default)]
     acceptable_answers: Vec<String>,
     max_words: Option<u32>,
     #[serde(default)]
@@ -457,11 +492,34 @@ struct FillBlankQuestionV1 {
     #[serde(default = "default_question_points")]
     points: u32,
     explanation: Option<String>,
+    source: Option<QuestionSourceV1>,
     sentence: String,
+    #[serde(default)]
     acceptable_answers: Vec<String>,
     max_words: Option<u32>,
     #[serde(default)]
     case_sensitive: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct QuestionSourceV1 {
+    raw_text: String,
+    source_pages: Vec<u32>,
+    source_block: String,
+    detected_type: DetectedQuestionTypeV1,
+    needs_review: bool,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum DetectedQuestionTypeV1 {
+    SingleChoice,
+    TrueFalseNotGiven,
+    ShortAnswer,
+    FillBlank,
+    MatchingHeadings,
+    Unsupported,
 }
 
 #[derive(Debug, Deserialize)]
@@ -686,6 +744,87 @@ pub fn install_pack(
             Err(error)
         }
     }
+}
+
+pub fn install_generated_pack(
+    workspace: &Workspace,
+    connection: &Connection,
+    pack: Value,
+) -> Result<InstalledPackRecord> {
+    let object = pack.as_object().ok_or_else(|| {
+        BackendError::InvalidInput("Generated IELTSPack must be a JSON object.".to_string())
+    })?;
+    if object.len() != 2 || !object.contains_key("manifest") || !object.contains_key("modules") {
+        return Err(BackendError::InvalidInput(
+            "Generated IELTSPack must contain only manifest and modules.".to_string(),
+        ));
+    }
+    let manifest = object.get("manifest").cloned().ok_or_else(|| {
+        BackendError::InvalidInput("Generated IELTSPack is missing manifest.".to_string())
+    })?;
+    let modules = object
+        .get("modules")
+        .and_then(Value::as_array)
+        .ok_or_else(|| {
+            BackendError::InvalidInput("Generated IELTSPack modules must be an array.".to_string())
+        })?;
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest)?;
+    let module_bytes = modules
+        .iter()
+        .map(|module| {
+            let module_type = module
+                .get("type")
+                .and_then(Value::as_str)
+                .filter(|value| matches!(*value, "reading" | "listening" | "writing"))
+                .ok_or_else(|| {
+                    BackendError::InvalidInput(
+                        "Every generated module needs a supported type.".to_string(),
+                    )
+                })?;
+            Ok((module_type.to_string(), serde_json::to_vec_pretty(module)?))
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let total_bytes = manifest_bytes.len()
+        + module_bytes
+            .iter()
+            .map(|(_, bytes)| bytes.len())
+            .sum::<usize>();
+    if total_bytes > MAX_GENERATED_PACK_JSON_BYTES {
+        return Err(BackendError::InvalidInput(
+            "Generated IELTSPack JSON is larger than 64 MB.".to_string(),
+        ));
+    }
+    let mut module_types = HashSet::new();
+    if module_bytes
+        .iter()
+        .any(|(module_type, _)| !module_types.insert(module_type.as_str()))
+    {
+        return Err(BackendError::InvalidInput(
+            "Generated IELTSPack module types must be unique.".to_string(),
+        ));
+    }
+
+    let imports_dir = workspace.root().join("imports");
+    reject_link_or_reparse(&imports_dir, "workspace imports directory")?;
+    ensure_existing_within(workspace.root(), &imports_dir)?;
+    let temporary = imports_dir.join(format!(".install-generated-{}", Uuid::new_v4()));
+    fs::create_dir(&temporary)?;
+    let result = (|| -> Result<InstalledPackRecord> {
+        fs::create_dir(temporary.join("modules"))?;
+        fs::write(temporary.join("manifest.json"), manifest_bytes)?;
+        for (module_type, bytes) in module_bytes {
+            fs::write(
+                temporary.join("modules").join(format!("{module_type}.json")),
+                bytes,
+            )?;
+        }
+        let path = temporary.to_str().ok_or_else(|| {
+            BackendError::InvalidInput("Generated pack staging path is not Unicode.".to_string())
+        })?;
+        install_pack(workspace, connection, path)
+    })();
+    cleanup_owned_directory(&imports_dir, &temporary);
+    result
 }
 
 pub fn load_pack(
@@ -1324,6 +1463,68 @@ fn validate_manifest_schema(
             Some("manifest.json"),
         ));
     }
+    if let Some(metadata) = &manifest.import_metadata {
+        validate_pdf_import_metadata(metadata, errors);
+    }
+}
+
+fn validate_pdf_import_metadata(
+    metadata: &PdfImportMetadataV1,
+    errors: &mut Vec<ValidationIssue>,
+) {
+    let non_blank_fields = [
+        &metadata.source_file_name,
+        &metadata.source_fingerprint,
+        &metadata.book_title,
+        &metadata.test_number,
+        &metadata.imported_at,
+        &metadata.parser_version,
+    ];
+    if non_blank_fields.iter().any(|value| !non_blank(value)) {
+        errors.push(issue(
+            "INVALID_PDF_IMPORT_METADATA",
+            "PDF import metadata text fields must contain non-whitespace text.",
+            Some("manifest.json#importMetadata"),
+        ));
+    }
+    let valid_hash = |value: &str| {
+        value.len() == 64
+            && value
+                .chars()
+                .all(|character| character.is_ascii_hexdigit() && !character.is_ascii_uppercase())
+    };
+    if metadata
+        .source_sha256
+        .as_ref()
+        .is_some_and(|hash| !valid_hash(hash))
+        || !valid_hash(&metadata.dedupe_key)
+    {
+        errors.push(issue(
+            "INVALID_PDF_IMPORT_HASH",
+            "PDF source and dedupe hashes must use 64 lowercase hexadecimal characters.",
+            Some("manifest.json#importMetadata"),
+        ));
+    }
+    let valid_range = |range: &SourcePageRangeV1| range.start > 0 && range.end >= range.start;
+    if !valid_range(&metadata.passage_page_range)
+        || !valid_range(&metadata.question_page_range)
+        || metadata
+            .answer_key_page_range
+            .as_ref()
+            .is_some_and(|range| !valid_range(range))
+        || !(1..=3).contains(&metadata.passage_number)
+        || metadata.module != "reading"
+        || metadata.extraction_mode != "pdf-text-layer"
+        || metadata.page_number_base != 1
+        || !valid_iso_utc_timestamp(&metadata.imported_at)
+    {
+        errors.push(issue(
+            "INVALID_PDF_IMPORT_METADATA",
+            "PDF import metadata contains an invalid page range, module, timestamp, or extraction mode.",
+            Some("manifest.json#importMetadata"),
+        ));
+    }
+    let _ = (metadata.source_file_size, metadata.needs_review);
 }
 
 fn validate_media_asset(
@@ -1838,6 +2039,7 @@ fn validate_question(
                 stable_ids,
                 errors,
             );
+            validate_question_source(question.source.as_ref(), path, errors);
             if question.options.len() < 2 {
                 errors.push(issue(
                     "TOO_FEW_CHOICE_OPTIONS",
@@ -1871,14 +2073,16 @@ fn validate_question(
                     ));
                 }
             }
-            if !valid_stable_id(&question.correct_option_id)
-                || !option_ids.contains(question.correct_option_id.as_str())
-            {
-                errors.push(issue(
-                    "INVALID_CORRECT_OPTION_REFERENCE",
-                    "correctOptionId must reference an option in the same question.",
-                    Some(&format!("{path}.correctOptionId")),
-                ));
+            if let Some(correct_option_id) = &question.correct_option_id {
+                if !valid_stable_id(correct_option_id)
+                    || !option_ids.contains(correct_option_id.as_str())
+                {
+                    errors.push(issue(
+                        "INVALID_CORRECT_OPTION_REFERENCE",
+                        "correctOptionId must reference an option in the same question.",
+                        Some(&format!("{path}.correctOptionId")),
+                    ));
+                }
             }
         }
         QuestionV1::TrueFalseNotGiven(question) => {
@@ -1892,6 +2096,7 @@ fn validate_question(
                 stable_ids,
                 errors,
             );
+            validate_question_source(question.source.as_ref(), path, errors);
             let _ = &question.correct_answer;
         }
         QuestionV1::ShortAnswer(question) => {
@@ -1905,12 +2110,14 @@ fn validate_question(
                 stable_ids,
                 errors,
             );
+            validate_question_source(question.source.as_ref(), path, errors);
             validate_acceptable_answers(
                 &question.acceptable_answers,
                 question.max_words,
                 path,
                 errors,
             );
+            validate_question_source(question.source.as_ref(), path, errors);
             let _ = question.case_sensitive;
         }
         QuestionV1::FillBlank(question) => {
@@ -1942,6 +2149,28 @@ fn validate_question(
             let _ = question.case_sensitive;
         }
     }
+}
+
+fn validate_question_source(
+    source: Option<&QuestionSourceV1>,
+    path: &str,
+    errors: &mut Vec<ValidationIssue>,
+) {
+    let Some(source) = source else {
+        return;
+    };
+    if source.raw_text.is_empty()
+        || !non_blank(&source.source_block)
+        || source.source_pages.is_empty()
+        || source.source_pages.iter().any(|page| *page == 0)
+    {
+        errors.push(issue(
+            "INVALID_QUESTION_SOURCE",
+            "Imported question source metadata requires raw text, positive source pages, and a source block.",
+            Some(&format!("{path}.source")),
+        ));
+    }
+    let _ = (&source.detected_type, source.needs_review);
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1992,10 +2221,10 @@ fn validate_acceptable_answers(
     path: &str,
     errors: &mut Vec<ValidationIssue>,
 ) {
-    if answers.is_empty() || answers.iter().any(|answer| !non_blank(answer)) {
+    if answers.iter().any(|answer| !non_blank(answer)) {
         errors.push(issue(
             "INVALID_ACCEPTABLE_ANSWERS",
-            "acceptableAnswers must contain at least one non-whitespace answer.",
+            "acceptableAnswers entries must contain non-whitespace text.",
             Some(&format!("{path}.acceptableAnswers")),
         ));
     }

@@ -42,11 +42,58 @@ export const RelativePackPathSchema = z
 
 export const ModuleTypeSchema = z.enum(["reading", "listening", "writing"]);
 
+export const SourcePageRangeSchema = z
+  .object({
+    start: z.number().int().positive(),
+    end: z.number().int().positive(),
+  })
+  .strict()
+  .refine((range) => range.end >= range.start, "Page range end must not precede start");
+
+export const PdfImportMetadataSchema = z
+  .object({
+    sourceFileName: z.string().trim().min(1),
+    sourceFileSize: z.number().int().nonnegative(),
+    sourceSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    sourceFingerprint: z.string().trim().min(1),
+    bookTitle: z.string().trim().min(1),
+    testNumber: z.string().trim().min(1),
+    module: z.literal("reading"),
+    passageNumber: z.number().int().min(1).max(3),
+    passagePageRange: SourcePageRangeSchema,
+    questionPageRange: SourcePageRangeSchema,
+    answerKeyPageRange: SourcePageRangeSchema.optional(),
+    importedAt: IsoUtcDateTimeSchema,
+    extractionMode: z.literal("pdf-text-layer"),
+    parserVersion: z.string().trim().min(1),
+    pageNumberBase: z.literal(1),
+    needsReview: z.boolean(),
+    dedupeKey: z.string().regex(/^[a-f0-9]{64}$/),
+  })
+  .strict();
+
 export const ChoiceOptionSchema = z
   .object({
     id: StableIdSchema,
     label: z.string().trim().min(1).max(16),
     text: z.string().trim().min(1),
+  })
+  .strict();
+
+export const QuestionSourceSchema = z
+  .object({
+    rawText: z.string().min(1),
+    sourcePages: z.array(z.number().int().positive()).min(1),
+    sourceBlock: z.string().trim().min(1),
+    detectedType: z.enum([
+      "single-choice",
+      "true-false-not-given",
+      "short-answer",
+      "fill-blank",
+      "matching-headings",
+      "unsupported",
+    ]),
+    needsReview: z.boolean(),
   })
   .strict();
 
@@ -56,6 +103,7 @@ const questionBaseShape = {
   prompt: z.string().trim().min(1),
   points: z.number().int().positive().default(1),
   explanation: z.string().trim().min(1).optional(),
+  source: QuestionSourceSchema.optional(),
 };
 
 export const SingleChoiceQuestionSchema = z
@@ -63,7 +111,7 @@ export const SingleChoiceQuestionSchema = z
     ...questionBaseShape,
     type: z.literal("single-choice"),
     options: z.array(ChoiceOptionSchema).min(2),
-    correctOptionId: StableIdSchema,
+    correctOptionId: StableIdSchema.optional(),
   })
   .strict();
 
@@ -71,7 +119,7 @@ export const TrueFalseNotGivenQuestionSchema = z
   .object({
     ...questionBaseShape,
     type: z.literal("true-false-not-given"),
-    correctAnswer: z.enum(["true", "false", "not-given"]),
+    correctAnswer: z.enum(["true", "false", "not-given"]).optional(),
   })
   .strict();
 
@@ -79,7 +127,7 @@ export const ShortAnswerQuestionSchema = z
   .object({
     ...questionBaseShape,
     type: z.literal("short-answer"),
-    acceptableAnswers: z.array(z.string().trim().min(1)).min(1),
+    acceptableAnswers: z.array(z.string().trim().min(1)).default([]),
     maxWords: z.number().int().positive().max(20).optional(),
     caseSensitive: z.boolean().default(false),
   })
@@ -90,7 +138,7 @@ export const FillBlankQuestionSchema = z
     ...questionBaseShape,
     type: z.literal("fill-blank"),
     sentence: z.string().trim().min(1),
-    acceptableAnswers: z.array(z.string().trim().min(1)).min(1),
+    acceptableAnswers: z.array(z.string().trim().min(1)).default([]),
     maxWords: z.number().int().positive().max(20).optional(),
     caseSensitive: z.boolean().default(false),
   })
@@ -113,7 +161,7 @@ export const QuestionSchema = z
           message: "Option IDs must be unique within a question",
         });
       }
-      if (!optionIds.includes(question.correctOptionId)) {
+      if (question.correctOptionId !== undefined && !optionIds.includes(question.correctOptionId)) {
         context.addIssue({
           code: "custom",
           path: ["correctOptionId"],
@@ -297,6 +345,7 @@ export const PackManifestSchema = z
     attribution: z.string().trim().min(1).optional(),
     tests: z.array(PackTestDescriptorSchema).min(1),
     mediaAssets: z.array(MediaAssetSchema).default([]),
+    importMetadata: PdfImportMetadataSchema.optional(),
   })
   .strict()
   .superRefine((manifest, context) => {

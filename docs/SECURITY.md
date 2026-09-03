@@ -232,3 +232,13 @@ form-action 'none'
 - CSP/capability 不出现未批准的宽权限。
 
 具体命令和手工验收见 [TESTING.md](TESTING.md)。当前环境缺少 Rust/Cargo/MSVC，因此 Rust、Tauri 与 Windows 打包安全链路尚不能在本机验证；不能把静态代码审阅写成测试通过。
+
+## 12. Reading PDF 辅助导入边界
+
+- 文件必须由用户在当前操作中明确选择；浏览器适配器只持有该 `File` 的内存字节，Tauri 适配器不得获得任意路径读取能力。
+- `pdfjs-dist` 在本机按需处理单页画布和文本层；不加载远程 PDF，不热链，不把文本发送到网络，也不自动执行 OCR。
+- 前端在生成题包前校验 MIME/扩展名、文件大小、页码范围、题目结构和答案文本。超过 50 MB 给出警告；解析错误只显示概括信息，不记录完整试题文本。
+- 源文件身份使用 SHA-256 和有限元数据；不保存绝对路径、百度网盘 token、分享口令或访问凭据。
+- Web/Vite 开发回退把状态放入当前 origin 的 IndexedDB，不使用 `localStorage`。它只用于 renderer 开发与测试，不代替桌面工作区的 SQLite 安全边界。
+- Tauri 的 `install_generated_pack` 只接受完整且经双端校验的 `manifest + modules` 对象，序列化大小上限为 64 MiB，只允许 Reading/Listening/Writing 固定模块名，并只在已校验工作区下创建应用自有暂存目录。安装仍复用现有防覆盖、路径边界和原子安装检查。
+- 真实或私人 PDF、提取文本、页面渲染、数据库和解析缓存由 `.gitignore` 排除；提交前必须同时检查暂存区与已跟踪文件，不能仅依赖扩展名规则。

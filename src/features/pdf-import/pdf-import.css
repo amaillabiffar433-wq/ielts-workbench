@@ -1,0 +1,294 @@
+.pdf-import-page {
+  min-width: 0;
+}
+
+.pdf-import-steps {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.pdf-import-steps li {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: var(--surface-raised);
+  font-size: 0.84rem;
+  font-weight: 650;
+}
+
+.pdf-import-steps li.is-current {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.pdf-import-panel,
+.pdf-preview-panel,
+.pdf-range-panel,
+.pdf-review-panel,
+.pdf-import-complete {
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  background: var(--surface-raised);
+}
+
+.pdf-import-panel {
+  padding: 1rem;
+}
+
+.pdf-drop-zone {
+  display: grid;
+  min-height: 320px;
+  place-items: center;
+  align-content: center;
+  gap: 0.7rem;
+  padding: 2rem;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  text-align: center;
+  transition: border-color 120ms ease, background 120ms ease;
+}
+
+.pdf-drop-zone.is-dragging {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.pdf-drop-zone h2,
+.pdf-drop-zone p {
+  margin: 0;
+}
+
+.pdf-drop-zone p {
+  max-width: 560px;
+  color: var(--text-secondary);
+}
+
+.pdf-page-layout {
+  display: grid;
+  grid-template-columns: minmax(460px, 1.2fr) minmax(340px, 0.8fr);
+  gap: 1rem;
+  min-height: 0;
+}
+
+.pdf-preview-panel {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.pdf-preview-panel > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.8rem 1rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.pdf-preview-panel > header > div:first-child {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.pdf-preview-panel > header strong,
+.pdf-preview-panel > header span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-preview-panel > header span {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+}
+
+.pdf-page-controls,
+.pdf-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.pdf-canvas-frame {
+  display: grid;
+  max-height: 68vh;
+  padding: 1rem;
+  overflow: auto;
+  place-items: start center;
+  background: var(--surface-canvas);
+}
+
+.pdf-canvas-frame canvas {
+  max-width: 100%;
+  height: auto !important;
+  background: white;
+  box-shadow: var(--shadow-float);
+}
+
+.pdf-range-panel,
+.pdf-review-panel {
+  display: grid;
+  align-content: start;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.pdf-range-panel h2,
+.pdf-range-panel p,
+.pdf-question-list h2,
+.pdf-question-list p {
+  margin: 0;
+}
+
+.pdf-range-panel > p,
+.pdf-question-list header p {
+  color: var(--text-secondary);
+  font-size: 0.84rem;
+}
+
+.pdf-text-preview {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.pdf-text-preview h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.95rem;
+}
+
+.pdf-text-preview pre,
+.pdf-question-editor details pre {
+  max-height: 180px;
+  margin: 0;
+  padding: 0.7rem;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+}
+
+.pdf-range-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.pdf-range-grid fieldset {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.pdf-range-grid label,
+.pdf-range-panel > label,
+.pdf-metadata-grid label,
+.pdf-passage-editor,
+.pdf-answer-editor label,
+.pdf-question-editor label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  font-weight: 620;
+}
+
+.pdf-range-grid input,
+.pdf-range-panel select,
+.pdf-metadata-grid input,
+.pdf-question-editor input,
+.pdf-question-editor select,
+.pdf-question-editor textarea,
+.pdf-passage-editor textarea,
+.pdf-answer-editor textarea {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  background: var(--surface-base);
+  font: inherit;
+}
+
+.pdf-metadata-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.pdf-answer-editor,
+.pdf-question-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.pdf-question-editor {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.9rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-base);
+}
+
+.pdf-question-editor__head {
+  display: grid;
+  grid-template-columns: 90px minmax(220px, 1fr) auto;
+  align-items: end;
+  gap: 0.8rem;
+}
+
+.pdf-question-editor .pdf-review-check {
+  display: flex;
+  align-items: center;
+  padding-bottom: 0.55rem;
+}
+
+.pdf-question-editor .pdf-review-check input {
+  width: auto;
+}
+
+.pdf-import-complete {
+  display: grid;
+  min-height: 300px;
+  place-items: center;
+  align-content: center;
+  gap: 0.8rem;
+  padding: 2rem;
+  text-align: center;
+}
+
+.pdf-import-complete h2,
+.pdf-import-complete p {
+  margin: 0;
+}
+
+.pdf-import-complete p {
+  color: var(--text-secondary);
+}
+
+@media (max-width: 1050px) {
+  .pdf-page-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pdf-range-grid,
+  .pdf-metadata-grid {
+    grid-template-columns: 1fr;
+  }
+}

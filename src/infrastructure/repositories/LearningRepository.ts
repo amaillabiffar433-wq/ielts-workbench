@@ -303,6 +303,7 @@ export interface LearningRepository {
   loadPack(packId: string): Promise<IELTSPack | null>;
   validatePackFolder(path: string): Promise<PackValidationReport>;
   installPack(path: string): Promise<InstalledPackSummary>;
+  installImportedPack(pack: IELTSPack): Promise<InstalledPackSummary>;
   readPackMedia(packId: string, relativePath: string): Promise<Uint8Array<ArrayBuffer>>;
 
   createSession(input: CreateSessionInput): Promise<SessionSnapshot>;

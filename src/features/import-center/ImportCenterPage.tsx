@@ -326,15 +326,20 @@ export function ImportCenterPage() {
         <aside aria-labelledby="unsupported-import-title" className="unsupported-import-panel">
           <div className="import-panel-heading">
             <div>
-              <span className="import-panel-eyebrow">LATER PHASES</span>
-              <h2 id="unsupported-import-title">其他格式</h2>
+              <span className="import-panel-eyebrow">ASSISTED IMPORT</span>
+              <h2 id="unsupported-import-title">文档来源</h2>
             </div>
           </div>
-          <p>下列入口仅说明路线，不会在本轮读取、上传或解析文件。</p>
+          <p>Reading PDF 已提供本地文本层提取；扫描件 OCR 与其他格式仍保持关闭。</p>
           <ul className="unsupported-import-list">
             <li>
               <FileText aria-hidden="true" size={18} />
-              <div><strong>PDF / DOCX</strong><span>规则提取与人工校正尚未实现</span></div>
+              <div><strong>Reading PDF</strong><span>页面预览、范围选择、规则提取与人工校正</span></div>
+              <Link className="button" to="/import/pdf">导入 PDF</Link>
+            </li>
+            <li>
+              <FileText aria-hidden="true" size={18} />
+              <div><strong>DOCX</strong><span>后续接入同一文档来源适配器</span></div>
               <button className="button" disabled type="button">暂不可用</button>
             </li>
             <li>

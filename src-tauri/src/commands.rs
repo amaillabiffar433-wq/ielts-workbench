@@ -241,6 +241,16 @@ pub fn install_pack(
 }
 
 #[tauri::command]
+pub fn install_generated_pack(
+    state: State<'_, AppBackend>,
+    pack: Value,
+) -> CommandResult<InstalledPackRecord> {
+    let _guard = state.lock_mutation().map_err(CommandError::from)?;
+    let (workspace, connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    packs::install_generated_pack(&workspace, &connection, pack).map_err(Into::into)
+}
+
+#[tauri::command]
 pub fn read_pack_media(
     state: State<'_, AppBackend>,
     pack_id: String,

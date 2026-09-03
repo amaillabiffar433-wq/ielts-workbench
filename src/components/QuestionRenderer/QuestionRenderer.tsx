@@ -12,21 +12,24 @@ export type QuestionRendererProps = {
 };
 
 function CorrectAnswer({ question }: { question: Question }) {
-  let answer: string;
+  let answer: string | null;
 
   switch (question.type) {
     case "single-choice":
-      answer = question.options.find((option) => option.id === question.correctOptionId)?.text ?? question.correctOptionId;
+      answer = question.correctOptionId
+        ? question.options.find((option) => option.id === question.correctOptionId)?.text ?? question.correctOptionId
+        : null;
       break;
     case "true-false-not-given":
-      answer = question.correctAnswer.replace("not-given", "Not Given");
+      answer = question.correctAnswer?.replace("not-given", "Not Given") ?? null;
       break;
     case "short-answer":
     case "fill-blank":
-      answer = question.acceptableAnswers.join(" / ");
+      answer = question.acceptableAnswers.length > 0 ? question.acceptableAnswers.join(" / ") : null;
       break;
   }
 
+  if (!answer) return <p className="question__answer-key">参考答案尚未录入，请人工核对。</p>;
   return <p className="question__answer-key">参考答案：{answer}</p>;
 }
 
@@ -53,6 +56,9 @@ export function QuestionRenderer({
       <div className="question__number" aria-hidden="true">{question.number}</div>
       <div className="question__body">
         <p className="question__prompt" id={legendId}>{question.prompt}</p>
+        {question.source?.needsReview && (
+          <span className="question__review-badge">待完善题型 · 保留原始提取文本</span>
+        )}
         {question.type === "single-choice" && (
           <fieldset aria-labelledby={legendId} className="question__options" disabled={disabled}>
             <legend className="sr-only">选择一个答案</legend>

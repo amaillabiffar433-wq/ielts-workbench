@@ -38,6 +38,7 @@ pub fn run() {
             commands::list_writing_versions,
             commands::validate_pack_folder,
             commands::install_pack,
+            commands::install_generated_pack,
             commands::read_pack_media,
         ])
         .run(tauri::generate_context!())

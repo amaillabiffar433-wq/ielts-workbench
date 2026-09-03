@@ -407,9 +407,27 @@ Draft 对 `(sessionId, taskId)` upsert；Version 只能 insert/list。自动保�
 
 索引覆盖 Session 恢复、Annotation block 查询、Writing version 时间线和词汇规范化检索。字段的最终名称与 CHECK 定义以迁移 SQL 为准，不在本文复制第二份可能漂移的 DDL。
 
-## 8. 演进规则
+## 8. PDF 导入来源元数据
 
-- 题包格式变化必须提升 `schemaVersion`，不能原地改变 v1 含义。
+PDF 辅助导入只生成现有 `IELTSPack`，不建立平行数据库。为保持旧题包兼容，v1 增加的字段均为可选字段：旧 demo 和既有用户题包无需补写即可继续通过校验。
+
+`manifest.importMetadata` 记录导入来源：源文件名、字节数、SHA-256 指纹、资料名、Test/Passage、1-based inclusive 的 Passage/Questions/Answer Key 页码范围、导入时间、提取方式、解析器版本、页码基准、复核状态和去重键。绝对路径和网盘 token 不属于该结构。
+
+`question.source` 记录：
+
+- `rawText`：识别前的题目文本，避免暂不支持的题型丢失内容；
+- `sourcePages`：1-based inclusive 来源页范围；
+- `sourceBlock`：稳定的解析块标识，而不是 DOM、Pane 或像素坐标；
+- `detectedType`：识别出的题型或 `unsupported`；
+- `needsReview`：题型、选项或答案仍需人工确认。
+
+导入题目的标准答案可以暂缺：`single-choice.correctOptionId` 与 `true-false-not-given.correctAnswer` 为可选，简答/填空的 `acceptableAnswers` 可以为空。缺答案表示“未评分/待核对”，不是错误答案；Review 不得据此把用户作答标红。导入后题包仍然只读，实际答案记录和标记仍由 Session/SQLite 所有。
+
+生成题包在 Tauri 中先写入工作区 `imports/.install-generated-*` 的应用自有暂存目录，只包含 `manifest.json` 和一个 Reading 模块，再复用现有校验与安装事务。重复 pack ID 或去重键不覆盖既有题包。
+
+## 9. 演进规则
+
+- 会改变既有字段含义、必填性或读取行为的题包格式变化必须提升 `schemaVersion`。只增加可选、可忽略的来源元数据时可保持 v1，但必须保留旧数据回归测试并同步 Rust/TypeScript 校验器。
 - 数据库结构变化必须新增迁移，不能修改已发布迁移。
 - 破坏性迁移前先备份工作区数据库；若备份失败则中止。
 - 新版本读取旧锚点时必须保留显式 unresolved 状态。

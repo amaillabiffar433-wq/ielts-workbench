@@ -387,6 +387,13 @@ export class TauriLearningRepository implements LearningRepository {
     );
   }
 
+  async installImportedPack(packInput: IELTSPack): Promise<InstalledPackSummary> {
+    const pack = parseIeltsPack(packInput);
+    return mapInstalledPack(
+      await this.invokeCommand("install_generated_pack", { pack }),
+    );
+  }
+
   async readPackMedia(packId: string, relativePath: string): Promise<Uint8Array<ArrayBuffer>> {
     const validatedPackId = StableIdSchema.parse(packId);
     const validatedRelativePath = RelativePackPathSchema.parse(relativePath);

@@ -11,7 +11,7 @@
 | Node.js | `v24.14.0` | 可运行 npm/TypeScript 工具 |
 | npm | `11.9.0` | 可安装锁定依赖并运行 scripts |
 | Git | `2.54.0.windows.1` | 可用 |
-| WebView2 Runtime | `151.0.4129.107` | 桌面 WebView 前置项可用 |
+| WebView2 Runtime | `152.0.4191.53` | 桌面 WebView 前置项可用 |
 | `rustc` | 不在 PATH | Rust 编译/测试阻塞 |
 | `cargo` | 不在 PATH | Tauri dev/build 阻塞 |
 | MSVC C++ toolchain / Windows SDK | 未检测到可用组合 | Windows Tauri 链接/打包阻塞 |
@@ -244,3 +244,27 @@ npm run tauri build
 8. 交付报告列出真实命令/结果、未完成项和风险。
 
 因 Rust/MSVC 缺失而暂时不能运行桌面链路时，可以完成并报告未阻塞的 TypeScript、源码和文档工作，但该功能仍应标记为“Rust/Tauri 未验证”，而不是“已完成”。
+
+## 9. Reading PDF 辅助导入回归
+
+新增自动化测试必须使用极短原创文本或人工构造的 `File`/页面对象，不提交私人 PDF。覆盖范围包括：
+
+- PDF 文件类型、文件大小提示和 1-based inclusive 页码范围；
+- 定位文本片段合并、Passage 标题/正文、题号与选项识别；
+- `TRUE/FALSE/NOT GIVEN`、单项选择、简答/填空与 unsupported 回退；
+- Answer Key 按题号解析、无法解析行保留；
+- SHA-256、导入 manifest、来源页/原始块保留与重复导入检测；
+- 无答案键时老数据/导入数据兼容，Review 显示未评分；
+- repository 安装、IndexedDB 快照恢复和 Tauri `install_generated_pack` 调用契约；
+- 导入向导的文件拒绝、提取、人工答案应用与成功入口。
+
+本轮人工 PDF 样本 `local-data/import-samples/original-reading-pdf-mvp.pdf` 为三页原创材料。每次需要真实文件验收时执行：
+
+```powershell
+pdfinfo local-data/import-samples/original-reading-pdf-mvp.pdf
+pdftotext -layout local-data/import-samples/original-reading-pdf-mvp.pdf tmp/pdfs/original-reading-pdf-mvp.txt
+pdftoppm -png -r 144 local-data/import-samples/original-reading-pdf-mvp.pdf output/pdf/original-reading-pdf-mvp-page
+Get-FileHash -Algorithm SHA256 local-data/import-samples/original-reading-pdf-mvp.pdf
+```
+
+所有渲染页都要目视检查截断、重叠和不可读字符。随后在 Vite 页面完成：载入 PDF → 单页预览 → 选择页 1/2/3 → 提取与人工校正 → 应用答案 → 导入 → Reading 作答/标记 → 刷新恢复 → 原创 demo 回归。关闭本地开发服务后才算 smoke test 收尾。

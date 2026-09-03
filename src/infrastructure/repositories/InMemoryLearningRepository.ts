@@ -46,12 +46,30 @@ import {
 export interface InMemoryLearningRepositoryOptions {
   readonly workspace?: WorkspaceSummary | null;
   readonly packs?: readonly IELTSPack[];
+  readonly packInstalledAt?: Readonly<Record<string, string>>;
   readonly sessions?: readonly SessionSnapshot[];
   readonly settings?: Readonly<Record<string, string>>;
+  readonly drafts?: readonly WritingDraft[];
+  readonly writingVersions?: readonly WritingVersion[];
   readonly packFolders?: Readonly<Record<string, IELTSPack>>;
   readonly media?: Readonly<Record<string, Uint8Array<ArrayBufferLike>>>;
   readonly now?: () => Date;
   readonly idFactory?: () => string;
+  readonly stateStore?: InMemoryRepositoryStateStore;
+}
+
+export interface InMemoryRepositorySnapshot {
+  readonly packs: readonly IELTSPack[];
+  readonly packInstalledAt: Readonly<Record<string, string>>;
+  readonly sessions: readonly SessionSnapshot[];
+  readonly settings: Readonly<Record<string, string>>;
+  readonly drafts: readonly WritingDraft[];
+  readonly writingVersions: readonly WritingVersion[];
+}
+
+export interface InMemoryRepositoryStateStore {
+  load(): Promise<InMemoryRepositorySnapshot | null>;
+  save(snapshot: InMemoryRepositorySnapshot): Promise<void>;
 }
 
 function normalizeFolderKey(path: string): string {
@@ -121,16 +139,22 @@ export class InMemoryLearningRepository implements LearningRepository {
   private readonly media = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly now: () => Date;
   private readonly idFactory: () => string;
+  private readonly stateStore?: InMemoryRepositoryStateStore;
+  private hydrationPromise: Promise<void> | null = null;
 
   constructor(options: InMemoryLearningRepositoryOptions = {}) {
     this.workspace = options.workspace === undefined ? null : cloneJson(options.workspace);
     this.now = options.now ?? (() => new Date());
     this.idFactory = options.idFactory ?? defaultIdFactory;
+    this.stateStore = options.stateStore;
 
     for (const packInput of options.packs ?? []) {
       const pack = parseIeltsPack(cloneJson(packInput));
       this.packs.set(pack.manifest.id, pack);
-      this.packInstalledAt.set(pack.manifest.id, pack.manifest.createdAt);
+      this.packInstalledAt.set(
+        pack.manifest.id,
+        options.packInstalledAt?.[pack.manifest.id] ?? pack.manifest.createdAt,
+      );
     }
     for (const session of options.sessions ?? []) {
       this.sessions.set(session.sessionId, deepFreeze(cloneJson(session)));
@@ -138,12 +162,59 @@ export class InMemoryLearningRepository implements LearningRepository {
     for (const [key, value] of Object.entries(options.settings ?? {})) {
       this.settings.set(key, value);
     }
+    for (const draft of options.drafts ?? []) {
+      this.drafts.set(`${draft.sessionId}\u0000${draft.taskId}`, deepFreeze(cloneJson(draft)));
+    }
+    for (const version of options.writingVersions ?? []) {
+      const key = `${version.sessionId}\u0000${version.taskId}`;
+      this.writingVersions.set(key, [
+        ...(this.writingVersions.get(key) ?? []),
+        deepFreeze(cloneJson(version)),
+      ]);
+    }
     for (const [folder, packInput] of Object.entries(options.packFolders ?? {})) {
       this.packFolders.set(normalizeFolderKey(folder), parseIeltsPack(cloneJson(packInput)));
     }
     for (const [key, bytes] of Object.entries(options.media ?? {})) {
       this.media.set(key, new Uint8Array(bytes));
     }
+  }
+
+  private async ensureHydrated(): Promise<void> {
+    if (!this.stateStore) return;
+    this.hydrationPromise ??= (async () => {
+      const snapshot = await this.stateStore!.load();
+      if (!snapshot) return;
+      for (const packInput of snapshot.packs) {
+        const pack = parseIeltsPack(cloneJson(packInput));
+        this.packs.set(pack.manifest.id, pack);
+        this.packInstalledAt.set(
+          pack.manifest.id,
+          snapshot.packInstalledAt[pack.manifest.id] ?? pack.manifest.createdAt,
+        );
+      }
+      for (const session of snapshot.sessions) {
+        this.sessions.set(session.sessionId, deepFreeze(cloneJson(session)));
+      }
+      for (const [key, value] of Object.entries(snapshot.settings)) {
+        this.settings.set(key, value);
+      }
+      for (const draft of snapshot.drafts) {
+        this.drafts.set(`${draft.sessionId}\u0000${draft.taskId}`, deepFreeze(cloneJson(draft)));
+      }
+      for (const version of snapshot.writingVersions) {
+        const key = `${version.sessionId}\u0000${version.taskId}`;
+        this.writingVersions.set(key, [
+          ...(this.writingVersions.get(key) ?? []),
+          deepFreeze(cloneJson(version)),
+        ]);
+      }
+    })();
+    await this.hydrationPromise;
+  }
+
+  private async persist(): Promise<void> {
+    if (this.stateStore) await this.stateStore.save(this.snapshot());
   }
 
   static withOriginalDemo(options: Omit<InMemoryLearningRepositoryOptions, "packs" | "packFolders" | "media"> = {}) {
@@ -158,6 +229,7 @@ export class InMemoryLearningRepository implements LearningRepository {
   }
 
   async getBootstrapState(): Promise<BootstrapState> {
+    await this.ensureHydrated();
     const installedPacks = await this.listInstalledPacks();
     const recentSessions = await this.listRecentSessions();
     return BootstrapStateSchema.parse({
@@ -172,6 +244,7 @@ export class InMemoryLearningRepository implements LearningRepository {
   }
 
   async initializeWorkspace(path: string): Promise<BootstrapState> {
+    await this.ensureHydrated();
     const normalized = path.trim().replace(/[\\/]+$/, "");
     if (normalized === "") {
       throw new Error("Workspace path cannot be empty");
@@ -184,6 +257,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       databasePath: `${normalized}${separator}ielts-workbench.sqlite3`,
       initializedAt: this.now().toISOString(),
     });
+    await this.persist();
     return this.getBootstrapState();
   }
 
@@ -223,6 +297,7 @@ export class InMemoryLearningRepository implements LearningRepository {
   }
 
   async installPack(path: string): Promise<InstalledPackSummary> {
+    await this.ensureHydrated();
     const pack = this.packFolders.get(normalizeFolderKey(path));
     if (!pack) {
       throw new Error(`Pack folder is not available in memory: ${path}`);
@@ -233,6 +308,20 @@ export class InMemoryLearningRepository implements LearningRepository {
     const installedAt = this.now().toISOString();
     this.packs.set(pack.manifest.id, pack);
     this.packInstalledAt.set(pack.manifest.id, installedAt);
+    await this.persist();
+    return cloneJson(toPackSummary(pack, installedAt));
+  }
+
+  async installImportedPack(packInput: IELTSPack): Promise<InstalledPackSummary> {
+    await this.ensureHydrated();
+    const pack = parseIeltsPack(cloneJson(packInput));
+    if (this.packs.has(pack.manifest.id)) {
+      throw new Error(`Pack is already installed: ${pack.manifest.id}`);
+    }
+    const installedAt = this.now().toISOString();
+    this.packs.set(pack.manifest.id, pack);
+    this.packInstalledAt.set(pack.manifest.id, installedAt);
+    await this.persist();
     return cloneJson(toPackSummary(pack, installedAt));
   }
 
@@ -250,6 +339,7 @@ export class InMemoryLearningRepository implements LearningRepository {
   }
 
   async createSession(input: CreateSessionInput): Promise<SessionSnapshot> {
+    await this.ensureHydrated();
     const validated = CreateSessionInputSchema.parse(input);
     const pack = this.packs.get(validated.packId);
     if (!pack) {
@@ -285,6 +375,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       annotations: [],
     });
     this.sessions.set(sessionId, snapshot);
+    await this.persist();
     return deepFreeze(cloneJson(snapshot));
   }
 
@@ -318,6 +409,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       updatedAt: timestamp,
     });
     this.sessions.set(validatedSessionId, submitted);
+    await this.persist();
     return deepFreeze(cloneJson(submitted));
   }
 
@@ -347,6 +439,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       updatedAt: answer.updatedAt,
     });
     this.sessions.set(validated.sessionId, nextSession);
+    await this.persist();
     return deepFreeze(cloneJson(answer));
   }
 
@@ -380,6 +473,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       validated.sessionId,
       deepFreeze({ ...session, annotations, updatedAt: timestamp }),
     );
+    await this.persist();
     return deepFreeze(cloneJson(annotation));
   }
 
@@ -399,6 +493,7 @@ export class InMemoryLearningRepository implements LearningRepository {
           updatedAt: this.now().toISOString(),
         }),
       );
+      await this.persist();
       return;
     }
   }
@@ -412,6 +507,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       throw new Error("Setting key cannot be empty");
     }
     this.settings.set(key, value);
+    await this.persist();
   }
 
   async loadWritingDraft(sessionId: string, taskId: string): Promise<WritingDraft | null> {
@@ -436,6 +532,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       updatedAt: this.now().toISOString(),
     });
     this.drafts.set(`${validated.sessionId}\u0000${validated.taskId}`, draft);
+    await this.persist();
     return deepFreeze(cloneJson(draft));
   }
 
@@ -459,6 +556,7 @@ export class InMemoryLearningRepository implements LearningRepository {
     });
     const key = `${validated.sessionId}\u0000${validated.taskId}`;
     this.writingVersions.set(key, [...(this.writingVersions.get(key) ?? []), version]);
+    await this.persist();
     return deepFreeze(cloneJson(version));
   }
 
@@ -466,6 +564,17 @@ export class InMemoryLearningRepository implements LearningRepository {
     return (this.writingVersions.get(`${sessionId}\u0000${taskId}`) ?? [])
       .map((version) => cloneJson(version))
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  }
+
+  snapshot(): InMemoryRepositorySnapshot {
+    return deepFreeze({
+      packs: [...this.packs.values()].map((pack) => cloneJson(pack)),
+      packInstalledAt: Object.fromEntries(this.packInstalledAt),
+      sessions: [...this.sessions.values()].map((session) => cloneJson(session)),
+      settings: Object.fromEntries(this.settings),
+      drafts: [...this.drafts.values()].map((draft) => cloneJson(draft)),
+      writingVersions: [...this.writingVersions.values()].flat().map((version) => cloneJson(version)),
+    });
   }
 }
 

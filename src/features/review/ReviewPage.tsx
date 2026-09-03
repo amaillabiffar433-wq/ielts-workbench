@@ -19,8 +19,8 @@ function normalize(value: string): string {
 
 function correctAnswers(question: Question): string[] {
   switch (question.type) {
-    case "single-choice": return [question.correctOptionId];
-    case "true-false-not-given": return [question.correctAnswer];
+    case "single-choice": return question.correctOptionId ? [question.correctOptionId] : [];
+    case "true-false-not-given": return question.correctAnswer ? [question.correctAnswer] : [];
     case "short-answer":
     case "fill-blank": return [...question.acceptableAnswers];
   }
@@ -28,10 +28,12 @@ function correctAnswers(question: Question): string[] {
 
 function displayCorrectAnswer(question: Question): string {
   if (question.type === "single-choice") {
-    return question.options.find((option) => option.id === question.correctOptionId)?.text ?? question.correctOptionId;
+    return question.correctOptionId
+      ? question.options.find((option) => option.id === question.correctOptionId)?.text ?? question.correctOptionId
+      : "尚未录入，请人工核对";
   }
-  if (question.type === "true-false-not-given") return question.correctAnswer.replace("not-given", "Not Given");
-  return question.acceptableAnswers.join(" / ");
+  if (question.type === "true-false-not-given") return question.correctAnswer?.replace("not-given", "Not Given") ?? "尚未录入，请人工核对";
+  return question.acceptableAnswers.join(" / ") || "尚未录入，请人工核对";
 }
 
 export function ReviewPage() {
@@ -78,9 +80,12 @@ export function ReviewPage() {
   const results = useMemo(() => questions.map((question) => {
     const record = session ? Object.values(answers).find((answer) => answer.sessionId === session.sessionId && answer.questionId === question.id) : undefined;
     const userAnswer = typeof record?.value === "string" ? record.value : record?.value.join(", ") ?? "";
+    const knownAnswers = correctAnswers(question);
     const status = !userAnswer.trim()
       ? "unanswered" as const
-      : correctAnswers(question).some((answer) => normalize(answer) === normalize(userAnswer))
+      : knownAnswers.length === 0
+        ? "unscored" as const
+        : knownAnswers.some((answer) => normalize(answer) === normalize(userAnswer))
         ? "correct" as const
         : "incorrect" as const;
     return { question, userAnswer, status };
@@ -161,6 +166,7 @@ export function ReviewPage() {
   const correct = results.filter((result) => result.status === "correct").length;
   const incorrect = results.filter((result) => result.status === "incorrect").length;
   const unanswered = results.filter((result) => result.status === "unanswered").length;
+  const unscored = results.filter((result) => result.status === "unscored").length;
   const route = buildPracticeRoute(session.moduleType, { identity: sessionIdentity, mode: "study" });
 
   return (
@@ -180,6 +186,7 @@ export function ReviewPage() {
         <article><CheckCircle2 aria-hidden="true" /><div><strong>{correct}</strong><span>正确</span></div></article>
         <article><AlertCircle aria-hidden="true" /><div><strong>{incorrect}</strong><span>错误</span></div></article>
         <article><CircleDashed aria-hidden="true" /><div><strong>{unanswered}</strong><span>未答</span></div></article>
+        <article><CircleDashed aria-hidden="true" /><div><strong>{unscored}</strong><span>待核对</span></div></article>
         <article><Highlighter aria-hidden="true" /><div><strong>{annotations.length}</strong><span>阅读标记</span></div></article>
         <article><FileClock aria-hidden="true" /><div><strong>{writingVersionCount}</strong><span>写作版本</span></div></article>
       </div>
@@ -199,7 +206,7 @@ export function ReviewPage() {
               <div>
                 <div className="review-answer__status">
                   {status === "correct" ? <CheckCircle2 aria-hidden="true" size={15} /> : status === "incorrect" ? <AlertCircle aria-hidden="true" size={15} /> : <CircleDashed aria-hidden="true" size={15} />}
-                  {status === "correct" ? "正确" : status === "incorrect" ? "错误" : "未答"}
+                  {status === "correct" ? "正确" : status === "incorrect" ? "错误" : status === "unscored" ? "待核对" : "未答"}
                   {session.moduleType === "listening" && status === "incorrect" && <Headphones aria-hidden="true" size={14} />}
                 </div>
                 <p className="review-answer__prompt">{question.prompt}</p>

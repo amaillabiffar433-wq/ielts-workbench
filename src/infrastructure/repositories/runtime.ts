@@ -1,5 +1,6 @@
 import { originalDemoPack } from "../demo";
 import { InMemoryLearningRepository } from "./InMemoryLearningRepository";
+import { createIndexedDbLearningStateStore } from "./IndexedDbLearningStateStore";
 import type { LearningRepository } from "./LearningRepository";
 import { TauriLearningRepository } from "./TauriLearningRepository";
 
@@ -20,6 +21,7 @@ export function createLearningRepository(): LearningRepository {
   }
 
   return InMemoryLearningRepository.withOriginalDemo({
+    stateStore: createIndexedDbLearningStateStore(),
     workspace: {
       path: "memory://ielts-workbench-demo",
       id: "memory-demo-workspace",

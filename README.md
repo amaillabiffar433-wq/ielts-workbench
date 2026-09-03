@@ -13,6 +13,7 @@ IELTS Workbench 是一个 Windows 优先、local-first / offline-first 的 IELTS
 - 工作区内的 SQLite 迁移与持久化；
 - `IELTSPack v1` schema 与原创 demo pack；
 - Library 和安全的 JSON 文件夹导入入口；
+- Reading PDF 半自动导入：单页预览、文本层提取、页码范围、人工校正、答案粘贴和去重；
 - Reading 双 Pane，以及跨 Pane 共享的答案与文字标记；
 - Listening 本地音频与基础答题；
 - Writing 草稿自动保存、手动版本和提交快照；
@@ -57,7 +58,7 @@ React / TypeScript UI
 - Microsoft Edge WebView2 Runtime；
 - Git。
 
-2026-09-01 的当前机器检查结果：Node.js `v24.14.0`、npm `11.9.0`、Git `2.54.0.windows.1` 与 WebView2 `151.0.4129.107` 可用；`rustc`/`cargo` 不在 PATH，且未检测到可用的 MSVC C++ toolchain。因此当前环境不能验证 Rust 测试、`tauri dev` 或 Tauri 安装包。此处是环境事实，不是构建成功声明。
+2026-09-03 的当前机器检查结果：Node.js `v24.14.0`、npm `11.9.0`、Git `2.54.0.windows.1` 与 WebView2 `152.0.4191.53` 可用；`rustc`/`cargo`/`rustup` 不在 PATH，且未检测到可用的 MSVC C++ toolchain 与 Windows SDK。因此当前环境不能验证 Rust 测试、`tauri dev` 或 Tauri 安装包。详细安装与复核步骤见 [Windows Tauri 2 环境准备](docs/TAURI_WINDOWS_SETUP.md)。此处是环境事实，不是构建成功声明。
 
 不要为本项目更改全局 npm/Rust 配置，也不要未经用户许可自动安装系统级依赖。补齐工具链后可检查：
 
@@ -124,6 +125,10 @@ IELTS-Workbench-Data/
 
 固定文件名的 v1 明确限定为每个 Pack 一个 Test、每种类型最多一个 Module；多 Test 将通过后续 schema 版本和显式文件映射引入，避免当前 UI/文件解析产生歧义。
 
+## Reading PDF 辅助导入
+
+Import Center 的“导入 Reading PDF”入口支持浏览器文件选择和拖放。当前 MVP 按需渲染单页、读取原生文本层，并让用户确认 1-based Passage/Questions/Answer Key 页码范围，再人工校正结构和答案。浏览器开发模式通过 IndexedDB 验证刷新恢复；Tauri 模式沿用 Rust 工作区与原生题包安装边界。扫描版不做 OCR，复杂题型保留原文并回退为待人工整理的文本输入。完整说明见 [PDF_IMPORT_MVP.md](docs/PDF_IMPORT_MVP.md)。
+
 ## 项目结构
 
 ```text
@@ -150,6 +155,8 @@ REFERENCE_AUDIT.md    仅供行为参考的候选项目审计
 - [题包、用户状态与 SQLite 格式](docs/DATA_FORMAT.md)
 - [安全与隐私模型](docs/SECURITY.md)
 - [测试与手工验收](docs/TESTING.md)
+- [Reading PDF 辅助导入 MVP](docs/PDF_IMPORT_MVP.md)
+- [Windows Tauri 2 环境准备](docs/TAURI_WINDOWS_SETUP.md)
 - [ADR 0001：采用 Tauri 2](docs/decisions/0001-use-tauri-2.md)
 - [ADR 0002：题包与用户状态分离](docs/decisions/0002-separate-pack-and-user-state.md)
 - [ADR 0003：主数据库位于用户工作区](docs/decisions/0003-workspace-owned-database.md)
