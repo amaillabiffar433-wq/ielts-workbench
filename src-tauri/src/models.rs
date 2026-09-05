@@ -241,3 +241,12 @@ pub struct PackMediaPayload {
     pub byte_length: u64,
     pub base64: String,
 }
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SelectedPdfPayload {
+    pub file_name: String,
+    pub mime_type: String,
+    pub byte_length: u64,
+    pub base64: String,
+}

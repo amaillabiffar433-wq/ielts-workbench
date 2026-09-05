@@ -15,7 +15,8 @@
           "title": "Community workshop attendance",
           "prompt": "The table below shows attendance at three fictional community workshops in Alderwick. Repair café: January 42, February 55, March 61. Seed exchange: January 68, February 64, March 79. Bicycle skills: January 35, February 47, March 46. Summarise the information by selecting and reporting the main features, and make comparisons where relevant.",
           "minimumWords": 150,
-          "suggestedMinutes": 20
+          "suggestedMinutes": 20,
+          "imageAssetId": "demo-writing-chart-01"
         },
         {
           "id": "demo-writing-task-02",

@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import { createTextAnchor } from "../../domain";
-import { ORIGINAL_DEMO_AUDIO_PATH, ORIGINAL_DEMO_PACK_FOLDER } from "../demo";
+import {
+  ORIGINAL_DEMO_AUDIO_PATH,
+  ORIGINAL_DEMO_PACK_FOLDER,
+  ORIGINAL_DEMO_WRITING_CHART_PATH,
+} from "../demo";
 import { InMemoryLearningRepository } from "./InMemoryLearningRepository";
 import type { SessionSnapshot } from "./LearningRepository";
 
@@ -74,10 +78,20 @@ describe("InMemoryLearningRepository", () => {
 
     const first = await repository.readPackMedia("original-demo-pack", ORIGINAL_DEMO_AUDIO_PATH);
     const second = await repository.readPackMedia("original-demo-pack", ORIGINAL_DEMO_AUDIO_PATH);
-    expect(first.byteLength).toBe(64_044);
+    expect(first.byteLength).toBe(128_044);
     expect(new TextDecoder().decode(first.slice(0, 4))).toBe("RIFF");
+    const audioDigest = [...new Uint8Array(await crypto.subtle.digest("SHA-256", first))]
+      .map((value) => value.toString(16).padStart(2, "0"))
+      .join("");
+    expect(audioDigest).toBe("86d7c2cd3128a2dd61f097b082201a9d0e91d3f989ecc086f62b55c194140ce6");
     first[0] = 0;
     expect(new TextDecoder().decode(second.slice(0, 4))).toBe("RIFF");
+
+    const chart = await repository.readPackMedia(
+      "original-demo-pack",
+      ORIGINAL_DEMO_WRITING_CHART_PATH,
+    );
+    expect([...chart.slice(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   });
 
   it("rejects an install when the pack ID is already installed", async () => {

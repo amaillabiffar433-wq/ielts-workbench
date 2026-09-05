@@ -40,6 +40,7 @@ pub fn run() {
             commands::install_pack,
             commands::install_generated_pack,
             commands::read_pack_media,
+            commands::select_pdf_file,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run IELTS Workbench");

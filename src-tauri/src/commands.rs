@@ -1,6 +1,10 @@
+use std::{fs, path::Path};
+
+use base64::{engine::general_purpose::STANDARD, Engine as _};
 use rusqlite::Connection;
 use serde_json::Value;
-use tauri::State;
+use tauri::{AppHandle, State};
+use tauri_plugin_dialog::DialogExt;
 
 use crate::{
     backend::AppBackend,
@@ -9,14 +13,90 @@ use crate::{
         AnnotationRecord, AnswerRecord, BootstrapState, CreateSessionInput,
         CreateWritingVersionInput, InstalledPackRecord, LoadedPack, PackMediaPayload,
         PackValidationReport, PracticeSessionRecord, SaveAnnotationInput, SaveAnswerInput,
-        SaveWritingDraftInput, SessionSnapshot, SettingRecord, WorkspaceInfo, WritingDraftRecord,
-        WritingVersionRecord,
+        SaveWritingDraftInput, SelectedPdfPayload, SessionSnapshot, SettingRecord, WorkspaceInfo,
+        WritingDraftRecord, WritingVersionRecord,
     },
     packs,
     storage::repositories,
 };
 
 type CommandResult<T> = std::result::Result<T, CommandError>;
+
+const MAX_SELECTED_PDF_BYTES: u64 = 64 * 1024 * 1024;
+
+#[tauri::command]
+pub async fn select_pdf_file(app: AppHandle) -> CommandResult<Option<SelectedPdfPayload>> {
+    let selected = app
+        .dialog()
+        .file()
+        .add_filter("PDF", &["pdf"])
+        .set_title("选择要导入的 Reading PDF")
+        .blocking_pick_file();
+    let Some(selected) = selected else {
+        return Ok(None);
+    };
+    let path = selected.into_path().map_err(|_| {
+        CommandError::from(BackendError::InvalidInput(
+            "The selected PDF is not a readable local file path.".to_string(),
+        ))
+    })?;
+    read_selected_pdf(&path).map(Some).map_err(Into::into)
+}
+
+fn read_selected_pdf(path: &Path) -> BackendResult<SelectedPdfPayload> {
+    crate::workspace::reject_link_or_reparse(path, "selected PDF")?;
+    let metadata = fs::metadata(path)?;
+    if !metadata.is_file() {
+        return Err(BackendError::InvalidInput(
+            "The selected PDF path is not a regular file.".to_string(),
+        ));
+    }
+    let has_pdf_extension = path
+        .extension()
+        .and_then(|extension| extension.to_str())
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("pdf"));
+    if !has_pdf_extension {
+        return Err(BackendError::InvalidInput(
+            "Choose a file with the .pdf extension.".to_string(),
+        ));
+    }
+    if metadata.len() == 0 {
+        return Err(BackendError::InvalidInput(
+            "The selected PDF is empty.".to_string(),
+        ));
+    }
+    if metadata.len() > MAX_SELECTED_PDF_BYTES {
+        return Err(BackendError::InvalidInput(format!(
+            "The selected PDF exceeds the {} MiB native import limit.",
+            MAX_SELECTED_PDF_BYTES / 1024 / 1024
+        )));
+    }
+
+    let bytes = fs::read(path)?;
+    let header_end = bytes.len().min(1024);
+    if !bytes[..header_end]
+        .windows(b"%PDF-".len())
+        .any(|window| window == b"%PDF-")
+    {
+        return Err(BackendError::InvalidInput(
+            "The selected file does not contain a PDF header.".to_string(),
+        ));
+    }
+    let file_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or_else(|| {
+            BackendError::InvalidInput("The PDF file name is not valid UTF-8.".to_string())
+        })?
+        .to_string();
+
+    Ok(SelectedPdfPayload {
+        file_name,
+        mime_type: "application/pdf".to_string(),
+        byte_length: bytes.len() as u64,
+        base64: STANDARD.encode(bytes),
+    })
+}
 
 #[tauri::command]
 pub fn get_bootstrap_state(state: State<'_, AppBackend>) -> BootstrapState {
@@ -278,5 +358,39 @@ fn session_target(
         _ => Err(BackendError::Conflict(
             "The practice session is not bound to an installed pack target.".to_string(),
         )),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    use tempfile::tempdir;
+
+    use super::read_selected_pdf;
+
+    #[test]
+    fn reads_only_a_non_empty_pdf_file() {
+        let directory = tempdir().expect("temp dir");
+        let path = directory.path().join("original.pdf");
+        let contents = b"%PDF-1.7\noriginal fixture\n%%EOF\n";
+        std::fs::write(&path, contents).expect("write fixture");
+
+        let payload = read_selected_pdf(&path).expect("read selected PDF");
+
+        assert_eq!(payload.file_name, "original.pdf");
+        assert_eq!(payload.mime_type, "application/pdf");
+        assert_eq!(payload.byte_length, contents.len() as u64);
+        assert_eq!(STANDARD.decode(payload.base64).expect("base64"), contents);
+    }
+
+    #[test]
+    fn rejects_a_pdf_extension_without_a_pdf_header() {
+        let directory = tempdir().expect("temp dir");
+        let path = directory.path().join("not-really.pdf");
+        std::fs::write(&path, b"plain text").expect("write fixture");
+
+        let error = read_selected_pdf(&path).expect_err("invalid PDF should fail");
+
+        assert!(error.to_string().contains("does not contain a PDF header"));
     }
 }

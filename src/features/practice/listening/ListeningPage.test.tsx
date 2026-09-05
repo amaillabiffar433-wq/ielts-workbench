@@ -84,6 +84,10 @@ describe("ListeningPage Exam playback policy", () => {
   it("resets position and rate when entering Exam mode", async () => {
     renderListening("/practice/listening?mode=study");
     const studyAudio = await screen.findByLabelText("原创示例听力音频") as HTMLAudioElement;
+    expect(workbenchStore.getState().readPackMedia).toHaveBeenCalledWith(
+      "original-demo-pack",
+      "media/audio/original-demo-tones.wav",
+    );
     studyAudio.currentTime = 42;
     studyAudio.playbackRate = 1.5;
 

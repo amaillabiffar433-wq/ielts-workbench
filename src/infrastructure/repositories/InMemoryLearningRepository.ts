@@ -11,7 +11,11 @@ import {
 import {
   ORIGINAL_DEMO_AUDIO_PATH,
   ORIGINAL_DEMO_PACK_FOLDER,
+  ORIGINAL_DEMO_SILENT_AUDIO_PATH,
+  ORIGINAL_DEMO_WRITING_CHART_PATH,
   createOriginalDemoSilentWav,
+  createOriginalDemoToneWav,
+  createOriginalDemoWritingChartPng,
   originalDemoPack,
 } from "../demo";
 import type {
@@ -223,7 +227,9 @@ export class InMemoryLearningRepository implements LearningRepository {
       packs: [originalDemoPack],
       packFolders: { [ORIGINAL_DEMO_PACK_FOLDER]: originalDemoPack },
       media: {
-        [mediaKey(originalDemoPack.manifest.id, ORIGINAL_DEMO_AUDIO_PATH)]: createOriginalDemoSilentWav(),
+        [mediaKey(originalDemoPack.manifest.id, ORIGINAL_DEMO_AUDIO_PATH)]: createOriginalDemoToneWav(),
+        [mediaKey(originalDemoPack.manifest.id, ORIGINAL_DEMO_SILENT_AUDIO_PATH)]: createOriginalDemoSilentWav(),
+        [mediaKey(originalDemoPack.manifest.id, ORIGINAL_DEMO_WRITING_CHART_PATH)]: createOriginalDemoWritingChartPng(),
       },
     });
   }

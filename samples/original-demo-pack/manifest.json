@@ -23,6 +23,24 @@
       "mimeType": "audio/wav",
       "durationMs": 4000,
       "sha256": "bff9ae2d1c0defb0f2b9070f43439fcb723621dbeb1cca5e2dbadcd9bfb13c68"
+    },
+    {
+      "id": "demo-audio-tones-01",
+      "type": "audio",
+      "relativePath": "media/audio/original-demo-tones.wav",
+      "mimeType": "audio/wav",
+      "durationMs": 4000,
+      "sha256": "86d7c2cd3128a2dd61f097b082201a9d0e91d3f989ecc086f62b55c194140ce6"
+    },
+    {
+      "id": "demo-writing-chart-01",
+      "type": "image",
+      "relativePath": "media/images/original-workshop-attendance.png",
+      "mimeType": "image/png",
+      "width": 900,
+      "height": 560,
+      "alt": "Grouped bar chart showing attendance at three fictional Alderwick community workshops in January, February and March.",
+      "sha256": "99305e2ff07d8864508cf7252d51e1211c8d656404b78a4c4b3199adecb5330d"
     }
   ]
 }

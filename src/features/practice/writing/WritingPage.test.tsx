@@ -14,6 +14,8 @@ import { countWords } from "./draftAutosave";
 import { WritingPage } from "./WritingPage";
 
 const originalState = workbenchStore.getState();
+const originalCreateObjectUrl = URL.createObjectURL;
+const originalRevokeObjectUrl = URL.revokeObjectURL;
 
 function sessionFor(mode: "study" | "exam"): SessionSnapshot {
   return {
@@ -44,6 +46,14 @@ describe("WritingPage durable draft transitions", () => {
   const repository = originalState.repository;
 
   beforeEach(() => {
+    Object.defineProperty(URL, "createObjectURL", {
+      configurable: true,
+      value: vi.fn(() => "blob:original-writing-chart"),
+    });
+    Object.defineProperty(URL, "revokeObjectURL", {
+      configurable: true,
+      value: vi.fn(),
+    });
     vi.spyOn(repository, "loadWritingDraft").mockResolvedValue(null);
     vi.spyOn(repository, "listWritingVersions").mockResolvedValue([]);
     vi.spyOn(repository, "saveWritingDraft").mockImplementation(async (input) => savedDraft(input));
@@ -72,6 +82,23 @@ describe("WritingPage durable draft transitions", () => {
       ensureSession: originalState.ensureSession,
     });
     vi.restoreAllMocks();
+    if (originalCreateObjectUrl === undefined) Reflect.deleteProperty(URL, "createObjectURL");
+    else Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectUrl });
+    if (originalRevokeObjectUrl === undefined) Reflect.deleteProperty(URL, "revokeObjectURL");
+    else Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectUrl });
+  });
+
+  it("loads and displays the original Task 1 chart through the repository media boundary", async () => {
+    const readMedia = vi.spyOn(repository, "readPackMedia");
+
+    renderWriting();
+
+    const chart = await screen.findByRole("img", { name: /Grouped bar chart/ });
+    expect(chart).toHaveAttribute("src", "blob:original-writing-chart");
+    expect(readMedia).toHaveBeenCalledWith(
+      "original-demo-pack",
+      "media/images/original-workshop-attendance.png",
+    );
   });
 
   it("flushes a pending Task 1 draft before switching to Task 2", async () => {

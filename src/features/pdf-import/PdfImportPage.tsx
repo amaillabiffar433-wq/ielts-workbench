@@ -16,7 +16,14 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { buildPracticeRoute } from "../practice/practiceRoute";
 import { useWorkbenchStore } from "../../stores/workbenchStore";
 import { BrowserPdfSourceAdapter } from "./BrowserPdfSourceAdapter";
-import { browserFileSource, type DocumentSourceAdapter, type PdfDocumentHandle } from "./documentSource";
+import { TauriPdfSourceAdapter } from "./TauriPdfSourceAdapter";
+import { isTauriRuntime } from "../../infrastructure/repositories/runtime";
+import {
+  browserFileSource,
+  type DocumentSourceAdapter,
+  type PdfBinarySource,
+  type PdfDocumentHandle,
+} from "./documentSource";
 import {
   applyAnswerKey,
   buildImportedReadingPack,
@@ -68,7 +75,11 @@ export interface PdfImportPageProps {
   readonly adapter?: DocumentSourceAdapter;
 }
 
-export function PdfImportPage({ adapter = new BrowserPdfSourceAdapter() }: PdfImportPageProps) {
+function createDefaultAdapter(): DocumentSourceAdapter {
+  return isTauriRuntime() ? new TauriPdfSourceAdapter() : new BrowserPdfSourceAdapter();
+}
+
+export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPageProps) {
   const repository = useWorkbenchStore((state) => state.repository);
   const installImportedPack = useWorkbenchStore((state) => state.installImportedPack);
   const [step, setStep] = useState<ImportStep>("source");
@@ -127,14 +138,14 @@ export function PdfImportPage({ adapter = new BrowserPdfSourceAdapter() }: PdfIm
     return () => { active = false; };
   }, [currentPage, documentHandle, step]);
 
-  const openFile = async (file: File) => {
-    const validation = validatePdfFile(file);
+  const openSource = async (source: PdfBinarySource) => {
+    const validation = validatePdfFile({ name: source.name, size: source.size, type: source.mimeType });
     setError(validation.error ?? null);
     setWarning(validation.warning ?? null);
     if (!validation.valid) return;
     setBusy(true);
     try {
-      const nextDocument = await adapter.open(browserFileSource(file));
+      const nextDocument = await adapter.open(source);
       const previousDocument = documentHandleRef.current;
       documentHandleRef.current = nextDocument;
       setDocumentHandle(nextDocument);
@@ -146,10 +157,30 @@ export function PdfImportPage({ adapter = new BrowserPdfSourceAdapter() }: PdfIm
       setQuestionEnd(Math.min(2, nextDocument.pageCount));
       setAnswerStart("");
       setAnswerEnd("");
-      setBookTitle(file.name.replace(/\.pdf$/iu, "") || "Local Reading PDF");
+      setBookTitle(source.name.replace(/\.pdf$/iu, "") || "Local Reading PDF");
       setDraft(null);
       setInstalledIdentity(null);
       setStep("pages");
+    } catch (nextError) {
+      setError(errorMessage(nextError));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openFile = async (file: File) => openSource(browserFileSource(file));
+
+  const selectPdf = async () => {
+    if (!adapter.selectSource) {
+      fileInputRef.current?.click();
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setWarning(null);
+    try {
+      const source = await adapter.selectSource();
+      if (source) await openSource(source);
     } catch (nextError) {
       setError(errorMessage(nextError));
     } finally {
@@ -287,23 +318,25 @@ export function PdfImportPage({ adapter = new BrowserPdfSourceAdapter() }: PdfIm
         <section className="pdf-import-panel">
           <div
             className={`pdf-drop-zone${dragActive ? " is-dragging" : ""}`}
-            onDragEnter={(event) => { event.preventDefault(); setDragActive(true); }}
-            onDragLeave={() => setDragActive(false)}
-            onDragOver={(event) => event.preventDefault()}
-            onDrop={handleDrop}
+            onDragEnter={adapter.selectSource ? undefined : (event) => { event.preventDefault(); setDragActive(true); }}
+            onDragLeave={adapter.selectSource ? undefined : () => setDragActive(false)}
+            onDragOver={adapter.selectSource ? undefined : (event) => event.preventDefault()}
+            onDrop={adapter.selectSource ? undefined : handleDrop}
           >
             <FileUp aria-hidden="true" size={36} />
             <h2>选择一个本地 PDF</h2>
-            <p>支持文件选择或拖放。文件只在本机解析，不会上传；大于 50 MB 会提示。</p>
-            <input
+            <p>{adapter.selectSource
+              ? "使用 Windows 文件对话框选择；Rust 只读取本次明确选择的 PDF，不会上传或保留原文件副本。"
+              : "支持文件选择或拖放。文件只在本机解析，不会上传；大于 50 MB 会提示。"}</p>
+            {!adapter.selectSource && <input
               accept="application/pdf,.pdf"
               aria-label="选择本地 PDF"
               hidden
               onChange={(event) => { const file = event.target.files?.[0]; if (file) void openFile(file); }}
               ref={fileInputRef}
               type="file"
-            />
-            <button className="button button--primary" disabled={busy} onClick={() => fileInputRef.current?.click()} type="button">
+            />}
+            <button className="button button--primary" disabled={busy} onClick={() => void selectPdf()} type="button">
               {busy ? "正在读取…" : "选择 PDF"}
             </button>
           </div>

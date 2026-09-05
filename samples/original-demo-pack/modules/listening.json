@@ -4,7 +4,7 @@
   "testId": "demo-test-01",
   "type": "listening",
   "title": "Local Audio Playback Check",
-  "audioAssetId": "demo-audio-silence-01",
+  "audioAssetId": "demo-audio-tones-01",
   "sections": [
     {
       "id": "demo-listening-section-01",
@@ -15,7 +15,7 @@
         {
           "id": "demo-listening-instruction-01",
           "kind": "instruction",
-          "text": "This original four-second track is intentionally silent. It exists only to verify local media loading, playback state, and exam-mode controls. The visible questions below test these instructions rather than listening ability."
+          "text": "This original four-second track contains four clearly audible ascending tones. It exists only to verify local media loading, playback state, and exam-mode controls. The visible questions below test these instructions rather than listening ability."
         }
       ],
       "questionGroups": [
@@ -29,16 +29,16 @@
               "number": 1,
               "type": "fill-blank",
               "prompt": "Complete the sentence.",
-              "sentence": "The test track lasts {{blank}} seconds.",
+              "sentence": "The test track contains {{blank}} ascending tones.",
               "acceptableAnswers": ["four", "4"],
               "maxWords": 1,
-              "explanation": "The verification note describes a four-second track."
+              "explanation": "The verification note describes four ascending tones."
             },
             {
               "id": "demo-listening-q02",
               "number": 2,
               "type": "single-choice",
-              "prompt": "Why is the silent track included?",
+              "prompt": "Why is the audible track included?",
               "options": [
                 {
                   "id": "demo-listening-q02-a",

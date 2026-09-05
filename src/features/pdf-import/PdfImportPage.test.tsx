@@ -54,6 +54,29 @@ describe("PdfImportPage", () => {
     expect(adapter.open).not.toHaveBeenCalled();
   });
 
+  it("uses an adapter-owned native picker without exposing a browser file input", async () => {
+    const handle = fakeDocument();
+    const source = {
+      name: "native-original.pdf",
+      size: 4096,
+      mimeType: "application/pdf",
+      readBytes: vi.fn(async () => new TextEncoder().encode("%PDF original").buffer),
+    };
+    const adapter: DocumentSourceAdapter = {
+      selectSource: vi.fn(async () => source),
+      open: vi.fn(async () => handle),
+    };
+    const user = userEvent.setup();
+    render(<MemoryRouter><PdfImportPage adapter={adapter} /></MemoryRouter>);
+
+    expect(screen.queryByLabelText("选择本地 PDF")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "选择 PDF" }));
+
+    expect(await screen.findByText(/original-ui-sample\.pdf/)).toBeInTheDocument();
+    expect(adapter.selectSource).toHaveBeenCalledTimes(1);
+    expect(adapter.open).toHaveBeenCalledWith(source);
+  });
+
   it("moves from a local PDF through extraction and repository installation", async () => {
     const handle = fakeDocument();
     const adapter: DocumentSourceAdapter = { open: vi.fn(async () => handle) };

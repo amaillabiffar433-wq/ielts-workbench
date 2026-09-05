@@ -57,6 +57,14 @@ const EMBEDDED_DEMO_FILES: &[(&str, &[u8])] = &[
         "media/audio/original-demo-silence.wav",
         include_bytes!("../../samples/original-demo-pack/media/audio/original-demo-silence.wav"),
     ),
+    (
+        "media/audio/original-demo-tones.wav",
+        include_bytes!("../../samples/original-demo-pack/media/audio/original-demo-tones.wav"),
+    ),
+    (
+        "media/images/original-workshop-attendance.png",
+        include_bytes!("../../samples/original-demo-pack/media/images/original-workshop-attendance.png"),
+    ),
 ];
 
 struct ValidatedPack {
