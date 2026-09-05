@@ -1,8 +1,27 @@
-# IELTS Workbench 第一轮执行计划
+# IELTS Workbench 执行计划
 
-更新日期：2026-09-03（继续按仓库现场恢复；启动 Reading PDF 辅助导入 MVP）
+更新日期：2026-09-05（项目迁移到 D 盘；进入稳定性修复与 Windows 桌面验收）
 
-## 当前执行切片：Reading PDF 辅助导入 MVP
+## 当前执行切片：稳定性修复与 Windows 桌面验收
+
+当前仓库为 `D:\Projects\雅思or算法软件项目`，分支 `feat/pdf-import-mvp`，起始 HEAD `dbfe98a5ecb596e7f12c4e1318f548227c69af3f`。C 盘原副本暂时保留，未经用户确认不删除。
+
+本轮桌面验收链路源码已提交为 `88e84ab`；最终文档提交与当前 HEAD 以 `git log -2 --oneline` 为准。
+
+| 步骤 | 内容 | 状态 |
+| --- | --- | --- |
+| M1 | 复制到 D 盘并核验 Git、文件数量、字节数和逐文件 SHA-256 | 已完成：662 个文件、3,838,842 字节、差异 0 |
+| M2 | 在 D 盘重建依赖和构建产物，验证 Git 与数据完整性 | 已完成：锁文件安装、前端构建及数据哈希均通过 |
+| S1 | 复现并修复标准 `npm test` 的默认失败 | 已完成核验：D 盘干净安装后旧超时未复现，未修改测试或超时设置 |
+| S2 | 标准 `npm test` 完整连续通过三次，同时 lint/build 通过 | 已完成：最终三次均为 23/23、114/114；lint/build 退出码 0 |
+| N1 | 复核 Rust、MSVC、Windows SDK、WebView2，并区分未安装与会话未加载 | 已完成：仅 WebView2 可用；Rust/Cargo 与 MSVC/SDK 确认未安装 |
+| N2 | 补齐原生 Repository/PDF/媒体/图片的最小桌面验收链路 | 源码与前端测试已完成；Rust 编译和真实桌面仍被环境阻塞 |
+| A1 | Rust、Tauri dev、SQLite 和两轮重启验收 | 环境阻塞：没有创建或污染任何验收数据库 |
+| R1 | Release 构建、独立启动和安装包产物核验 | 环境阻塞：无 Release/安装包产物，未执行安装 |
+
+状态和当前结论以 `docs/CURRENT_STATE.md` 为准；逐次执行记录追加到 `docs/WORK_LOG.md`；原生验收逐项记录在 `docs/DESKTOP_ACCEPTANCE.md`。
+
+## 历史执行切片：Reading PDF 辅助导入 MVP（2026-09-03）
 
 本切片在现有 React/Tauri 架构和已完成页面之上增量实施，不重新初始化工程，也不重做 Reading、Library 或 Import Center。自动化测试仅使用原创/人工构造内容；来自个人网盘的 PDF 只允许进入被 Git 忽略的 `local-data/import-samples/`，不得上传、移动、重命名或提交。
 
@@ -21,7 +40,7 @@
 
 本文件在恢复前仍停留在 2026-09-01 的“脚手架进行中”，但当前目录已经包含 React/Tauri 工程、领域 schema、repository、SQLite 迁移、工作区与题包 Rust 实现、原创 demo、各功能页面和测试。恢复时没有重新初始化脚手架，也没有删除、重置或覆盖现有成果。
 
-由于仓库仍是 unborn `master`（0 commit），全部项目文件都是 untracked，普通 `git log`/`git diff` 无法提供上一轮基线。只读取证进一步确认 `.git/refs/codex/turn-diffs` 中存在 2026-09-02 09:48 的自动树快照；该快照的 186 个文件与恢复开始时工作区逐 blob 一致。进度判断同时依据文件内容、修改时间、现有 Playwright 记录和本次重新执行的构建结果。
+历史恢复现场在 2026-09-02 曾是 unborn `master`（0 commit），当时全部项目文件未跟踪，普通 `git log`/`git diff` 无法提供历史基线。该描述只适用于当时现场。当前已经存在基线提交 `bdf9ac7` 和功能提交 `dbfe98a`，不能再把 “unborn master” 作为当前结论。
 
 文件时间线显示：最后一批 Rust 题包实现修改于 2026-09-02 09:33，`dist/` 于 09:34 重新生成。因此断点位于 Phase 0–1 收尾验证与文档回写，而不是工程初始化。恢复前旧计划已原样备份到 `output/recovery-backup-20260902-095231/docs/EXECUTION_PLAN.md`。
 
@@ -36,7 +55,7 @@
 | Tauri CLI | `tauri-cli 2.11.4` | CLI 包存在 |
 | Rust / Cargo | 不在 PATH，默认 `%USERPROFILE%\.cargo\bin` 也不存在 | 阻塞 Rust 编译与测试 |
 | Microsoft C++ Build Tools | `tauri info` 未检测到含 MSVC/Windows SDK 的 Visual Studio 或 Build Tools | 阻塞 Windows Tauri 打包验收 |
-| WebView2 Runtime | `152.0.4191.53` | `tauri info` 已检测 |
+| WebView2 Runtime | `152.0.4191.62` | `tauri info` 与注册表均已检测 |
 
 当前实现已远超最初环境记录。starter pack 仍只作需求材料；未复制任何未授权参考仓库代码或内容。
 
@@ -62,7 +81,7 @@
 | 4 | Onboarding、Library、Import Center 与 PDF 导入入口 | 已实现并有组件测试；真实目录选择/安装仍待桌面验收 |
 | 5 | Reading 双 Pane、答案和文字标记共享 | 共享答案、唯一 DOM ID、确定性题号导航和真实页面回归已完成；多 Passage/题段自由选择仍是后续功能 |
 | 6 | Listening v0、Writing v0、Review、Settings、AI 占位 | Writing 待保存草稿已覆盖 Task/模式/卸载边界；Listening Exam 生命周期和 Review 题包身份已加固并测试 |
-| 7 | 原创 demo pack、前端测试、Rust 测试 | PDF 测试均为原创/人工构造；21 个文件、106 项 TypeScript 测试通过，Rust 测试未运行 |
+| 7 | 原创 demo pack、前端测试、Rust 测试 | PDF/音频/图表均为原创；23 个文件、114 项 TypeScript 测试连续三次通过，Rust 测试未运行 |
 | 8 | README、数据格式、安全、测试与 ADR 文档 | 已补充 PDF 导入和 Windows Tauri 环境文档，并回写最终 Node 验证结果 |
 | 9 | lint/test/build/Tauri build 与手工 QA | PDF 结构/文本/逐页渲染、浏览器完整闭环和最终 Node 命令已通过；Rust/Tauri 被环境阻塞 |
 
@@ -82,15 +101,15 @@
 
 | 命令 | 退出码 | 结果 |
 | --- | ---: | --- |
-| `Get-Location` | 0 | `C:\Users\Exming\Documents\雅思or算法软件项目` |
-| `Get-ChildItem -Force` | 0 | 确认现有 `.git`、`src`、`src-tauri`、`docs`、`samples`、`dist`、`node_modules` 等均存在 |
-| `git status --short --branch` | 0 | `No commits yet on master`；全部项目成果未跟踪 |
+| `Get-Location` | 0 | 当前工作目录已切换为 `D:\Projects\雅思or算法软件项目`；C 盘路径仅保留为待确认删除的原副本 |
+| `Get-ChildItem -Force` | 0 | D 盘确认 `.git`、`src`、`src-tauri`、`docs`、`samples` 等均存在；依赖和 `dist` 已在 D 盘重新生成 |
+| `git status --short --branch` | 0 | 2026-09-05 迁移完成时为干净的 `feat/pdf-import-mvp`，HEAD `dbfe98a`；旧的 `No commits yet on master` 仅是 2026-09-02 历史现场 |
 | `npm run lint` | 0 | 最终全量 ESLint 无警告、无错误 |
-| `npm test` | 0 | 最终 Vitest 21/21 个文件、106/106 项测试通过，约 13.84 秒 |
-| `npm run build` | 0 | 最终 `tsc --noEmit` 与 Vite 8.2.2 构建通过；1989 modules transformed；仅有既知的 >500 kB chunk 提示 |
+| `npm test`（D 盘最终标准命令，连续三次） | 0 | 三次均为 23/23 文件、114/114 项通过，总时长 19.36 秒、18.82 秒、20.11 秒；未调整超时、重试或测试选择 |
+| `npm run build`（D 盘最终） | 0 | `tsc --noEmit` 与 Vite 8.2.2 构建通过；1991 modules transformed；PDF worker 已输出，仅有既知的 >500 kB chunk 提示 |
 | `pdfinfo` / `pdftotext` / `pdftoppm` / `pypdf` / `pdfplumber` | 0 | 原创 3 页样本未加密、有文本层；三页均提取并渲染，逐页目视无截断或不可读字符 |
 | Playwright CLI 本地 GUI 冒烟 | 0 | 原创 PDF 载入、单页预览、页 1/2/3 提取、4 题整理/答案、导入、Reading 打开、双 Pane 答案/标记同步、明确刷新恢复和原 demo 回归均通过；控制台 0 error / 0 warning |
-| `npm run tauri -- info` | 0 | CLI 可运行；明确报告 Rust、Cargo、rustup 与 MSVC/SDK Build Tools 缺失，WebView2 可用 |
+| `npm run tauri -- info` | 0 | CLI 可运行；明确报告 Rust、Cargo、rustup 与 MSVC/SDK Build Tools 缺失，WebView2 152.0.4191.62 可用 |
 | `rustc --version` / `cargo --version` | 不可执行 | 命令不存在；属于环境前置条件缺失 |
 | `cargo test --manifest-path src-tauri/Cargo.toml` | 未运行 | Rust/Cargo 缺失，不宣称通过或失败 |
 | `npm run tauri build` | 未运行 | Rust/Cargo/MSVC 链路未就绪，不宣称通过或失败 |
