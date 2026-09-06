@@ -3,6 +3,7 @@ dist/
 coverage/
 .playwright-cli/
 src-tauri/target/
+src-tauri/gen/
 output/
 local-data/
 tmp/

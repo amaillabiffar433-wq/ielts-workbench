@@ -6,8 +6,14 @@ import type { SaveWritingDraftInput, WritingVersion } from "../../../infrastruct
 import { SaveStatus, type SaveState } from "../../../components/common/SaveStatus";
 import { SegmentedControl } from "../../../components/common/SegmentedControl";
 import { useWorkbenchStore } from "../../../stores/workbenchStore";
+import {
+  closeCurrentWindow,
+  confirmDiscardAfterSaveFailure,
+  listenForCloseRequested,
+} from "../../../infrastructure/window/windowClose";
 import { usePracticeRoutePack } from "../usePracticeRoutePack";
 import { countWords, scheduleDraftAutosave } from "./draftAutosave";
+import { handleWritingCloseRequest } from "./writingClose";
 import "./WritingPage.css";
 
 type WritingMode = "study" | "exam";
@@ -48,6 +54,7 @@ export function WritingPage() {
   const failedDraftRef = useRef<DraftSnapshot | null>(null);
   const writeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const lastWriteRef = useRef<Promise<void>>(Promise.resolve());
+  const allowCloseRef = useRef(false);
   const activeDraftRef = useRef<{ sessionId: string | null; taskId: string | null }>({ sessionId: null, taskId: null });
 
   const module = useMemo(
@@ -124,6 +131,44 @@ export function WritingPage() {
     }
     await lastWriteRef.current;
   }, [saveDraftSnapshot]);
+
+  useEffect(() => {
+    let active = true;
+    let unlisten: () => void = () => undefined;
+    void listenForCloseRequested((event) => {
+      if (allowCloseRef.current) return;
+      void handleWritingCloseRequest(event, {
+        flushDraft: flushPendingDraft,
+        closeWindow: async () => {
+          allowCloseRef.current = true;
+          try {
+            await closeCurrentWindow();
+          } catch (reason) {
+            allowCloseRef.current = false;
+            throw reason;
+          }
+        },
+        confirmDiscard: confirmDiscardAfterSaveFailure,
+        onSaveError: (reason) => {
+          setSaveState("error");
+          setError(reason instanceof Error ? reason.message : String(reason));
+        },
+      }).catch((reason: unknown) => {
+        if (!active) return;
+        setSaveState("error");
+        setError(reason instanceof Error ? reason.message : String(reason));
+      });
+    }).then((stopListening) => {
+      if (active) unlisten = stopListening;
+      else stopListening();
+    }).catch((reason: unknown) => {
+      if (active) setError(reason instanceof Error ? reason.message : String(reason));
+    });
+    return () => {
+      active = false;
+      unlisten();
+    };
+  }, [flushPendingDraft]);
 
   const queueDraftSave = (nextContent: string) => {
     if (!session || !task || !sessionMatchesRoute) return;

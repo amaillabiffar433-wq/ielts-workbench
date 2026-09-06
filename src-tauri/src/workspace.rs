@@ -1,6 +1,6 @@
 use std::{
     fs::{self, OpenOptions},
-    io::Write,
+    io::{self, Write},
     path::{Component, Path, PathBuf},
 };
 
@@ -324,13 +324,7 @@ fn write_new_json_atomically<T: serde::Serialize>(path: &Path, value: &T) -> Res
     })?;
     let temporary = parent.join(format!(".new-{}.tmp", Uuid::new_v4()));
     write_synced_json(&temporary, value)?;
-    match fs::rename(&temporary, path) {
-        Ok(()) => Ok(()),
-        Err(error) => {
-            let _ = fs::remove_file(&temporary);
-            Err(error.into())
-        }
-    }
+    place_new_file(&temporary, path)
 }
 
 fn replace_json_atomically<T: serde::Serialize>(path: &Path, value: &T) -> Result<()> {
@@ -341,25 +335,78 @@ fn replace_json_atomically<T: serde::Serialize>(path: &Path, value: &T) -> Resul
     write_synced_json(&temporary, value)?;
 
     if !path.exists() {
-        return match fs::rename(&temporary, path) {
-            Ok(()) => Ok(()),
-            Err(error) => {
-                let _ = fs::remove_file(&temporary);
-                Err(error.into())
-            }
-        };
+        return place_new_file(&temporary, path);
     }
 
     reject_link_or_reparse(path, "bootstrap config")?;
     let backup = parent.join(format!(".backup-{}.tmp", Uuid::new_v4()));
-    fs::rename(path, &backup)?;
-    if let Err(error) = fs::rename(&temporary, path) {
-        let _ = fs::rename(&backup, path);
-        let _ = fs::remove_file(&temporary);
-        return Err(error.into());
+    match fs::rename(path, &backup) {
+        Ok(()) => {
+            if let Err(error) = place_new_file(&temporary, path) {
+                let _ = place_new_file(&backup, path);
+                return Err(error);
+            }
+        }
+        Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {
+            copy_new_file_synced(path, &backup)?;
+            if let Err(error) = overwrite_file_synced(&temporary, path) {
+                let _ = overwrite_file_synced(&backup, path);
+                let _ = fs::remove_file(&temporary);
+                let _ = fs::remove_file(&backup);
+                return Err(error.into());
+            }
+            fs::remove_file(&temporary)?;
+        }
+        Err(error) => {
+            let _ = fs::remove_file(&temporary);
+            return Err(error.into());
+        }
     }
     fs::remove_file(backup)?;
     Ok(())
+}
+
+fn place_new_file(temporary: &Path, path: &Path) -> Result<()> {
+    match fs::rename(temporary, path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == io::ErrorKind::CrossesDevices => {
+            if let Err(copy_error) = copy_new_file_synced(temporary, path) {
+                let _ = fs::remove_file(temporary);
+                let _ = fs::remove_file(path);
+                return Err(copy_error.into());
+            }
+            fs::remove_file(temporary)?;
+            Ok(())
+        }
+        Err(error) => {
+            let _ = fs::remove_file(temporary);
+            Err(error.into())
+        }
+    }
+}
+
+fn copy_new_file_synced(source: &Path, destination: &Path) -> io::Result<()> {
+    let mut source_file = fs::File::open(source)?;
+    let mut destination_file = OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(destination)?;
+    if let Err(error) = io::copy(&mut source_file, &mut destination_file) {
+        drop(destination_file);
+        let _ = fs::remove_file(destination);
+        return Err(error);
+    }
+    destination_file.sync_all()
+}
+
+fn overwrite_file_synced(source: &Path, destination: &Path) -> io::Result<()> {
+    let mut source_file = fs::File::open(source)?;
+    let mut destination_file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(destination)?;
+    io::copy(&mut source_file, &mut destination_file)?;
+    destination_file.sync_all()
 }
 
 fn write_synced_json<T: serde::Serialize>(path: &Path, value: &T) -> Result<()> {
@@ -441,5 +488,16 @@ mod tests {
         let json: serde_json::Value =
             serde_json::from_slice(&fs::read(config_dir.join("bootstrap.json")).unwrap()).unwrap();
         assert_eq!(json.as_object().unwrap().len(), 2);
+
+        let replacement_path = temp.path().join("replacement-workspace");
+        let replacement = Workspace::initialize(replacement_path.to_str().unwrap()).unwrap();
+        store.save(&replacement).unwrap();
+        assert_eq!(
+            store.load().unwrap().unwrap().workspace_path,
+            replacement.root().to_str().unwrap()
+        );
+        assert!(fs::read_dir(config_dir)
+            .unwrap()
+            .all(|entry| entry.unwrap().file_name() == "bootstrap.json"));
     }
 }

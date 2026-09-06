@@ -2125,7 +2125,6 @@ fn validate_question(
                 path,
                 errors,
             );
-            validate_question_source(question.source.as_ref(), path, errors);
             let _ = question.case_sensitive;
         }
         QuestionV1::FillBlank(question) => {
@@ -2145,6 +2144,7 @@ fn validate_question(
                 path,
                 errors,
             );
+            validate_question_source(question.source.as_ref(), path, errors);
             if !non_blank(&question.sentence)
                 || question.sentence.matches("{{blank}}").count() != 1
             {
@@ -2900,7 +2900,6 @@ fn report(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::Engine as _;
     use crate::storage;
 
     fn write_valid_pack(root: &Path) {
@@ -2933,8 +2932,36 @@ mod tests {
         assert!(report.source_hash.is_some());
         assert_eq!(
             report.media_references,
-            vec!["media/audio/original-demo-silence.wav"]
+            vec![
+                "media/audio/original-demo-silence.wav",
+                "media/audio/original-demo-tones.wav",
+                "media/images/original-workshop-attendance.png",
+            ]
         );
+    }
+
+    #[test]
+    fn rejects_invalid_fill_blank_source_metadata() {
+        let temp = tempfile::tempdir().unwrap();
+        let pack = temp.path().join("pack");
+        write_valid_pack(&pack);
+        let mut reading = read_fixture_json(&pack, "modules/reading.json");
+        reading["sections"][0]["questionGroups"][1]["questions"][2]["source"] =
+            serde_json::json!({
+                "rawText": "",
+                "sourcePages": [0],
+                "sourceBlock": " ",
+                "detectedType": "fill-blank",
+                "needsReview": true
+            });
+        write_fixture_json(&pack, "modules/reading.json", &reading);
+
+        let report = validate_pack_folder(pack.to_str().unwrap());
+        assert!(!report.valid);
+        assert!(report
+            .errors
+            .iter()
+            .any(|error| error.code == "INVALID_QUESTION_SOURCE"));
     }
 
     #[test]
