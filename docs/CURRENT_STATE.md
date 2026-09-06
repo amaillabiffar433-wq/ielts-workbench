@@ -1,12 +1,13 @@
 # IELTS Workbench 当前状态
 
-更新日期：2026-09-05
+更新日期：2026-09-06
 
 ## 当前仓库
 
 - 项目目录：`D:\Projects\雅思or算法软件项目`
 - 分支：`feat/pdf-import-mvp`
-- 本轮起始 HEAD：`dbfe98a5ecb596e7f12c4e1318f548227c69af3f`
+- 本轮起始 HEAD：`a2b43d8f9352f4eae3bc70dcf5dc465c758ae985`
+- 稳定性与 Release 源码提交：`23527b6`（Rust 首次编译修复、关窗保存、最小权限、D 盘 bundler cache）
 - 桌面验收链路提交：`88e84ab`（原生 PDF、原创媒体及测试）
 - 基线提交：`bdf9ac76bc71d8fb2d1fd1fbcaf7e977925e65f4`
 - 迁移完成时工作树：干净
@@ -32,22 +33,47 @@
 
 | 范围 | 当前状态 | 证据或说明 |
 | --- | --- | --- |
-| React/TypeScript/Vite 前端 | D 盘验证通过 | `npm ci` 后，`npm run lint` 与 `npm run build` 均成功；构建仅有既知的大 chunk 提示 |
-| 默认 `npm test` | D 盘最终配置连续三次通过 | 三次均为 23/23 文件、114/114 测试；未改超时、重试或测试选择 |
-| Reading 双 Pane/共享答案与文字标记 | 浏览器验证通过 | 原有 renderer 冒烟证据保留；原生 SQLite 重启恢复未验证 |
-| Reading PDF 辅助导入 | 原生链路已实现但未原生验证 | Rust 命令独占文件选择和一次性字节读取；renderer 不获得任意路径读取入口；浏览器 adapter 保留 |
-| Rust 工作区、SQLite、题包和媒体源码 | 已实现但未原生验证 | Rust 测试源码存在；需复核本机工具链 |
-| 原创 Listening/Writing 媒体 | 已实现，浏览器边界验证通过 | 新增可听 WAV 与 Task 1 PNG；旧静音 WAV 保留；重启后的原生路径仍未验证 |
-| Tauri dev | 环境阻塞 | Rust/Cargo 与 MSVC/Windows SDK 未安装；不以 renderer 结果替代 |
-| Release/安装包 | 环境阻塞 | 未生成可执行文件或安装包，也未执行安装 |
+| React/TypeScript/Vite 前端 | D 盘最终验证通过 | `npm run lint` 退出码 0；`npm run build` 成功转换 1997 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
+| 默认 `npm test` | 最终源码连续两次通过 | 两次均为 24/24 文件、117/117 测试；未改超时、重试或测试选择 |
+| Reading 双 Pane/共享答案与文字标记 | 原生验证通过 | Tauri 窗口中左右 Pane 同步显示 `true` 与 `solar panels`；黄色标记在两 Pane 同步，SQLite 写入并在两轮重启后读回 |
+| Reading PDF 辅助导入 | 原生验证通过 | Windows 原生文件对话框完成取消、有效 PDF、重复导入和伪 PDF 拒绝；有效样本 SHA-256 未变化，题包重启后仍存在 |
+| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | `cargo check` 退出码 0；修复两个首次编译暴露的问题后 `cargo test` 为 24/24 |
+| 原创 Listening/Writing 媒体 | 原生验证通过 | WAV 在真实 WebView 中播放；Exam 拖动/倍速/重播限制生效；900×560 Task 1 PNG 与 SQLite 草稿/版本均跨重启恢复 |
+| Tauri dev | 原生验证通过 | 在真实 Tauri 进程中确认 `window.__TAURI_INTERNALS__`，设置页显示 D 盘工作区和 SQLite；两轮正常退出/重启通过 |
+| Release/安装包 | 构建与独立运行通过 | 标准 `npm run tauri build` 退出码 0；Release EXE、MSI、NSIS 均生成；Vite 关闭时 Release 完成启动、媒体/PDF/SQLite 与退出恢复验收；未安装 |
 | DeepSeek、Vocabulary、OCR 等 | 未开始 | 明确不在本轮范围 |
 
 ## 当前阻塞与下一步
 
-1. 经用户明确授权后安装 Rust stable MSVC 与 Visual Studio “Desktop development with C++”工作负载（含 MSVC x64/x86 和 Windows SDK）；本轮没有执行系统安装。
-2. 从 `cargo check --manifest-path src-tauri/Cargo.toml` 恢复，随后运行 Rust 测试与 `npm run tauri dev`。
-3. 使用新的独立 D 盘测试工作区完成 SQLite、PDF、Reading、Listening、Writing 和两轮完整重启验收。
-4. 桌面开发验收通过后再构建 Release；Reading 多 Passage/题段自由选择留到下一轮。
+1. 本轮稳定性修复、开发窗口验收、Release 构建和独立启动均已完成；没有剩余环境阻塞。
+2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；不得删除当前所选工作区 `D:\IELTS-Workbench-Acceptance-20260905`，否则本次验收数据会丢失。
+3. 下一轮进入 Reading 多 Passage、指定题段/单题选择，并保持两 Pane 独立选择、独立滚动、共享答案和标记。
+
+## 2026-09-06 原生桌面验收摘要
+
+- 独立验收工作区：`D:\IELTS-Workbench-Acceptance-20260905`；数据库：`D:\IELTS-Workbench-Acceptance-20260905\ielts-workbench.sqlite3`（设置页显示规范化的 `\\?\` 路径）。
+- Repository 证据：实际窗口中 `window.__TAURI_INTERNALS__ === true`；运行时工厂因此选择 `TauriLearningRepository`。answers、annotations、writing_drafts、writing_versions 均在上述 SQLite 中查到真实记录，没有回退 IndexedDB。
+- 原生 PDF：取消选择不改变页面；原创 3 页 PDF 导入为 `pdf-reading-3380bbb850f80d50`；重复导入没有创建第二份题包；隔离伪 PDF 显示 “The selected file does not contain a PDF header.”。
+- Reading：Session `06237ec2-508e-4c7e-8819-3a2f758452b3` 保存 q01=`true`、q05=`solar panels`，并保存 quote=`fictional town of Alderwick,` 的黄色标记；两 Pane 即时同步且重启读回。
+- Listening：原创 4 秒音频 `duration=4`、`readyState=4`，播放期间 `currentTime>0`；Exam 隐藏原生 controls 和 Transcript，禁止拖动、倍速和重播。
+- Writing：Task 1 图表实际加载为 900×560；Session `df74b87c-3243-4115-bdd2-876845ca4f5e` 写入 30 词草稿、manual 与 submitted 两个不可变版本。
+- 快速关窗修复：首次实测发现保存后再次 `close()` 会递归触发 close-requested，窗口不能退出；改为保存完成后 `destroy()`。复测在输入后 120 ms 请求正常关窗，445 ms 内进程结束，最后内容已写入 SQLite 并在重启后恢复。
+- 两轮完整重启：两次均恢复已导入题包、Reading 答案/标记、Writing 草稿和本地图片；随后正常退出，进程分别在 273 ms 和 281 ms 内结束。
+
+## Release 与安装包
+
+- 标准 `npm run tauri build` 最终退出码 0，同时完成 MSI 与 NSIS；`bundle.useLocalToolsDir=true` 将 Tauri bundler 的 WiX/NSIS 缓存放在 D 盘 `src-tauri\target\.tauri`。
+- 可直接运行：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`，12,659,712 字节，SHA-256 `89131796210E52C44AEA591772068B780C8F8D2C5D616BE1854B490280CA25CD`。
+- MSI：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\bundle\msi\IELTS Workbench_0.1.0_x64_en-US.msi`，4,857,856 字节，SHA-256 `75E21DB0D806088D408DB1F30327BF099E0A429034475891A46A3B6F2F0529D7`。
+- NSIS：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\bundle\nsis\IELTS Workbench_0.1.0_x64-setup.exe`，3,581,782 字节，SHA-256 `8F1A5A9804068063CAE1273618EE1AFF73A9BC54BC93207415B606831E66936B`。
+- Vite 1420 端口关闭时，最终 Release 从 `http://tauri.localhost` 启动且 Tauri runtime 为真；两个题包可见。内嵌 PDF worker 实际加载 1,265,413 字节并解析 3 页 PDF，WAV 播放、900×560 PNG、SQLite 均正常。
+- Release 输入最后 marker 后 216 ms 发出关窗请求，574 ms 内退出；SQLite 写入后再次独立启动完整读回，再次正常退出。安装包仅生成，未执行安装。
+
+## 磁盘占用（2026-09-06 收尾）
+
+- C 盘可用空间从安装前约 21.94 GiB 变为 19.14 GiB，净减少约 2.80 GiB；其中 Windows SDK 目录当前逻辑文件大小 1.67 GiB，失败打包尝试留下的可重建 Tauri 工具缓存为 123.10 MiB。
+- D 盘可用空间从安装前约 105.21 GiB 变为 95.88 GiB，净减少约 9.33 GiB。主要目录逻辑大小：Rustup 575.97 MiB、Cargo 570.55 MiB、Build Tools 2.84 GiB、`src-tauri\target` 8.03 GiB、`node_modules` 262.96 MiB、npm cache 64.83 MiB。逻辑文件大小之和与卷净占用不直接等价（NTFS 硬链接、压缩和同期系统写入会造成差异）。
+- `src-tauri\target` 是可重建产物但包含本次可直接双击的 Release 与两个安装包；在另行保存这些交付文件前不要删除。Rustup、Cargo、Build Tools、Windows SDK、WebView2 和当前验收工作区是继续开发/运行所需内容，不得清理。
 
 ## D 盘前端验证
 
@@ -60,9 +86,12 @@
 ## Windows 原生环境
 
 - Node `v24.14.0`、npm `11.9.0`、Git `2.54.0.windows.1` 可用。
-- `rustup`、`rustc`、`cargo` 均不在 PATH，且默认 `C:\Users\Exming\.cargo\bin` 不存在；属于未安装，不是当前 shell 未加载。
-- `vswhere` 只发现 `D:\SSMS`，使用 C++ 组件条件查询返回空数组；Windows Kits 注册表根不存在，`cl`、`link`、`msbuild` 也不可用。MSVC/Windows SDK 未安装。
-- `npm run tauri -- info` 检出 WebView2 `152.0.4191.62`；WebView2 不构成当前阻塞。
+- 用户级 `RUSTUP_HOME=D:\DevTools\rustup`、`CARGO_HOME=D:\DevTools\cargo` 已持久化；`D:\DevTools\cargo\bin` 已在保留原条目的前提下加入用户 PATH。
+- Rust minimal stable MSVC 已安装：`rustc 1.98.1`、`cargo 1.98.1`、`rustup 1.29.1`，唯一目标为 `x86_64-pc-windows-msvc`。
+- Visual Studio Build Tools 2022 `17.14.39` 位于 `D:\DevTools\VSBuildTools`；`vswhere` 已确认 `VC.Tools.x86.x64` 和 `Windows11SDK.26100`，MSVC 工具集为 `14.44.35207`。
+- Windows SDK 10.0.26100.0 按官方安装器要求位于 `C:\Program Files (x86)\Windows Kits\10`；现有 VS shared/cache 继续使用 `D:\SSMS共享` 与 `D:\SSMS缓存`，未移动或卸载 SSMS。
+- `npm run tauri -- info` 的 Environment 全部通过，WebView2 为 `152.0.4191.62`。
+- 安装前用户环境已备份至 `D:\DevCache\HKCU-Environment-before-ielts-toolchain.reg`；没有全局修改 TEMP/TMP、没有自动重启。
 
 ## 原创验收资源
 
@@ -79,5 +108,6 @@
 - 其中可重建的 `node_modules`：14,006 个文件，275,548,191 字节（262.78 MiB）。
 - 其中可重建的 `dist`：6 个文件，2,259,135 字节（2.15 MiB）。
 - C 盘旧副本没有 `src-tauri/target`。
+- 首次打包失败留下的 `C:\Users\Exming\AppData\Local\tauri` 工具缓存：661 个文件、129,081,000 字节（123.10 MiB）；项目已改用 D 盘本地工具缓存，因此它属于可重建候选，但本轮未删除。
 
 若最终确认清理，优先一次性移除整个旧项目副本，避免留下两个容易误操作的仓库；执行前仍需再次核对 C/D 绝对路径、D 盘 HEAD 与工作树。

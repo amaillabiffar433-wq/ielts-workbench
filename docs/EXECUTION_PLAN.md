@@ -1,12 +1,12 @@
 # IELTS Workbench 执行计划
 
-更新日期：2026-09-05（项目迁移到 D 盘；进入稳定性修复与 Windows 桌面验收）
+更新日期：2026-09-06（原生开发验收、Release 构建与最终回归已完成）
 
 ## 当前执行切片：稳定性修复与 Windows 桌面验收
 
-当前仓库为 `D:\Projects\雅思or算法软件项目`，分支 `feat/pdf-import-mvp`，起始 HEAD `dbfe98a5ecb596e7f12c4e1318f548227c69af3f`。C 盘原副本暂时保留，未经用户确认不删除。
+当前仓库为 `D:\Projects\雅思or算法软件项目`，分支 `feat/pdf-import-mvp`，本轮起始 HEAD `a2b43d8f9352f4eae3bc70dcf5dc465c758ae985`。C 盘原副本暂时保留，未经用户确认不删除。
 
-本轮桌面验收链路源码已提交为 `88e84ab`；最终文档提交与当前 HEAD 以 `git log -2 --oneline` 为准。
+历史桌面验收链路源码提交为 `88e84ab`；本轮稳定性与 Release 源码提交为 `23527b6`。最终文档提交与当前 HEAD 以 `git log -3 --oneline` 为准。
 
 | 步骤 | 内容 | 状态 |
 | --- | --- | --- |
@@ -14,10 +14,12 @@
 | M2 | 在 D 盘重建依赖和构建产物，验证 Git 与数据完整性 | 已完成：锁文件安装、前端构建及数据哈希均通过 |
 | S1 | 复现并修复标准 `npm test` 的默认失败 | 已完成核验：D 盘干净安装后旧超时未复现，未修改测试或超时设置 |
 | S2 | 标准 `npm test` 完整连续通过三次，同时 lint/build 通过 | 已完成：最终三次均为 23/23、114/114；lint/build 退出码 0 |
-| N1 | 复核 Rust、MSVC、Windows SDK、WebView2，并区分未安装与会话未加载 | 已完成：仅 WebView2 可用；Rust/Cargo 与 MSVC/SDK 确认未安装 |
-| N2 | 补齐原生 Repository/PDF/媒体/图片的最小桌面验收链路 | 源码与前端测试已完成；Rust 编译和真实桌面仍被环境阻塞 |
-| A1 | Rust、Tauri dev、SQLite 和两轮重启验收 | 环境阻塞：没有创建或污染任何验收数据库 |
-| R1 | Release 构建、独立启动和安装包产物核验 | 环境阻塞：无 Release/安装包产物，未执行安装 |
+| N1 | 安装并复核 Rust、MSVC、Windows SDK、WebView2 | 已完成：D 盘 Rust minimal + Build Tools；SDK 26100 与 WebView2 可用 |
+| N2 | 补齐并实际编译原生 Repository/PDF/媒体/图片链路 | 已完成：`cargo check` 通过，`cargo test` 24/24；首次编译问题已最小修复 |
+| A1 | Rust、Tauri dev、SQLite 和两轮重启验收 | 已完成：独立 D 盘工作区、原生 PDF、Reading/Listening/Writing、快速关窗及两轮重启均通过 |
+| R1 | Release 构建、独立启动和安装包产物核验 | 已完成：标准 Tauri build 退出码 0；EXE/MSI/NSIS 均生成，Release 独立启动和 SQLite 恢复通过；未安装 |
+
+本轮完成后下一切片：Reading 多 Passage、指定题段/单题选择；两个 Pane 继续保持独立选择、独立滚动，并共享 Session 答案和文字标记。
 
 状态和当前结论以 `docs/CURRENT_STATE.md` 为准；逐次执行记录追加到 `docs/WORK_LOG.md`；原生验收逐项记录在 `docs/DESKTOP_ACCEPTANCE.md`。
 
@@ -53,8 +55,8 @@
 | Node.js | `v24.14.0` | 可用 |
 | npm | `11.9.0` | 可用 |
 | Tauri CLI | `tauri-cli 2.11.4` | CLI 包存在 |
-| Rust / Cargo | 不在 PATH，默认 `%USERPROFILE%\.cargo\bin` 也不存在 | 阻塞 Rust 编译与测试 |
-| Microsoft C++ Build Tools | `tauri info` 未检测到含 MSVC/Windows SDK 的 Visual Studio 或 Build Tools | 阻塞 Windows Tauri 打包验收 |
+| Rust / Cargo | `rustc 1.98.1`、`cargo 1.98.1`，stable `x86_64-pc-windows-msvc` minimal；home 均在 D 盘 | 可用 |
+| Microsoft C++ Build Tools | Build Tools 2022 `17.14.39` 位于 `D:\DevTools\VSBuildTools`；MSVC 14.44 + Windows SDK 10.0.26100.0 | 可用 |
 | WebView2 Runtime | `152.0.4191.62` | `tauri info` 与注册表均已检测 |
 
 当前实现已远超最初环境记录。starter pack 仍只作需求材料；未复制任何未授权参考仓库代码或内容。

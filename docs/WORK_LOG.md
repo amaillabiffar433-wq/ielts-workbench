@@ -48,3 +48,41 @@
 - 由于原生工具链缺失，未运行 `cargo check`、`cargo test`、`npm run tauri dev` 或 `npm run tauri build`；没有生成或启动 Release，也没有创建 SQLite 验收工作区。
 - 只读统计 C 盘旧项目为 268.60 MiB，其中 `node_modules` 262.78 MiB、`dist` 2.15 MiB；未删除任何内容，等待用户明确确认。
 - 原生 PDF、原创媒体及相关测试已保存为本地提交 `88e84ab`；未推送远程。
+
+## 2026-09-05 — 解除 Windows 原生工具链阻塞
+
+- 安装前 C 盘可用 21.94 GiB、D 盘可用 105.21 GiB；确认当前无 Rust，且 Build Tools 未重复安装。
+- 在写入前导出用户环境为 `D:\DevCache\HKCU-Environment-before-ielts-toolchain.reg`。
+- 持久化用户变量 `RUSTUP_HOME=D:\DevTools\rustup`、`CARGO_HOME=D:\DevTools\cargo`，并在保留所有原 PATH 条目的前提下加入 `D:\DevTools\cargo\bin`；安装命令同时设置当前进程环境和 D 盘临时目录。
+- Rust x64 安装器来自 Rust 官方入口；下载文件 12,721,664 字节，SHA-256 `6F4BEF66261261FCB43131BE8720BAB817D403A09EDEC7455C371974B90BDB7E`，与官方 `.sha256` 完全一致。
+- 使用 minimal profile 安装 stable `x86_64-pc-windows-msvc`：`rustc 1.98.1`、`cargo 1.98.1`、`rustup 1.29.1`；只安装默认 x64 MSVC 目标。
+- Microsoft Build Tools 引导程序 Authenticode 签名有效，签发者为 Microsoft Corporation。以管理员权限、`--passive --wait --norestart` 安装 `Microsoft.VisualStudio.Workload.VCTools`、`VC.Tools.x86.x64` 和 `Windows11SDK.26100`，退出码 0。
+- Build Tools 2022 `17.14.39` 位于 `D:\DevTools\VSBuildTools`，MSVC 工具集为 14.44.35207。已有 SSMS 锁定的 shared/cache 位于 `D:\SSMS共享`、`D:\SSMS缓存`，未强制修改。
+- Windows SDK 10.0.26100.0 由官方安装器放在 `C:\Program Files (x86)\Windows Kits\10`；提升后的 SDK 子安装器仍在 C 盘用户 Temp 写入日志，未手工迁移或删除。
+- `npm run tauri -- info` 已把 Rust、Cargo、rustup、MSVC 和 WebView2 全部标为可用；没有安装完整 Visual Studio IDE、nightly、交叉目标，也未自动重启。
+
+## 2026-09-06 — 首次 Rust 编译与原生开发验收
+
+- 在 D 盘 Rust/Cargo home、D 盘临时目录和 VS Build Tools x64 环境中实际执行 `cargo check --manifest-path src-tauri/Cargo.toml`，退出码 0；首次生成并保留应用级 `src-tauri/Cargo.lock`。
+- 首次 `cargo test --manifest-path src-tauri/Cargo.toml` 暴露一条内嵌媒体数量旧断言和一条无效 fill-blank 来源校验；做最小修复并补回归后，Rust 测试为 24/24。
+- Codex 宿主的 AppData 重命名跨卷行为触发 `CrossesDevices`；保留正常原子 rename，只有该错误时才执行同步复制并保留备份/恢复语义，新增替换 bootstrap 测试通过。
+- 创建隔离工作区 `D:\IELTS-Workbench-Acceptance-20260905`，实际数据库为 `ielts-workbench.sqlite3`；设置页显示规范化 D 盘路径，运行时确认 `window.__TAURI_INTERNALS__ === true`。
+- Windows 原生 PDF 对话框验证取消、有效 3 页原创 PDF、重复导入与隔离伪 PDF。有效文件仍为 4,497 字节、SHA-256 `2CD82AB886E160F4F64996484FE621860AFEEE774B366353902DB936706ABA48`；重复项未创建，伪 PDF 明确报告缺少 PDF header。
+- Reading 在两个 Pane 同步 q01=`true` 与 q05=`solar panels`，并同步 quote=`fictional town of Alderwick,` 的黄色标记；SQLite answers/annotations 实际记录与两轮重启读回一致。
+- Listening 原创 4 秒 WAV 在真实 WebView 中 `readyState=4` 且播放时间推进；Exam 模式隐藏原生 controls/Transcript，拖动被回弹、倍速复原为 1，结束后播放按钮禁用。
+- Writing Task 1 图表实际为 900×560；30 词草稿、manual 版本和 submitted 快照均写入 SQLite。
+- 快速关窗首次暴露 `close()` 再次触发 close-requested 的重入问题：草稿保存成功但进程不退出。改为 flush 成功后调用 `destroy()` 并添加最小权限；复测在输入后 120 ms 请求关窗，445 ms 内退出，最后内容跨重启恢复。
+- 随后连续完成两轮完整 Tauri 启动、持久化读回与正常退出；两轮退出分别耗时 273 ms、281 ms。未删除或清空任何用户数据，未触碰 C 盘旧副本。
+
+## 2026-09-06 — 最终门槛与 Windows Release
+
+- 最终环境复核：`rustc 1.98.1`、`cargo 1.98.1`、`rustup 1.29.1`，唯一工具链/目标为 stable `x86_64-pc-windows-msvc`；`npm run tauri -- info` 全部可用，WebView2 为 152.0.4191.66。
+- `cargo check --manifest-path src-tauri/Cargo.toml` 退出码 0；`cargo test --manifest-path src-tauri/Cargo.toml` 为 24/24，退出码 0。
+- `npm run lint` 退出码 0；最终源码标准 `npm test` 连续两次为 24/24 文件、117/117 项，退出码均为 0，时长 23.54 秒和 33.87 秒。
+- 首次最终 `npm run build` 捕获关闭监听反注册函数的 TypeScript 返回类型推断错误；显式声明 `() => void` 后重跑全部门槛。最终 `npm run build` 退出码 0，1997 modules transformed，PDF worker 输出成功，仅有非阻塞大 chunk 提示。
+- 首次全量 Tauri build 已成功生成 Release 和 MSI，但 NSIS 下载解压因工具缓存位于 C 盘而 TEMP 位于 D 盘，`rename` 返回 os error 17。项目启用 Tauri 官方 `bundle.useLocalToolsDir=true`，将 WiX/NSIS 缓存固定到 D 盘 `src-tauri\target\.tauri`；随后 NSIS 单独打包成功，最终标准 `npm run tauri build` 同时生成 MSI/NSIS 并退出码 0。
+- 最终产物：Release EXE 12,659,712 字节、SHA-256 `89131796210E52C44AEA591772068B780C8F8D2C5D616BE1854B490280CA25CD`；MSI 4,857,856 字节、SHA-256 `75E21DB0D806088D408DB1F30327BF099E0A429034475891A46A3B6F2F0529D7`；NSIS 3,581,782 字节、SHA-256 `8F1A5A9804068063CAE1273618EE1AFF73A9BC54BC93207415B606831E66936B`。
+- 停止 Vite 后独立启动 Release；1420 未监听，origin 为 `http://tauri.localhost`。内嵌 PDF worker 实际加载并解析 3 页 PDF；WAV、PNG 与 SQLite 正常。一次 Release 关窗写回/重启恢复和最终产物再次启动/退出均通过；未执行安装。
+- 收尾磁盘：C 盘可用 19.14 GiB（相对安装前约减少 2.80 GiB），D 盘可用 95.88 GiB（相对安装前约减少 9.33 GiB）。`src-tauri\target` 当前逻辑文件 8.03 GiB；失败尝试留下的 C 盘 Tauri 工具缓存 123.10 MiB 未删除，列入待确认清理项。
+- `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` 因 minimal profile 未安装 rustfmt 而不能执行；未为非必需门槛临时扩展工具链。Rust 源码已通过 `cargo check`、24/24 测试和人工 diff 格式检查。
+- 稳定性与 Release 源码保存为本地提交 `23527b6`；构建产物、工具链、隔离数据库和私有/原创导入样本均未提交。
