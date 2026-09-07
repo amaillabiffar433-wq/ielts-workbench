@@ -86,3 +86,24 @@
 - 收尾磁盘：C 盘可用 19.14 GiB（相对安装前约减少 2.80 GiB），D 盘可用 95.88 GiB（相对安装前约减少 9.33 GiB）。`src-tauri\target` 当前逻辑文件 8.03 GiB；失败尝试留下的 C 盘 Tauri 工具缓存 123.10 MiB 未删除，列入待确认清理项。
 - `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` 因 minimal profile 未安装 rustfmt 而不能执行；未为非必需门槛临时扩展工具链。Rust 源码已通过 `cargo check`、24/24 测试和人工 diff 格式检查。
 - 稳定性与 Release 源码保存为本地提交 `23527b6`；构建产物、工具链、隔离数据库和私有/原创导入样本均未提交。
+
+## 2026-09-06 — Reading 多 Passage 实现与针对性回归
+
+- 从干净的 `feat/pdf-import-mvp` / `f7fd42af1584714f1b681f1662ce01a4f799b76e` 恢复；确认 `ReadingModule.sections[]` 是 Passage 层，Section 内持有稳定 `contentBlocks[]` 和 `questionGroups[]`。旧页面正文固定取 `sections[0]`，但题目跨所有 Section 展平，形成“第一篇正文 + 所有篇题目”的结构缺陷。
+- 新增完整 Reading 题目索引与选择模型。题目按模块原始顺序建立稳定展示号；全部、按 Passage、连续范围、单题均返回原 `questionId`、`sectionId`、题组及原始顺序，范围缺失、越界、反向和重复题号明确报错。
+- Reading Pane 现在分别保存模式、Passage、题目选择和每个内容选择的滚动位置；设置键为 `reading.viewState.v1.<sessionId>`，复用工作区 SQLite 的 settings，不写入 Session 快照。只有 Session 和设置读取完成后才开始保存，失效旧状态会安全回退并提示。
+- 题目局部视图保留题组标题、说明、字数限制和选择项；整套视图逐 Passage 渲染其自身正文和题组。题目 DOM ID 继续以 `left-pane` / `right-pane` 为前缀，导航只滚动目标 Pane；答案统计始终基于完整 Reading 模块。
+- 新增原创、可按标准 IELTSPack 文件夹流程安装的 `samples/original-multi-passage-pack`：3 个 Passage、Question 1–21，Q14–20 跨 Passage 2/3，Q18 位于 Passage 3；Passage 1/3 含相同句子但使用不同 block ID。未覆盖原 demo、PDF 或任何用户数据。
+- 前端针对性测试为 5/5 文件、33/33 项通过；随后继续完成全量回归和 Release 验收，最终结果见 2026-09-07 记录。
+
+## 2026-09-07 — Reading 多 Passage Release 与原生验收
+
+- 将 React fast-refresh 不应导出的 Pane 辅助函数移到 `readingPaneIdentity.ts`；前端构建与 lint 恢复通过。Rust 只允许旧 Reading v1 缺省题号，Listening 缺号继续明确拒绝，并新增对应测试；未改数据库 schema。
+- 全量测试曾有 2 个组件测试在并发 I/O 下撞到默认 5 秒门槛；未提高超时或开启重试，而是拆分过长用例、减少无关题目渲染。最终标准 `npm test` 连续两次均为 27 文件、135/135；`npm run lint`、`npm run build`（2002 modules）和 Cargo 26/26 均通过。
+- 构建前把上一版 EXE 单独复制到 `D:\IELTS-Workbench-Releases\rollback-f7fd42a-20260907\ielts-workbench.exe`，大小 12,659,712 字节，SHA-256 `89131796210E52C44AEA591772068B780C8F8D2C5D616BE1854B490280CA25CD`，未复制整个 target。
+- 首个长时间 `tauri build --no-bundle` 进程结束但没有更新 EXE；直接 `cargo build --release` 虽生成新二进制，却仍指向 `http://localhost:1420`，因此明确判定为不可交付并正常关闭。随后用 Tauri 生产构建上下文、覆盖 `beforeBuildCommand=null` 复用已完成的 dist，显式 `--no-bundle`，生成可独立运行的新 EXE；未生成或安装 MSI/NSIS。
+- 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`，修改时间 `2026-09-07 18:26:56.593 +08:00`，12,631,040 字节，SHA-256 `B04448D8E8D2ABD6068AB124397B31BE7E828A2B3D2BB79BBF12A825BA73FF89`。Vite 1420 关闭时直接启动，target 为 `http://tauri.localhost`。
+- 备份原 bootstrap（94 字节，SHA-256 `6C6779157B01A854F691FBA6E27B4979F6D09B73625F1DFFD644288AE49A3BBC`）后，通过原生目录选择器初始化 `D:\IELTS-Workbench-Reading-Acceptance-20260907`。上一轮 `D:\IELTS-Workbench-Acceptance-20260905` 保持不变。
+- 原创 `original-multi-passage-pack` 通过系统目录选择、原生预览校验、版权确认和安装命令进入工作区。实际验证全部 21 题、Passage 2 Q8–15、跨 Passage Q14–20、单题 Q18、Pane 独立选择/滚动、目标 Pane 导航、同题答案同步、同 Passage 双份 DOM、相同文本不串标记，以及整套 P1/Q1–7、P2/Q8–15、P3/Q16–21 配对。
+- SQLite Session `3a372276-af6c-42f0-bf0f-00b132ddc1e0` 实际写入 Q18=`true`；`northbridge-p2-paragraph-02` 的 `regional harbour office` 标记为 offsets 53..76。视图设置保存为左 Passage 2、右 single Q18。正常退出后进程结束，再直接启动 Release，从“最近继续”完整恢复选择、答案和标记。
+- 功能源码与原创样本已保存为本地提交 `91c7e77`；未 push、未打 tag，验收数据库、构建产物和工具链未提交。

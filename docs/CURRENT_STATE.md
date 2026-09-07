@@ -1,12 +1,13 @@
 # IELTS Workbench 当前状态
 
-更新日期：2026-09-06
+更新日期：2026-09-07
 
 ## 当前仓库
 
 - 项目目录：`D:\Projects\雅思or算法软件项目`
 - 分支：`feat/pdf-import-mvp`
-- 本轮起始 HEAD：`a2b43d8f9352f4eae3bc70dcf5dc465c758ae985`
+- Reading 多 Passage 源码提交：`91c7e77`（Pane 独立选择、稳定题号/ID、视图恢复、原创三 Passage 样本）
+- 本轮 Reading 起始 HEAD：`f7fd42af1584714f1b681f1662ce01a4f799b76e`
 - 稳定性与 Release 源码提交：`23527b6`（Rust 首次编译修复、关窗保存、最小权限、D 盘 bundler cache）
 - 桌面验收链路提交：`88e84ab`（原生 PDF、原创媒体及测试）
 - 基线提交：`bdf9ac76bc71d8fb2d1fd1fbcaf7e977925e65f4`
@@ -33,21 +34,38 @@
 
 | 范围 | 当前状态 | 证据或说明 |
 | --- | --- | --- |
-| React/TypeScript/Vite 前端 | D 盘最终验证通过 | `npm run lint` 退出码 0；`npm run build` 成功转换 1997 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
-| 默认 `npm test` | 最终源码连续两次通过 | 两次均为 24/24 文件、117/117 测试；未改超时、重试或测试选择 |
-| Reading 双 Pane/共享答案与文字标记 | 原生验证通过 | Tauri 窗口中左右 Pane 同步显示 `true` 与 `solar panels`；黄色标记在两 Pane 同步，SQLite 写入并在两轮重启后读回 |
+| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-07 最终 `npm run lint` 退出码 0；`npm run build` 成功转换 2002 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
+| 默认 `npm test` | 最终源码连续两次通过 | 2026-09-07 两次均为 27/27 文件、135/135 测试；未改超时、重试或全局超时 |
+| Reading 多 Passage、双 Pane、答案与文字标记 | Release 原生验证通过 | 3 Passage / Q1–21；全部、按 Passage、Q14–20、Q18、整套正确配对均通过。双 Pane 同题答案同步、同 Passage DOM ID 唯一，SQLite 写入并在完整退出/重启后读回 |
 | Reading PDF 辅助导入 | 原生验证通过 | Windows 原生文件对话框完成取消、有效 PDF、重复导入和伪 PDF 拒绝；有效样本 SHA-256 未变化，题包重启后仍存在 |
-| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | `cargo check` 退出码 0；修复两个首次编译暴露的问题后 `cargo test` 为 24/24 |
+| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-07 `cargo test --manifest-path src-tauri/Cargo.toml` 为 26/26；旧 Reading 缺号兼容与 Listening 缺号拒绝均有测试 |
 | 原创 Listening/Writing 媒体 | 原生验证通过 | WAV 在真实 WebView 中播放；Exam 拖动/倍速/重播限制生效；900×560 Task 1 PNG 与 SQLite 草稿/版本均跨重启恢复 |
 | Tauri dev | 原生验证通过 | 在真实 Tauri 进程中确认 `window.__TAURI_INTERNALS__`，设置页显示 D 盘工作区和 SQLite；两轮正常退出/重启通过 |
-| Release/安装包 | 构建与独立运行通过 | 标准 `npm run tauri build` 退出码 0；Release EXE、MSI、NSIS 均生成；Vite 关闭时 Release 完成启动、媒体/PDF/SQLite 与退出恢复验收；未安装 |
+| Release/安装包 | 新 Reading EXE 独立运行通过 | Tauri 生产上下文 `--no-bundle` 生成新 EXE；Vite 关闭时从 `http://tauri.localhost` 启动并完成 Reading 退出/恢复；本轮未重建或安装 MSI/NSIS |
 | DeepSeek、Vocabulary、OCR 等 | 未开始 | 明确不在本轮范围 |
 
 ## 当前阻塞与下一步
 
-1. 本轮稳定性修复、开发窗口验收、Release 构建和独立启动均已完成；没有剩余环境阻塞。
-2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；不得删除当前所选工作区 `D:\IELTS-Workbench-Acceptance-20260905`，否则本次验收数据会丢失。
-3. 下一轮进入 Reading 多 Passage、指定题段/单题选择，并保持两 Pane 独立选择、独立滚动、共享答案和标记。
+1. Reading 多 Passage、指定 Passage/题段/单题、整套配对、视图恢复与新 Release 均已完成；没有剩余环境阻塞。
+2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；本轮验收数据位于 `D:\IELTS-Workbench-Reading-Acceptance-20260907`，不得删除。上一轮 `D:\IELTS-Workbench-Acceptance-20260905` 也保持不变。
+3. 下一轮最值得做的是 Reading 按稳定 `questionGroupId` 直接选择题组，让常用练习无需手工输入题号范围，并继续保留题组完整上下文。
+
+## 2026-09-07 Reading 多 Passage Release 验收摘要
+
+- 原创样本：`samples\original-multi-passage-pack`，通过原生系统目录选择器、校验预览、版权确认和安装命令进入新工作区；安装副本包含 manifest、README 与 Reading module，未覆盖源目录或旧题包。
+- 独立验收工作区：`D:\IELTS-Workbench-Reading-Acceptance-20260907`；SQLite：`D:\IELTS-Workbench-Reading-Acceptance-20260907\ielts-workbench.sqlite3`；Session：`3a372276-af6c-42f0-bf0f-00b132ddc1e0`。
+- 实际选择：Pane A = Passage 2，Pane B = Question 18。Passage 2 正文为 ferry 文章；Q18 保持题号、题干及 Passage 3 题组说明。全部 21 题、Passage 2 的 Q8–15、跨 Passage 的 Q14–20 和单题 Q18 均按原始顺序显示。
+- Q18 最终答案为 `true`。标记证据包括 `northbridge-p2-paragraph-02` 的 `regional harbour office`（offsets 53..76）及 Passage 1 重复句标记；Passage 3 含同一句但未错误显示该标记。
+- 双 Pane 独立滚动实际设置为左 180、右 760；Q18 导航焦点和 `aria-controls` 只指向 `right-pane-northbridge-q18-section`，左滚动保持 180。两 Pane 同显 Q18 时两个 DOM ID 唯一且答案同步；同显 Passage 2 时两份标记均正常显示且全局 DOM ID 无重复。
+- 整套模式得到 3 个顺序区块：Passage 1 对应 Q1–7、Passage 2 对应 Q8–15、Passage 3 对应 Q16–21，不再混合第一篇正文与全部题目。
+- 正常退出后进程与 9230 监听均结束；Vite 1420 关闭时重新直接启动 EXE，从“最近继续”恢复 Passage 2 / Q18、Q18=`true` 与 Passage 2 标记。
+
+## 2026-09-07 Reading Release EXE
+
+- 可直接运行：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`。
+- 修改时间：`2026-09-07 18:26:56.593 +08:00`；大小：12,631,040 字节；SHA-256：`B04448D8E8D2ABD6068AB124397B31BE7E828A2B3D2BB79BBF12A825BA73FF89`。
+- 上一版已单文件备份到 `D:\IELTS-Workbench-Releases\rollback-f7fd42a-20260907\ielts-workbench.exe`，12,659,712 字节，SHA-256 `89131796210E52C44AEA591772068B780C8F8D2C5D616BE1854B490280CA25CD`；新旧哈希不同，证明本次生成了新 EXE。
+- 本轮使用 Tauri 生产构建上下文和现有 `dist`，显式 `--no-bundle`；未生成、覆盖或安装 MSI/NSIS。最终 EXE 在 1420 未监听时以 `http://tauri.localhost` 独立启动。
 
 ## 2026-09-06 原生桌面验收摘要
 
@@ -60,10 +78,10 @@
 - 快速关窗修复：首次实测发现保存后再次 `close()` 会递归触发 close-requested，窗口不能退出；改为保存完成后 `destroy()`。复测在输入后 120 ms 请求正常关窗，445 ms 内进程结束，最后内容已写入 SQLite 并在重启后恢复。
 - 两轮完整重启：两次均恢复已导入题包、Reading 答案/标记、Writing 草稿和本地图片；随后正常退出，进程分别在 273 ms 和 281 ms 内结束。
 
-## Release 与安装包
+## 2026-09-06 Release 与安装包（历史基准）
 
 - 标准 `npm run tauri build` 最终退出码 0，同时完成 MSI 与 NSIS；`bundle.useLocalToolsDir=true` 将 Tauri bundler 的 WiX/NSIS 缓存放在 D 盘 `src-tauri\target\.tauri`。
-- 可直接运行：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`，12,659,712 字节，SHA-256 `89131796210E52C44AEA591772068B780C8F8D2C5D616BE1854B490280CA25CD`。
+- 当时的 EXE 为 12,659,712 字节，SHA-256 `89131796210E52C44AEA591772068B780C8F8D2C5D616BE1854B490280CA25CD`；2026-09-07 构建前已备份到 `D:\IELTS-Workbench-Releases\rollback-f7fd42a-20260907\ielts-workbench.exe`，target 中的同名路径现为上方新 Reading Release。
 - MSI：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\bundle\msi\IELTS Workbench_0.1.0_x64_en-US.msi`，4,857,856 字节，SHA-256 `75E21DB0D806088D408DB1F30327BF099E0A429034475891A46A3B6F2F0529D7`。
 - NSIS：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\bundle\nsis\IELTS Workbench_0.1.0_x64-setup.exe`，3,581,782 字节，SHA-256 `8F1A5A9804068063CAE1273618EE1AFF73A9BC54BC93207415B606831E66936B`。
 - Vite 1420 端口关闭时，最终 Release 从 `http://tauri.localhost` 启动且 Tauri runtime 为真；两个题包可见。内嵌 PDF worker 实际加载 1,265,413 字节并解析 3 页 PDF，WAV 播放、900×560 PNG、SQLite 均正常。
@@ -75,7 +93,7 @@
 - D 盘可用空间从安装前约 105.21 GiB 变为 95.88 GiB，净减少约 9.33 GiB。主要目录逻辑大小：Rustup 575.97 MiB、Cargo 570.55 MiB、Build Tools 2.84 GiB、`src-tauri\target` 8.03 GiB、`node_modules` 262.96 MiB、npm cache 64.83 MiB。逻辑文件大小之和与卷净占用不直接等价（NTFS 硬链接、压缩和同期系统写入会造成差异）。
 - `src-tauri\target` 是可重建产物但包含本次可直接双击的 Release 与两个安装包；在另行保存这些交付文件前不要删除。Rustup、Cargo、Build Tools、Windows SDK、WebView2 和当前验收工作区是继续开发/运行所需内容，不得清理。
 
-## D 盘前端验证
+## D 盘前端验证（2026-09-06 基准）
 
 - 依赖使用锁文件和 D 盘项目专用缓存重新安装：`npm ci --cache D:\Projects\.npm-cache\ielts-workbench --prefer-offline`，退出码 0。
 - C 盘审计时出现过 5 个默认 5 秒超时；迁移并干净重装后，D 盘标准 `npm test` 未复现失败。迁移阶段三次为 106/106；最终新增原生边界和媒体测试后，三次均为 114/114，通过时长分别为 19.36 秒、18.82 秒和 20.11 秒。

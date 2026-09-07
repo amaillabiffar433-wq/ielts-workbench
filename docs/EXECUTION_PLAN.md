@@ -1,8 +1,23 @@
 # IELTS Workbench 执行计划
 
-更新日期：2026-09-06（原生开发验收、Release 构建与最终回归已完成）
+更新日期：2026-09-07（Reading 多 Passage 增量开发与 Release 验收完成）
 
-## 当前执行切片：稳定性修复与 Windows 桌面验收
+## 当前执行切片：Reading 多 Passage、题段与单题选择
+
+恢复基准为 `D:\Projects\雅思or算法软件项目`、分支 `feat/pdf-import-mvp`、起始 HEAD `f7fd42af1584714f1b681f1662ce01a4f799b76e`；恢复时工作树干净。现有题包、SQLite、原创 PDF/音频/图表及上一版 Release 均只读保护，不重新迁移、不删除 C 盘副本、不推送远程。
+
+| 步骤 | 内容 | 状态 |
+| --- | --- | --- |
+| MP1 | 读取规则与真实实现，确认 Reading Section、题组、题目、答案、标记和设置持久化边界 | 已完成：确认旧页面只渲染 `sections[0]`，题目则跨全部 Section 展开；答案和标记已使用稳定领域 ID |
+| MP2 | 实现 Passage/题目范围选择、稳定题号、题组上下文、整套正确配对及 Pane 独立状态 | 已完成：Pane 状态按 Session 写入现有 settings；题号/ID 分离，导航 DOM ID 按 Pane 区分 |
+| MP3 | 新增可经正常安装链路使用的原创三 Passage样本，并补齐要求的自动化测试 | 已完成：`original-multi-passage-pack` 含 3 个 Passage、Question 1–21，Q14–20 跨 Passage，Q18 位于 Passage 3 |
+| MP4 | 连续两次标准前端测试、lint、Vite build 和 Cargo test 回归 | 已完成：最终两次 `npm test` 均为 27 文件、135/135；lint、2002-module Vite build、Cargo 26/26 均通过 |
+| MP5 | 备份上一版 EXE，构建新 Release，并在新 D 盘工作区完成原生退出/恢复验收 | 已完成：旧 EXE 单文件备份并核验 SHA-256；新 EXE 在 1420 关闭时独立启动，三 Passage、SQLite 与一次完整重启恢复通过 |
+| MP6 | 更新 CURRENT_STATE、WORK_LOG、DESKTOP_ACCEPTANCE、READING_AUDIT 并建立小型本地提交 | 已完成：功能源码提交 `91c7e77`；验收文档与最终提交按当前 Git 历史为准 |
+
+发布边界：本轮“Release”指生成并启动本地 Windows 可执行文件；按用户明确要求不做版本号提升、changelog/tag、远程推送或 GitHub Release，也不重复构建或安装 MSI/NSIS。
+
+## 已完成切片：稳定性修复与 Windows 桌面验收
 
 当前仓库为 `D:\Projects\雅思or算法软件项目`，分支 `feat/pdf-import-mvp`，本轮起始 HEAD `a2b43d8f9352f4eae3bc70dcf5dc465c758ae985`。C 盘原副本暂时保留，未经用户确认不删除。
 
@@ -19,7 +34,7 @@
 | A1 | Rust、Tauri dev、SQLite 和两轮重启验收 | 已完成：独立 D 盘工作区、原生 PDF、Reading/Listening/Writing、快速关窗及两轮重启均通过 |
 | R1 | Release 构建、独立启动和安装包产物核验 | 已完成：标准 Tauri build 退出码 0；EXE/MSI/NSIS 均生成，Release 独立启动和 SQLite 恢复通过；未安装 |
 
-本轮完成后下一切片：Reading 多 Passage、指定题段/单题选择；两个 Pane 继续保持独立选择、独立滚动，并共享 Session 答案和文字标记。
+该历史切片当时规划的下一步即本页上方 Reading 多 Passage 切片，现已完成。
 
 状态和当前结论以 `docs/CURRENT_STATE.md` 为准；逐次执行记录追加到 `docs/WORK_LOG.md`；原生验收逐项记录在 `docs/DESKTOP_ACCEPTANCE.md`。
 

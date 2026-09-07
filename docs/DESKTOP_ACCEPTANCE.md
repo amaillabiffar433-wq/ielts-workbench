@@ -1,6 +1,6 @@
 # IELTS Workbench Windows 桌面验收记录
 
-更新日期：2026-09-06
+更新日期：2026-09-07
 
 状态定义：`未开始`、`已实现但未原生验证`、`浏览器验证通过`、`环境阻塞`、`验证失败`、`待人工验收`、`原生验证通过`。
 
@@ -11,6 +11,7 @@
 - 本轮起始 HEAD：`a2b43d8f9352f4eae3bc70dcf5dc465c758ae985`
 - 测试工作区：`D:\IELTS-Workbench-Acceptance-20260905`（独立、可写，不指向用户真实学习数据）。
 - SQLite：`D:\IELTS-Workbench-Acceptance-20260905\ielts-workbench.sqlite3`。
+- Reading 多 Passage Release 工作区：`D:\IELTS-Workbench-Reading-Acceptance-20260907`；SQLite 位于同目录，未修改上一轮工作区。
 
 ## 验收矩阵
 
@@ -20,10 +21,12 @@
 | 工作区与 SQLite | 选择独立 D 盘目录，创建固定目录和数据库 | 已初始化并持续写入 `D:\IELTS-Workbench-Acceptance-20260905` | 设置页显示规范化工作区及数据库路径；数据库 114,688 字节 | 原生验证通过 |
 | 原创 PDF 导入 | 原生选择文件、读取字节、解析、安装、重开 | 取消、有效导入、重复去重、无效头拒绝均在 Windows 文件对话框中验证 | 原 PDF SHA-256 `2CD82A…BA48`；题包 `pdf-reading-3380bbb850f80d50` 跨重启存在 | 原生验证通过 |
 | Reading | 答案和标记跨 Pane 同步，重启恢复 | q01=`true`、q05=`solar panels` 在两 Pane 即时同步；黄色标记在相同内容两侧出现并重启恢复 | SQLite Session `06237ec2…`、answers 2 条、annotation 1 条 | 原生验证通过 |
+| Reading 多 Passage | Passage/全部/按 Passage/范围/单题/整套；Pane 独立滚动、稳定 ID、共享答案/标记、重启恢复 | P2/Q18、Q8–15、Q14–20、Q18、同题/同 Passage、相同文本隔离和整套配对均在新 Release 实际操作；一次退出/重启完整恢复 | SQLite Session `3a372276…`、Q18=`true`、annotations 2 条、视图设置 1 条 | Release 原生验证通过 |
 | Listening | 播放可听原创音频，验证 Study/Exam 限制 | `duration=4`、`readyState=4`，播放时间推进；Exam 无原生 controls/Transcript，拖动回弹、倍速复原、结束禁重播 | 实际 WebView audio 状态与 Exam 控件状态 | 原生验证通过 |
 | Writing | 自动保存、版本、提交、Task 1 图片、快速关窗 | 900×560 图表加载；草稿、manual、submitted 均写入 SQLite；快速关窗缺陷修复并复测 | 输入后 120 ms 关窗，445 ms 退出；最后文字重启恢复 | 原生验证通过 |
 | 两轮完整重启 | 正常退出后重新启动两次，恢复题包和用户状态 | 两轮均恢复题包、Reading 答案/标记、Writing 草稿与图片并正常退出 | 两次退出分别为 273 ms、281 ms | 原生验证通过 |
-| Release 独立运行 | 关闭 Vite 后启动 Release，可加载 PDF worker/媒体/SQLite | 1420 未监听时从 `http://tauri.localhost` 启动；PDF worker、WAV、PNG、SQLite 读写和一次退出/恢复均通过 | 最终 EXE SHA-256 `89131796…25CD` | 原生验证通过 |
+| 2026-09-06 Release 独立运行（历史） | 关闭 Vite 后启动 Release，可加载 PDF worker/媒体/SQLite | 1420 未监听时从 `http://tauri.localhost` 启动；PDF worker、WAV、PNG、SQLite 读写和一次退出/恢复均通过 | 历史 EXE SHA-256 `89131796…25CD`；现已单文件备份 | 原生验证通过 |
+| Reading Release 独立运行 | 不运行 Vite，直接启动本轮 EXE，恢复新 Reading 状态 | 1420 未监听；`http://tauri.localhost`；三 Passage 与 SQLite 正常，一次正常退出/重启恢复通过 | 新 EXE SHA-256 `B04448D8…FF89` | 原生验证通过 |
 | Windows 安装包 | 生成安装包；未获授权前不执行系统安装 | 标准 `npm run tauri build` 同时生成 MSI 与 NSIS，未执行安装 | MSI `75E21DB0…29D7`；NSIS `8F1A5A98…36B` | 原生构建通过，安装未授权 |
 
 ## 原生环境（2026-09-05 已安装）
@@ -82,3 +85,16 @@ npm run tauri dev
 - PDF worker 请求 `http://tauri.localhost/assets/pdf.worker.min-Dswkl-cV.mjs`，传输 1,265,713 字节、解码 1,265,413 字节；原创 PDF 显示 3 页和文本层。
 - 原创 WAV 在 Release 中 `duration=4`、`readyState=4` 且播放时间推进；Task 1 图片 `naturalWidth=900`、`naturalHeight=560`。
 - Release 关窗前写入 marker，216 ms 后请求正常关闭，574 ms 内进程结束；SQLite 随后读到 20 词草稿并在下一次 Release 启动完整恢复。最终构建产物又执行一次启动与正常退出，仍无 Vite 监听。
+
+## 2026-09-07 Reading 多 Passage Release 证据
+
+- 新工作区：`D:\IELTS-Workbench-Reading-Acceptance-20260907`；数据库：`D:\IELTS-Workbench-Reading-Acceptance-20260907\ielts-workbench.sqlite3`；实际为 Tauri WebView/SQLite，不是浏览器 mock。
+- 原创题包从 `D:\Projects\雅思or算法软件项目\samples\original-multi-passage-pack` 经原生目录选择器、校验预览、版权确认和安装按钮导入。安装副本位于新工作区 `packs\original-multi-passage-pack`。
+- Pane A 实际选择 Passage 2，显示 ferry 正文而非第一篇；Pane B 实际选择 Q18，保留题号 18、题干、True/False/Not Given 选项和 Passage 3 题组说明。
+- 选择结果：全部 Q1–21；Passage 2 为 Q8–15；范围 Q14–20 按顺序跨 Passage 2/3；单题为 Q18。Q18 最终写入 `answer_json="true"`。
+- 标记：Passage 2 `block_id=northbridge-p2-paragraph-02`、offsets 53..76、quote=`regional harbour office`、yellow；切换 P1→P3→P2 后仍在。另在 Passage 1 标记重复句，Passage 3 虽含相同句但没有错误标记。
+- 独立滚动实测左 180、右 760；Q18 导航 `aria-controls=right-pane-northbridge-q18-section`，焦点进入右 Pane 且左侧保持 180。两 Pane 同显 Q18 时 ID 分别以 `left-pane` / `right-pane` 开头，修改一侧后两侧同步为 `true`。
+- 两 Pane 同显 Passage 2 时同一逻辑 block 有两份视图、两侧均显示已有标记，全局 DOM ID 无重复。整套模式为 P1/Q1–7、P2/Q8–15、P3/Q16–21 三个区块。
+- 视图设置键 `reading.viewState.v1.3a372276-af6c-42f0-bf0f-00b132ddc1e0` 保存左 `passage/P2`、右 `questions/single/18`。正常关窗后进程和 9230 均结束；直接重启 EXE，从“最近继续”恢复该选择、Q18=`true` 和 Passage 2 标记。
+- 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；修改时间 `2026-09-07 18:26:56.593 +08:00`；12,631,040 字节；SHA-256 `B04448D8E8D2ABD6068AB124397B31BE7E828A2B3D2BB79BBF12A825BA73FF89`。Vite 1420 未监听，origin 为 `http://tauri.localhost`。
+- 本轮只生成独立 EXE，`--no-bundle` 未重建 MSI/NSIS，也未执行任何安装程序。最终回归：前端 27 文件、135/135 连续两次；lint 与 Vite build 通过；Cargo 26/26。
