@@ -4,6 +4,8 @@ import manifest from "../../../samples/original-demo-pack/manifest.json";
 import listening from "../../../samples/original-demo-pack/modules/listening.json";
 import reading from "../../../samples/original-demo-pack/modules/reading.json";
 import writing from "../../../samples/original-demo-pack/modules/writing.json";
+import multiPassageManifest from "../../../samples/original-multi-passage-pack/manifest.json";
+import multiPassageReading from "../../../samples/original-multi-passage-pack/modules/reading.json";
 import { IELTSPackSchema, QuestionSchema, parseIeltsPack } from "./schemas";
 
 const originalDemoInput = {
@@ -23,6 +25,19 @@ describe("IELTSPackSchema", () => {
     ]);
     expect(Object.isFrozen(parsed)).toBe(true);
     expect(Object.isFrozen(parsed.modules[0].sections)).toBe(true);
+  });
+
+  it("accepts the original three-Passage Reading sample through the pack schema", () => {
+    const parsed = parseIeltsPack({ manifest: multiPassageManifest, modules: [multiPassageReading] });
+    const readingModule = parsed.modules[0];
+    expect(readingModule.type).toBe("reading");
+    if (readingModule.type !== "reading") throw new Error("Reading module missing");
+    const questions = readingModule.sections.flatMap((section) =>
+      section.questionGroups.flatMap((group) => group.questions),
+    );
+    expect(readingModule.sections).toHaveLength(3);
+    expect(questions).toHaveLength(21);
+    expect(questions.find((question) => question.number === 18)?.id).toBe("northbridge-q18");
   });
 
   it("rejects unsupported schema versions", () => {
@@ -72,6 +87,24 @@ describe("IELTSPackSchema", () => {
     if (!result.success) {
       expect(result.error.issues.some((issue) => issue.message.includes("at most one reading"))).toBe(true);
     }
+  });
+
+  it("assigns missing legacy Reading numbers from the stable full-module order", () => {
+    const legacy = structuredClone(originalDemoInput);
+    const legacyReading = legacy.modules[0] as unknown as {
+      sections: Array<{ questionGroups: Array<{ questions: Array<{ id: string; number?: number }> }> }>;
+    };
+    const questions = legacyReading.sections[0].questionGroups.flatMap((group) => group.questions);
+    delete (questions[3] as { number?: number }).number;
+
+    const parsed = parseIeltsPack(legacy);
+    const readingModule = parsed.modules.find((module) => module.type === "reading");
+    if (!readingModule || readingModule.type !== "reading") throw new Error("Reading module missing");
+    const parsedQuestions = readingModule.sections.flatMap((section) =>
+      section.questionGroups.flatMap((group) => group.questions),
+    );
+    expect(parsedQuestions[3].number).toBe(4);
+    expect(parsedQuestions[3].id).toBe(questions[3].id);
   });
 });
 

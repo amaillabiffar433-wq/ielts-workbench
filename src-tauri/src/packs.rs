@@ -443,7 +443,7 @@ impl QuestionV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct SingleChoiceQuestionV1 {
     id: String,
-    number: u32,
+    number: Option<u32>,
     prompt: String,
     #[serde(default = "default_question_points")]
     points: u32,
@@ -457,7 +457,7 @@ struct SingleChoiceQuestionV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct TrueFalseNotGivenQuestionV1 {
     id: String,
-    number: u32,
+    number: Option<u32>,
     prompt: String,
     #[serde(default = "default_question_points")]
     points: u32,
@@ -478,7 +478,7 @@ enum TrueFalseNotGivenAnswer {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct ShortAnswerQuestionV1 {
     id: String,
-    number: u32,
+    number: Option<u32>,
     prompt: String,
     #[serde(default = "default_question_points")]
     points: u32,
@@ -495,7 +495,7 @@ struct ShortAnswerQuestionV1 {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct FillBlankQuestionV1 {
     id: String,
-    number: u32,
+    number: Option<u32>,
     prompt: String,
     #[serde(default = "default_question_points")]
     points: u32,
@@ -1852,7 +1852,7 @@ fn validate_reading_section(
             errors,
         );
     }
-    validate_question_groups(&section.question_groups, path, stable_ids, errors);
+    validate_question_groups(&section.question_groups, path, true, stable_ids, errors);
 }
 
 fn validate_listening_section(
@@ -1891,7 +1891,7 @@ fn validate_listening_section(
             errors,
         );
     }
-    validate_question_groups(&section.question_groups, path, stable_ids, errors);
+    validate_question_groups(&section.question_groups, path, false, stable_ids, errors);
 }
 
 fn validate_writing_section(
@@ -1984,6 +1984,7 @@ fn validate_content_block(
 fn validate_question_groups(
     groups: &[QuestionGroupV1],
     section_path: &str,
+    allow_missing_numbers: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
@@ -2022,6 +2023,7 @@ fn validate_question_groups(
             validate_question(
                 question,
                 &format!("{group_path}.questions[{question_index}]"),
+                allow_missing_numbers,
                 stable_ids,
                 errors,
             );
@@ -2032,6 +2034,7 @@ fn validate_question_groups(
 fn validate_question(
     question: &QuestionV1,
     path: &str,
+    allow_missing_number: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
@@ -2044,6 +2047,7 @@ fn validate_question(
                 question.points,
                 question.explanation.as_deref(),
                 path,
+                allow_missing_number,
                 stable_ids,
                 errors,
             );
@@ -2101,6 +2105,7 @@ fn validate_question(
                 question.points,
                 question.explanation.as_deref(),
                 path,
+                allow_missing_number,
                 stable_ids,
                 errors,
             );
@@ -2115,6 +2120,7 @@ fn validate_question(
                 question.points,
                 question.explanation.as_deref(),
                 path,
+                allow_missing_number,
                 stable_ids,
                 errors,
             );
@@ -2135,6 +2141,7 @@ fn validate_question(
                 question.points,
                 question.explanation.as_deref(),
                 path,
+                allow_missing_number,
                 stable_ids,
                 errors,
             );
@@ -2184,19 +2191,26 @@ fn validate_question_source(
 #[allow(clippy::too_many_arguments)]
 fn validate_question_base(
     id: &str,
-    number: u32,
+    number: Option<u32>,
     prompt: &str,
     points: u32,
     explanation: Option<&str>,
     path: &str,
+    allow_missing_number: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
     stable_ids.record(id, &format!("{path}.id"), errors);
-    if number == 0 {
+    if number.is_none() && !allow_missing_number {
+        errors.push(issue(
+            "MISSING_QUESTION_NUMBER",
+            "Listening question numbers are required.",
+            Some(&format!("{path}.number")),
+        ));
+    } else if number == Some(0) {
         errors.push(issue(
             "INVALID_QUESTION_NUMBER",
-            "Question number must be a positive integer.",
+            "Question number must be a positive integer when supplied.",
             Some(&format!("{path}.number")),
         ));
     }
@@ -2938,6 +2952,42 @@ mod tests {
                 "media/images/original-workshop-attendance.png",
             ]
         );
+    }
+
+    #[test]
+    fn accepts_a_legacy_reading_question_without_an_explicit_number() {
+        let temp = tempfile::tempdir().unwrap();
+        let pack = temp.path().join("pack");
+        write_valid_pack(&pack);
+        let mut reading = read_fixture_json(&pack, "modules/reading.json");
+        reading["sections"][0]["questionGroups"][0]["questions"][1]
+            .as_object_mut()
+            .unwrap()
+            .remove("number");
+        write_fixture_json(&pack, "modules/reading.json", &reading);
+
+        let report = validate_pack_folder(pack.to_str().unwrap());
+        assert!(report.valid, "{:?}", report.errors);
+    }
+
+    #[test]
+    fn still_requires_explicit_listening_question_numbers() {
+        let temp = tempfile::tempdir().unwrap();
+        let pack = temp.path().join("pack");
+        write_valid_pack(&pack);
+        let mut listening = read_fixture_json(&pack, "modules/listening.json");
+        listening["sections"][0]["questionGroups"][0]["questions"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("number");
+        write_fixture_json(&pack, "modules/listening.json", &listening);
+
+        let report = validate_pack_folder(pack.to_str().unwrap());
+        assert!(!report.valid);
+        assert!(report
+            .errors
+            .iter()
+            .any(|error| error.code == "MISSING_QUESTION_NUMBER"));
     }
 
     #[test]

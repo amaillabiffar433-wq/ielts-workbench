@@ -1,5 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -14,6 +13,7 @@ import type {
 } from "../../../infrastructure/repositories/LearningRepository";
 import { answerKey, workbenchStore } from "../../../stores/workbenchStore";
 import { ReadingPage } from "./ReadingPage";
+import { createDefaultReadingViewState, readingViewStateSettingKey } from "./readingViewState";
 
 const originalState = workbenchStore.getState();
 const originalResizeObserver = window.ResizeObserver;
@@ -102,6 +102,8 @@ describe("ReadingPage shared panes and question navigation", () => {
       }));
     });
 
+    const firstQuestion = firstSingleChoiceQuestion();
+    const initialView = createDefaultReadingViewState(readingModule());
     workbenchStore.setState({
       activePack: originalDemoPack,
       session,
@@ -110,7 +112,16 @@ describe("ReadingPage shared panes and question navigation", () => {
       saveState: "idle",
       ensureSession,
       answerQuestion,
-      loadSetting: vi.fn(async () => null),
+      loadSetting: vi.fn(async (key: string) => key === readingViewStateSettingKey(session.sessionId)
+        ? JSON.stringify({
+            ...initialView,
+            right: {
+              ...initialView.right,
+              questionScope: "single",
+              singleNumber: firstQuestion.number,
+            },
+          })
+        : null),
       saveSetting: vi.fn(async () => undefined),
     });
     Object.defineProperty(HTMLElement.prototype, "scrollIntoView", {
@@ -141,20 +152,19 @@ describe("ReadingPage shared panes and question navigation", () => {
   });
 
   it("synchronizes one canonical answer across the real left and right question panes", async () => {
-    const user = userEvent.setup();
     const question = firstSingleChoiceQuestion();
     const option = question.options[0];
     if (!option) throw new Error("The demo single-choice question needs an option");
     renderReading();
 
     await screen.findByTestId("reading-split-workspace");
-    await user.selectOptions(screen.getByLabelText("左窗格内容"), "questions");
+    fireEvent.change(screen.getByLabelText("左窗格内容"), { target: { value: "questions" } });
 
     const matchingOptions = screen.getAllByRole("radio", {
       name: `${option.label}${option.text}`,
     });
     expect(matchingOptions).toHaveLength(2);
-    await user.click(matchingOptions[0]);
+    fireEvent.click(matchingOptions[0]);
 
     await waitFor(() => {
       expect(matchingOptions[0]).toBeChecked();
@@ -168,17 +178,19 @@ describe("ReadingPage shared panes and question navigation", () => {
   });
 
   it("uses unique pane-scoped IDs and focuses the deterministic right-pane navigation target", async () => {
-    const user = userEvent.setup();
     const question = firstSingleChoiceQuestion();
     renderReading();
 
     await screen.findByTestId("reading-split-workspace");
-    await user.selectOptions(screen.getByLabelText("左窗格内容"), "questions");
+    fireEvent.change(screen.getByLabelText("左窗格内容"), { target: { value: "questions" } });
 
     const leftId = questionContainerId("left-pane", question.id);
     const rightId = questionContainerId("right-pane", question.id);
     const leftTarget = document.getElementById(leftId);
     const rightTarget = document.getElementById(rightId);
+    const rightScroll = document.querySelector<HTMLElement>('[data-pane-scroll="right"]');
+    const rightScrollTo = vi.fn();
+    if (rightScroll) rightScroll.scrollTo = rightScrollTo;
     expect(leftTarget).not.toBeNull();
     expect(rightTarget).not.toBeNull();
     expect(leftTarget?.id).not.toBe(rightTarget?.id);
@@ -192,23 +204,19 @@ describe("ReadingPage shared panes and question navigation", () => {
       name: `跳到第 ${question.number} 题，未答，右窗格`,
     });
     expect(navigationButton).toHaveAttribute("aria-controls", rightId);
-    await user.click(navigationButton);
+    fireEvent.click(navigationButton);
 
     await waitFor(() => expect(document.activeElement).toBe(rightTarget));
-    expect(rightTarget?.scrollIntoView).toHaveBeenCalledWith({
-      behavior: "smooth",
-      block: "center",
-    });
+    expect(rightScrollTo).toHaveBeenCalledWith(expect.objectContaining({ behavior: "smooth" }));
   });
 
   it("opens the right question view before focusing when neither pane currently shows questions", async () => {
-    const user = userEvent.setup();
     const question = firstSingleChoiceQuestion();
     renderReading();
 
     await screen.findByTestId("reading-split-workspace");
     const rightSelector = screen.getByLabelText("右窗格内容");
-    await user.selectOptions(rightSelector, "passage");
+    fireEvent.change(rightSelector, { target: { value: "passage" } });
 
     const rightId = questionContainerId("right-pane", question.id);
     expect(document.getElementById(rightId)).toBeNull();
@@ -216,7 +224,7 @@ describe("ReadingPage shared panes and question navigation", () => {
       name: `跳到第 ${question.number} 题，未答，右窗格`,
     });
     expect(navigationButton).toHaveAttribute("aria-controls", rightId);
-    await user.click(navigationButton);
+    fireEvent.click(navigationButton);
 
     await waitFor(() => {
       expect(rightSelector).toHaveValue("questions");
@@ -225,7 +233,6 @@ describe("ReadingPage shared panes and question navigation", () => {
   });
 
   it("shows a recoverable error when Session restoration fails", async () => {
-    const user = userEvent.setup();
     const ensureSession = vi.fn()
       .mockRejectedValueOnce(new Error("workspace database is unavailable"))
       .mockImplementation(async () => {
@@ -238,7 +245,7 @@ describe("ReadingPage shared panes and question navigation", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "无法恢复阅读 Session：workspace database is unavailable",
     );
-    await user.click(screen.getByRole("button", { name: "重试" }));
+    fireEvent.click(screen.getByRole("button", { name: "重试" }));
 
     expect(await screen.findByTestId("reading-split-workspace")).toBeInTheDocument();
     expect(ensureSession).toHaveBeenCalledTimes(2);

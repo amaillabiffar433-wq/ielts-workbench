@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "id": "northbridge-reading-01",
+  "testId": "northbridge-test-01",
+  "type": "reading",
+  "title": "Northbridge Field Notes",
+  "sections": [
+    {
+      "id": "northbridge-passage-01",
+      "title": "The Clockwork Seed Bank",
+      "contentBlocks": [
+        { "id": "northbridge-p1-heading", "kind": "heading", "text": "The Clockwork Seed Bank" },
+        { "id": "northbridge-p1-paragraph-01", "kind": "paragraph", "text": "Northbridge opened its first community seed bank inside a disused railway office. The organisers wanted a place where locally adapted beans, herbs and flowers could be exchanged without selling them. A small brass marker was fixed beside the entrance. It carried the year of the building's restoration rather than the date when the seed bank opened." },
+        { "id": "northbridge-p1-paragraph-02", "kind": "paragraph", "text": "Packets are stored in shallow wooden drawers. Each drawer has a paper card describing the plant, the neighbourhood where its seeds were collected and the month in which they were dried. Volunteers deliberately avoided a computer-controlled cabinet because the room has an unreliable power supply and the paper index remains usable during winter outages." },
+        { "id": "northbridge-p1-paragraph-03", "kind": "paragraph", "text": "Members may take two packets on each visit. They are invited, but not required, to return fresh seed after the next harvest. The rule is intended to keep uncommon varieties in circulation while avoiding a penalty for beginners whose first crop fails. Commercial seed is accepted only when its original label is still attached." },
+        { "id": "northbridge-p1-paragraph-04", "kind": "paragraph", "text": "The oldest part of the collection consists of climbing beans grown beside the canal. Gardeners reported that these plants tolerated cool evenings better than several modern varieties. The volunteers have not claimed that this observation proves a genetic advantage; samples would need controlled trials before any such conclusion could be made." },
+        { "id": "northbridge-p1-paragraph-05", "kind": "paragraph", "text": "Every February the drawers are checked for moisture and damaged envelopes. Packets that smell damp are isolated instead of being returned to the shelves. A local college lends a low-temperature drying cabinet for one weekend, after which volunteers reseal suitable seeds in new paper envelopes." },
+        { "id": "northbridge-p1-paragraph-06", "kind": "paragraph", "text": "Usage rose slowly during the first year. Most visitors initially chose familiar vegetables, but illustrated labels later encouraged them to try dye plants and pollinator-friendly flowers. The labels were drawn by art students and may be copied by other non-commercial seed libraries." }
+      ],
+      "questionGroups": [
+        {
+          "id": "northbridge-p1-group-01",
+          "title": "Questions 1–4",
+          "instructions": "Decide whether each statement agrees with Passage 1. Choose True, False, or Not Given.",
+          "questions": [
+            { "id": "northbridge-q01", "number": 1, "type": "true-false-not-given", "prompt": "Seeds are sold from the former railway office.", "correctAnswer": "false" },
+            { "id": "northbridge-q02", "number": 2, "type": "true-false-not-given", "prompt": "The brass marker records the opening date of the seed bank.", "correctAnswer": "false" },
+            { "id": "northbridge-q03", "number": 3, "type": "true-false-not-given", "prompt": "Members must return seed after every successful harvest.", "correctAnswer": "false" },
+            { "id": "northbridge-q04", "number": 4, "type": "true-false-not-given", "prompt": "The seed bank has compared its beans with varieties grown in another country.", "correctAnswer": "not-given" }
+          ]
+        },
+        {
+          "id": "northbridge-p1-group-02",
+          "title": "Questions 5–7",
+          "instructions": "Answer the questions using no more than three words from Passage 1.",
+          "questions": [
+            { "id": "northbridge-q05", "number": 5, "type": "short-answer", "prompt": "What remains usable when the electricity fails?", "acceptableAnswers": ["the paper index", "paper index"], "maxWords": 3 },
+            { "id": "northbridge-q06", "number": 6, "type": "fill-blank", "prompt": "Complete the sentence.", "sentence": "Damp packets are {{blank}} before the annual drying weekend.", "acceptableAnswers": ["isolated"], "maxWords": 1 },
+            { "id": "northbridge-q07", "number": 7, "type": "short-answer", "prompt": "Who created the illustrated labels?", "acceptableAnswers": ["art students"], "maxWords": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "northbridge-passage-02",
+      "title": "A Ferry Timetable Written by Tides",
+      "contentBlocks": [
+        { "id": "northbridge-p2-heading", "kind": "heading", "text": "A Ferry Timetable Written by Tides" },
+        { "id": "northbridge-p2-paragraph-01", "kind": "paragraph", "text": "The Northbridge foot ferry crosses a broad tidal inlet rather than a conventional river channel. Its landing stages stand at different heights, so a departure time that works in the morning may be unsafe later on the same day. The published timetable therefore changes weekly and includes short periods when no crossing is offered." },
+        { "id": "northbridge-p2-paragraph-02", "kind": "paragraph", "text": "Skippers begin with tide predictions supplied by the regional harbour office. They then compare those figures with observations from two simple gauges beside the landings. Strong winds can hold water inside the inlet or push it out earlier than predicted, which is why the printed table is described as guidance rather than a guarantee." },
+        { "id": "northbridge-p2-paragraph-03", "kind": "paragraph", "text": "Passengers once queued in a narrow lane where they could not see the vessel. A new waiting area now faces the water and uses numbered benches. The numbers help the crew board people in arrival order, but they are not tickets and a place on a bench cannot be reserved in advance." },
+        { "id": "northbridge-p2-paragraph-04", "kind": "paragraph", "text": "Bicycles are carried when space permits. Cargo tricycles are excluded because their turning circle is too wide for the older landing stage. Folding bicycles count as hand luggage if they are bagged before boarding, while ordinary bicycles are secured to a rail by a crew member." },
+        { "id": "northbridge-p2-paragraph-05", "kind": "paragraph", "text": "In fog, the service may pause even when the water level is suitable. The skipper announces the pause on a noticeboard and by a low-power local radio signal. The radio message is intentionally brief, since it is meant for people already near the harbour and is not a replacement for regional weather reports." },
+        { "id": "northbridge-p2-paragraph-06", "kind": "paragraph", "text": "A trial evening crossing was introduced on Fridays during one summer. It was popular with walkers but expensive to staff, and the following year's schedule replaced it with a later Saturday afternoon service. Survey responses are still being reviewed before any permanent extension is proposed." }
+      ],
+      "questionGroups": [
+        {
+          "id": "northbridge-p2-group-01",
+          "title": "Questions 8–11",
+          "instructions": "Choose the correct answer, A, B, or C, for each question about Passage 2.",
+          "questions": [
+            { "id": "northbridge-q08", "number": 8, "type": "single-choice", "prompt": "Why does the ferry timetable change every week?", "options": [{ "id": "northbridge-q08-a", "label": "A", "text": "The inlet is affected by tides." }, { "id": "northbridge-q08-b", "label": "B", "text": "The ferry changes its destination." }, { "id": "northbridge-q08-c", "label": "C", "text": "The crew work at another harbour." }], "correctOptionId": "northbridge-q08-a" },
+            { "id": "northbridge-q09", "number": 9, "type": "single-choice", "prompt": "What can make predicted water levels inaccurate?", "options": [{ "id": "northbridge-q09-a", "label": "A", "text": "Numbered benches" }, { "id": "northbridge-q09-b", "label": "B", "text": "Strong winds" }, { "id": "northbridge-q09-c", "label": "C", "text": "Folding bicycles" }], "correctOptionId": "northbridge-q09-b" },
+            { "id": "northbridge-q10", "number": 10, "type": "single-choice", "prompt": "What is the purpose of the bench numbers?", "options": [{ "id": "northbridge-q10-a", "label": "A", "text": "To reserve a place" }, { "id": "northbridge-q10-b", "label": "B", "text": "To collect fares" }, { "id": "northbridge-q10-c", "label": "C", "text": "To preserve arrival order" }], "correctOptionId": "northbridge-q10-c" },
+            { "id": "northbridge-q11", "number": 11, "type": "single-choice", "prompt": "Why are cargo tricycles not carried?", "options": [{ "id": "northbridge-q11-a", "label": "A", "text": "They are too heavy for the vessel." }, { "id": "northbridge-q11-b", "label": "B", "text": "They cannot turn safely on one landing." }, { "id": "northbridge-q11-c", "label": "C", "text": "They interfere with the radio." }], "correctOptionId": "northbridge-q11-b" }
+          ]
+        },
+        {
+          "id": "northbridge-p2-group-02",
+          "title": "Questions 12–15",
+          "instructions": "Complete each answer using no more than three words from Passage 2.",
+          "questions": [
+            { "id": "northbridge-q12", "number": 12, "type": "short-answer", "prompt": "Who provides the initial tide predictions?", "acceptableAnswers": ["regional harbour office", "the harbour office"], "maxWords": 3 },
+            { "id": "northbridge-q13", "number": 13, "type": "fill-blank", "prompt": "Complete the sentence.", "sentence": "A folding bicycle must be {{blank}} before boarding.", "acceptableAnswers": ["bagged"], "maxWords": 1 },
+            { "id": "northbridge-q14", "number": 14, "type": "short-answer", "prompt": "Which condition can stop crossings even at a safe water level?", "acceptableAnswers": ["fog"], "maxWords": 1 },
+            { "id": "northbridge-q15", "number": 15, "type": "short-answer", "prompt": "On which day was the experimental evening service offered?", "acceptableAnswers": ["Fridays", "Friday"], "maxWords": 1 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "northbridge-passage-03",
+      "title": "Listening Posts for Urban Moths",
+      "contentBlocks": [
+        { "id": "northbridge-p3-heading", "kind": "heading", "text": "Listening Posts for Urban Moths" },
+        { "id": "northbridge-p3-paragraph-01", "kind": "paragraph", "text": "Researchers in Northbridge built three night-time observation shelters for volunteers recording moth activity. A small brass marker was fixed beside the entrance. Unlike the marker at the seed bank, this one gives a grid reference so that photographs and weather notes can be assigned to the correct shelter." },
+        { "id": "northbridge-p3-paragraph-02", "kind": "paragraph", "text": "Each shelter contains a low-brightness lamp, a white recording sheet and a microphone. The microphone does not capture moth calls; most moths in the study do not produce sounds that the equipment could identify. Instead, it records rain and nearby traffic so analysts can estimate when poor conditions may have reduced human observation accuracy." },
+        { "id": "northbridge-p3-paragraph-03", "kind": "paragraph", "text": "Volunteers photograph every distinct visitor to the sheet but do not handle the insects. An offline guide on a shared tablet suggests broad families, while final species labels are checked later by trained recorders. The guide stores no participant names and the tablet is returned to a locked cabinet after each session." },
+        { "id": "northbridge-p3-paragraph-04", "kind": "paragraph", "text": "The shelters use amber approach lights because an early white-light trial attracted insects away from the recording sheet. The central lamp remains white during a timed twenty-minute count. After the count it switches off automatically, preventing different teams from accidentally extending the sampling period." },
+        { "id": "northbridge-p3-paragraph-05", "kind": "paragraph", "text": "Preliminary records show fewer observations beside the busiest road, but the research team has not interpreted this as proof that traffic reduces moth abundance. Noise may simply make it harder for volunteers to concentrate, and roadside wind can also move small insects beyond the photographed area." },
+        { "id": "northbridge-p3-paragraph-06", "kind": "paragraph", "text": "Next season, identical fabric screens will be added behind all three sheets. This change should reduce variation in the background of photographs. The team will continue using the same lamps and timing system so that the new records remain comparable with the first season." }
+      ],
+      "questionGroups": [
+        {
+          "id": "northbridge-p3-group-01",
+          "title": "Questions 16–18",
+          "instructions": "Decide whether each statement agrees with Passage 3. Choose True, False, or Not Given.",
+          "questions": [
+            { "id": "northbridge-q16", "number": 16, "type": "true-false-not-given", "prompt": "The shelter microphone is used to identify moth calls.", "correctAnswer": "false" },
+            { "id": "northbridge-q17", "number": 17, "type": "true-false-not-given", "prompt": "Volunteers catch moths before photographing them.", "correctAnswer": "false" },
+            { "id": "northbridge-q18", "number": 18, "type": "true-false-not-given", "prompt": "The offline guide records the names of all volunteers.", "correctAnswer": "false", "explanation": "The guide stores no participant names." }
+          ]
+        },
+        {
+          "id": "northbridge-p3-group-02",
+          "title": "Questions 19–21",
+          "instructions": "Answer using no more than three words from Passage 3.",
+          "questions": [
+            { "id": "northbridge-q19", "number": 19, "type": "short-answer", "prompt": "What colour are the approach lights?", "acceptableAnswers": ["amber"], "maxWords": 1 },
+            { "id": "northbridge-q20", "number": 20, "type": "fill-blank", "prompt": "Complete the sentence.", "sentence": "Each count lasts {{blank}}.", "acceptableAnswers": ["twenty minutes", "20 minutes"], "maxWords": 2 },
+            { "id": "northbridge-q21", "number": 21, "type": "short-answer", "prompt": "What will be placed behind each recording sheet next season?", "acceptableAnswers": ["identical fabric screens", "fabric screens"], "maxWords": 3 }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "original-multi-passage-pack",
+  "title": "Northbridge Field Notes",
+  "sourceLabel": "IELTS Workbench original multi-passage demonstration material",
+  "edition": "2026.1",
+  "language": "en",
+  "modules": ["reading"],
+  "createdAt": "2026-09-06T00:00:00.000Z",
+  "attribution": "Written from scratch for IELTS Workbench. No third-party test content is included.",
+  "tests": [
+    {
+      "id": "northbridge-test-01",
+      "title": "Original Three-Passage Reading Test",
+      "moduleIds": ["northbridge-reading-01"]
+    }
+  ],
+  "mediaAssets": []
+}

@@ -9,6 +9,7 @@ export type QuestionRendererProps = {
   disabled?: boolean;
   showCorrectAnswer?: boolean;
   instanceId?: string;
+  displayNumber?: number;
 };
 
 function CorrectAnswer({ question }: { question: Question }) {
@@ -40,6 +41,7 @@ export function QuestionRenderer({
   disabled = false,
   showCorrectAnswer = false,
   instanceId = "question-view",
+  displayNumber = question.number,
 }: QuestionRendererProps) {
   const domPrefix = `${instanceId}-${question.id}`;
   const legendId = `${domPrefix}-legend`;
@@ -53,7 +55,7 @@ export function QuestionRenderer({
       id={containerId}
       tabIndex={-1}
     >
-      <div className="question__number" aria-hidden="true">{question.number}</div>
+      <div className="question__number" aria-hidden="true">{displayNumber}</div>
       <div className="question__body">
         <p className="question__prompt" id={legendId}>{question.prompt}</p>
         {question.source?.needsReview && (
@@ -105,7 +107,7 @@ export function QuestionRenderer({
                 {question.sentence.replace("{{blank}}", answer || "________")}
               </p>
             )}
-            <label className="sr-only" htmlFor={`${domPrefix}-answer`}>第 {question.number} 题答案</label>
+            <label className="sr-only" htmlFor={`${domPrefix}-answer`}>第 {displayNumber} 题答案</label>
             <input
               aria-describedby={question.maxWords ? `${domPrefix}-limit` : undefined}
               className="input"

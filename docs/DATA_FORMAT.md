@@ -178,7 +178,7 @@ type QuestionGroup = {
 
 type QuestionBase = {
   id: string;
-  number: number;
+  number?: number;
   prompt: string;
   points?: number;
   explanation?: string;
@@ -208,6 +208,8 @@ type Question =
       caseSensitive?: boolean;
     });
 ```
+
+新建题包仍应为每道题写入正整数 `number`。为兼容早期 Reading v1 题包，Reading 题目缺少该字段时，导入后会按完整 Reading 模块（Section → QuestionGroup → Question）的稳定原始顺序补齐展示题号；Listening 题目仍必须显式提供 `number`。筛选 Passage、题段或单题只改变视图，不得重新编号，也不得改变 `questionId`、`sectionId` 或 `blockId`。
 
 `points` 省略时为 1。Fill-blank 的 `sentence` 必须恰好包含一个 `{{blank}}`。`correctOptionId` 必须引用本题唯一 option，`acceptableAnswers` 至少包含一个非空字符串。正确答案属于只读题包；未提交练习，尤其进行中的 Exam，不得通过 UI 暴露。
 

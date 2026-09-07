@@ -368,7 +368,52 @@ export const PackManifestSchema = z
     }
   });
 
-export const IELTSPackSchema = z
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * Early IELTSPack v1 drafts did not always persist Reading question numbers.
+ * Normalize only those missing values from the complete module order before
+ * strict validation, so view filtering can never renumber a question.
+ */
+function normalizeLegacyReadingQuestionNumbers(input: unknown): unknown {
+  if (!isPlainRecord(input) || !Array.isArray(input.modules)) return input;
+  let packChanged = false;
+  const modules = input.modules.map((module) => {
+    if (!isPlainRecord(module) || module.type !== "reading" || !Array.isArray(module.sections)) {
+      return module;
+    }
+    let questionOrder = 0;
+    let moduleChanged = false;
+    const sections = module.sections.map((section) => {
+      if (!isPlainRecord(section) || !Array.isArray(section.questionGroups)) return section;
+      let sectionChanged = false;
+      const questionGroups = section.questionGroups.map((group) => {
+        if (!isPlainRecord(group) || !Array.isArray(group.questions)) return group;
+        let groupChanged = false;
+        const questions = group.questions.map((question) => {
+          questionOrder += 1;
+          if (!isPlainRecord(question) || question.number !== undefined) return question;
+          groupChanged = true;
+          return { ...question, number: questionOrder };
+        });
+        if (!groupChanged) return group;
+        sectionChanged = true;
+        return { ...group, questions };
+      });
+      if (!sectionChanged) return section;
+      moduleChanged = true;
+      return { ...section, questionGroups };
+    });
+    if (!moduleChanged) return module;
+    packChanged = true;
+    return { ...module, sections };
+  });
+  return packChanged ? { ...input, modules } : input;
+}
+
+const IELTSPackStrictSchema = z
   .object({
     manifest: PackManifestSchema,
     modules: z.array(PackModuleSchema).min(1),
@@ -550,6 +595,11 @@ export const IELTSPackSchema = z
       });
     });
   });
+
+export const IELTSPackSchema = z.preprocess(
+  normalizeLegacyReadingQuestionNumbers,
+  IELTSPackStrictSchema,
+);
 
 type MutableQuestion = z.infer<typeof QuestionSchema>;
 type MutablePackManifest = z.infer<typeof PackManifestSchema>;
