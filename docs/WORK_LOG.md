@@ -120,3 +120,14 @@
 - 原生实际操作：左 P2，右 `northbridge-p3-group-01`（Q16–18）；右侧切到 `northbridge-p2-group-02` 时只显示 Q12–15，再切回。双 Pane 同显 P3 group 01 时 Q18 的左右 DOM ID 唯一，从左改答后右侧同步为 `true`。最终回到左 `passage/P2`、右 `questions/group/northbridge-p3-group-01`。
 - SQLite Session `b894b975-a6d3-4560-b34c-b04ab0e73f77` 写入 `northbridge-q18="true"` 和包含稳定 group ID 的 Pane 设置。正常退出后进程及 9231 监听结束；再次直接启动同一 EXE，从“最近继续”恢复两 Pane 选择、Q16–18、Q18=`true` 和完整模块统计 `已答 1/21`，随后再次正常退出。
 - 功能源码提交为 `1b141d8`。未 push、未打 tag；验收工作区、隔离备份、工具链和构建产物均未提交。
+
+## 2026-09-08 — Reading PDF 人工确认式多 Passage / 多题组导入
+
+- 从干净的 `feat/pdf-import-mvp` / `174d89266bef4f4816fd075b3614709fb87325d6` 恢复，先复核现有 PDF adapter、IELTSPack v1、Repository settings、Tauri SQLite 和关闭保存边界。确认旧 PDF MVP 只生成单 Section/单题组，草稿仅在组件内存，领域 ID 到最终构建时才生成。
+- 新增版本化结构化草稿模型：来源文本快照按页/片段保留，Passage、正文块、题组、共享选项、题目和题目选项在创建时获得稳定 ID；重排、改名和跨 Passage/题组移动不重建 ID。建议器只识别通用 `READING PASSAGE` / `Questions` 标题，未确定片段保持未分配，不含原创样本特判。
+- 导入页新增三阶段编辑器：来源与结构、答案映射、校验预览。支持同页拆分、跨页合并、任意 Passage/题组/题目增删重排、非空删除警告、题组说明/字数限制/共享选项、显式题组成员和每题人工复核标记；保留原简单单 Passage 入口。
+- 草稿经现有 Repository settings 按“索引 + 单草稿 payload”写入；Tauri 使用当前工作区 SQLite。保存前检查 256 KiB 原生设置边界，恢复不重读原 PDF，重选要求 SHA-256/大小/页数一致。取消/退出保留，显式丢弃只删草稿；安装失败和重复源检查都不会产生半成品或删除草稿。
+- 答案先按完整 Reading 层级显示，再按无歧义题号映射到稳定 questionId；重复答案行、重复题号歧义和无效选项会整批阻止，不做部分应用。空答案作为未评分警告；不支持题型必须人工改为现有类型，不能伪装成简答。
+- 原创样本脚本生成 7 页文本层 PDF：3 Passage、每篇 2 题组、Question 1–22、Q18 位于 Passage 3、页面 4 混合区域、跨页正文、共享选项和字数限制。PDF 已用 `pdfinfo`/`pdftotext` 检查并逐页渲染目视复核，不含 Cambridge 或第三方内容。
+- 浏览器层通过正常文件选择/提取链路生成 3 Passage/6 题组/22 题，映射全部答案，显式忽略 7 个未分配片段后结构校验通过；安装后 Reading 显示 Passage 3 的 Q14–18 题组。浏览器证据不计作 Tauri 原生验收。
+- 最终自动化门槛：`npm test` 连续两次均为 28 文件、163/163；`npm run lint` 退出码 0；`npm run build` 转换 2004 modules、退出码 0；Cargo 26/26。未改测试重试、断言或全局超时。

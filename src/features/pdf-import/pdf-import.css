@@ -38,7 +38,65 @@
 }
 
 .pdf-import-panel {
+  display: grid;
+  gap: 1rem;
   padding: 1rem;
+}
+
+.pdf-saved-drafts {
+  display: grid;
+  gap: 0.65rem;
+  padding: 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.pdf-saved-drafts > header,
+.pdf-saved-drafts article,
+.pdf-structured-editor__header,
+.pdf-structure-tree > header,
+.pdf-passage-card > header,
+.pdf-group-card > header,
+.pdf-structured-question > header,
+.pdf-validation-stage > header,
+.pdf-structured-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.pdf-saved-drafts h2,
+.pdf-saved-drafts p,
+.pdf-structured-editor h2,
+.pdf-structured-editor h3,
+.pdf-structured-editor h4,
+.pdf-structured-editor p {
+  margin: 0;
+}
+
+.pdf-saved-drafts header > div,
+.pdf-saved-drafts article > div,
+.pdf-structured-editor__header > div:first-child {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.pdf-saved-drafts article {
+  padding: 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+}
+
+.pdf-saved-drafts span,
+.pdf-structured-editor__header p,
+.pdf-structure-tree header p,
+.pdf-source-reference,
+.pdf-structured-footer span {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
 }
 
 .pdf-drop-zone {
@@ -150,6 +208,22 @@
 .pdf-question-list header p {
   color: var(--text-secondary);
   font-size: 0.84rem;
+}
+
+.pdf-mode-choice {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.7rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+}
+
+.pdf-mode-choice label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
 }
 
 .pdf-text-preview {
@@ -282,13 +356,218 @@
   color: var(--text-secondary);
 }
 
+.pdf-structured-editor {
+  min-width: 0;
+}
+
+.pdf-structured-tabs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.pdf-structured-tabs button {
+  padding: 0.65rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.pdf-structured-tabs button[aria-current="step"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.pdf-structure-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.75fr) minmax(520px, 1.25fr);
+  gap: 1rem;
+  min-height: 0;
+}
+
+.pdf-source-fragments,
+.pdf-structure-tree,
+.pdf-answers-stage,
+.pdf-validation-stage,
+.pdf-structure-preview {
+  display: grid;
+  align-content: start;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+.pdf-source-fragments {
+  position: sticky;
+  top: 0.75rem;
+  align-self: start;
+  max-height: calc(100vh - 8rem);
+  padding: 0.8rem;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.pdf-source-fragments > header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.6rem;
+}
+
+.pdf-source-fragments > p {
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+}
+
+.pdf-source-fragments__list {
+  display: grid;
+  gap: 0.4rem;
+  max-height: 48vh;
+  padding-right: 0.25rem;
+  overflow: auto;
+}
+
+.pdf-source-fragment {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.25rem 0.45rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  font-size: 0.78rem;
+}
+
+.pdf-source-fragment small {
+  grid-column: 2;
+  color: var(--text-secondary);
+}
+
+.pdf-source-fragment.is-assigned,
+.pdf-source-fragment.is-ignored {
+  opacity: 0.62;
+}
+
+.pdf-source-actions {
+  display: grid;
+  gap: 0.4rem;
+}
+
+.pdf-passage-card,
+.pdf-group-card,
+.pdf-structured-question,
+.pdf-answer-map,
+.pdf-validation-list,
+.pdf-structure-preview article {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--surface-canvas);
+}
+
+.pdf-passage-card.is-active,
+.pdf-group-card.is-active,
+.pdf-structured-question.is-active {
+  border-color: var(--accent);
+}
+
+.pdf-group-card,
+.pdf-structured-question {
+  margin-left: 0.55rem;
+  background: var(--surface-raised);
+}
+
+.pdf-passage-card code,
+.pdf-group-card code,
+.pdf-structured-question code {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pdf-group-fields {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.35fr) minmax(240px, 1fr);
+  gap: 0.65rem;
+}
+
+.pdf-answers-stage {
+  grid-template-columns: minmax(300px, 0.7fr) minmax(460px, 1.3fr);
+}
+
+.pdf-answer-map {
+  grid-column: 2;
+}
+
+.pdf-answer-map > div,
+.pdf-structure-preview article > div {
+  display: grid;
+  gap: 0.45rem;
+  padding: 0.65rem;
+  border-left: 3px solid var(--border-strong);
+}
+
+.pdf-answer-map label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.35fr);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.pdf-validation-stage > header {
+  justify-content: flex-start;
+}
+
+.pdf-validation-list.is-error {
+  border-color: var(--danger);
+}
+
+.pdf-validation-list p {
+  font-size: 0.82rem;
+}
+
+.pdf-structure-preview ol {
+  margin: 0;
+}
+
+.pdf-structured-footer {
+  justify-content: flex-start;
+  padding-top: 0.8rem;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.pdf-structured-footer span {
+  margin-left: auto;
+}
+
 @media (max-width: 1050px) {
   .pdf-page-layout {
     grid-template-columns: 1fr;
   }
 
   .pdf-range-grid,
-  .pdf-metadata-grid {
+  .pdf-metadata-grid,
+  .pdf-structure-layout,
+  .pdf-answers-stage,
+  .pdf-group-fields {
     grid-template-columns: 1fr;
+  }
+
+  .pdf-source-fragments {
+    position: static;
+    max-height: none;
+  }
+
+  .pdf-answer-map {
+    grid-column: 1;
   }
 }

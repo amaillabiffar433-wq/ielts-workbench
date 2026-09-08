@@ -18,6 +18,14 @@
 
 原项目仍保留在 `C:\Users\Exming\Documents\雅思or算法软件项目`，尚未删除，因此迁移核验期间没有释放 C 盘空间。
 
+## 2026-09-08 Reading PDF 人工结构化导入（Release 构建前）
+
+- 现有 PDF 导入页新增“多 Passage / 多题组（人工确认）”，简单单 Passage 流程仍保留。结构化草稿支持任意 Passage、题组、题目与来源片段的新增、删除、重排、跨归属移动，并在创建时一次生成稳定 ID。
+- 草稿、来源文本快照、SHA-256、页码引用、向导阶段、编辑选择与稳定 ID 通过现有 Repository settings 保存；Tauri 下进入工作区 SQLite。恢复不读取原 PDF，重选时核对 SHA-256、大小与页数；取消或退出保留草稿，只有显式丢弃才删除草稿。
+- 预览将不支持题型、重复题号/ID、无归属来源片段、无效答案与缺失必要结构列为阻塞错误；空答案、来源页缺失和“待人工复核”列为警告。安装使用既有原生题包校验/安装链路并防止重复点击；失败不删除草稿。
+- 原创验收 PDF 为 7 页文本层、3 Passage、6 题组、Question 1–22；页面 4 同时含 Passage 2 与 Passage 3，三篇均跨页，Question 18 位于 Passage 3。生成脚本和预期结构可提交，生成的 PDF 位于被忽略的 `local-data\import-samples`。
+- 浏览器层已通过真实 PDF 选择/提取、初始建议、显式忽略未分配片段、22 条答案映射、阻塞校验、安装和 Reading 打开；该结果只证明 renderer 流程，不替代待完成的 Tauri Release/SQLite 验收。
+
 ## 迁移验证基准
 
 2026-09-05 采用“复制 → 核验 → 切换”迁移到 D 盘：
@@ -36,11 +44,11 @@
 
 | 范围 | 当前状态 | 证据或说明 |
 | --- | --- | --- |
-| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-08 `npm run lint` 退出码 0；`npm run build` 成功转换 2002 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
-| 默认 `npm test` | 最终源码连续两次通过 | 2026-09-08 两次均为 27/27 文件、143/143 测试；未改超时、重试或全局超时 |
+| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-08 `npm run lint` 退出码 0；`npm run build` 成功转换 2004 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
+| 默认 `npm test` | 最终源码连续两次通过 | 2026-09-08 两次均为 28/28 文件、163/163 测试；未改超时、重试或全局超时 |
 | Reading 多 Passage、稳定题组、双 Pane、答案与文字标记 | Release 原生验证通过 | 题目模式可按稳定 `questionGroupId` 选择完整题组；非连续题号按 ID 处理。原生验证 P2 / `northbridge-p3-group-01`、切换题组、双 Pane 同组答案同步及 SQLite 退出/重启恢复 |
-| Reading PDF 辅助导入 | 原生验证通过 | Windows 原生文件对话框完成取消、有效 PDF、重复导入和伪 PDF 拒绝；有效样本 SHA-256 未变化，题包重启后仍存在 |
-| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-07 `cargo test --manifest-path src-tauri/Cargo.toml` 为 26/26；旧 Reading 缺号兼容与 Listening 缺号拒绝均有测试 |
+| Reading PDF 辅助导入 | 单 Passage 原生通过；结构化 Release 待验收 | 旧单 Passage 原生文件对话框、重复导入和伪 PDF 拒绝保持；新增人工确认式 3 Passage/6 题组/22 题链路已通过浏览器与自动化，尚待新 Release/SQLite 证据 |
+| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-08 `cargo test --manifest-path src-tauri/Cargo.toml` 为 26/26；旧 Reading 缺号兼容与 Listening 缺号拒绝均有测试 |
 | 原创 Listening/Writing 媒体 | 原生验证通过 | WAV 在真实 WebView 中播放；Exam 拖动/倍速/重播限制生效；900×560 Task 1 PNG 与 SQLite 草稿/版本均跨重启恢复 |
 | Tauri dev | 原生验证通过 | 在真实 Tauri 进程中确认 `window.__TAURI_INTERNALS__`，设置页显示 D 盘工作区和 SQLite；两轮正常退出/重启通过 |
 | Release/安装包 | 新 Reading EXE 独立运行通过 | Tauri 生产上下文 `--no-bundle` 生成新 EXE；Vite 关闭时从 `http://tauri.localhost` 启动并完成 Reading 退出/恢复；本轮未重建或安装 MSI/NSIS |

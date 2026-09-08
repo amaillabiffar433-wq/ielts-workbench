@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -116,5 +116,50 @@ describe("PdfImportPage", () => {
     const pack = installImportedPack.mock.calls[0][0];
     expect(pack.manifest.importMetadata?.sourceFileName).toBe("original-ui-sample.pdf");
     expect(pack.modules[0].type).toBe("reading");
+  });
+
+  it("creates and restores a structured draft through repository persistence", async () => {
+    const handle = fakeDocument();
+    const adapter: DocumentSourceAdapter = { open: vi.fn(async () => handle) };
+    const repository = new InMemoryLearningRepository();
+    workbenchStore.setState({ repository });
+    const user = userEvent.setup();
+    const firstRender = render(<MemoryRouter><PdfImportPage adapter={adapter} /></MemoryRouter>);
+
+    await user.upload(
+      screen.getByLabelText("选择本地 PDF"),
+      new File(["%PDF original structured fixture"], "original-ui-sample.pdf", { type: "application/pdf" }),
+    );
+    await user.click(screen.getByRole("radio", { name: "多 Passage / 多题组（人工确认）" }));
+    await user.click(screen.getByRole("button", { name: /提取并整理/ }));
+    expect(await screen.findByText("人工确认式结构化草稿")).toBeInTheDocument();
+    expect(await screen.findByText("已自动保存")).toBeInTheDocument();
+
+    firstRender.unmount();
+    render(<MemoryRouter><PdfImportPage adapter={adapter} /></MemoryRouter>);
+    const resume = await screen.findByRole("button", { name: "继续编辑" });
+    expect(screen.getByText(/3 Passage|1 Passage/)).toBeInTheDocument();
+    await user.click(resume);
+    expect(await screen.findByText("人工确认式结构化草稿")).toBeInTheDocument();
+    expect(screen.getByText(/原 PDF 当前未连接/)).toBeInTheDocument();
+  });
+
+  it("does not enable structured installation while source fragments and required structure are unresolved", async () => {
+    const handle = fakeDocument();
+    const adapter: DocumentSourceAdapter = { open: vi.fn(async () => handle) };
+    const user = userEvent.setup();
+    render(<MemoryRouter><PdfImportPage adapter={adapter} /></MemoryRouter>);
+
+    await user.upload(
+      screen.getByLabelText("选择本地 PDF"),
+      new File(["%PDF original structured fixture"], "original-ui-sample.pdf", { type: "application/pdf" }),
+    );
+    await user.click(screen.getByRole("radio", { name: "多 Passage / 多题组（人工确认）" }));
+    await user.click(screen.getByRole("button", { name: /提取并整理/ }));
+    await screen.findByText("人工确认式结构化草稿");
+    await user.click(screen.getByRole("button", { name: "3 校验与预览" }));
+
+    await waitFor(() => expect(screen.getAllByText(/阻塞错误/).length).toBeGreaterThan(0));
+    expect(screen.getByRole("button", { name: /确认结构并安装题包/ })).toBeDisabled();
   });
 });

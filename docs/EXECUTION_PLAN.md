@@ -1,8 +1,25 @@
 # IELTS Workbench 执行计划
 
-更新日期：2026-09-08（Reading 稳定题组选择与 Release 验收完成）
+更新日期：2026-09-08（Reading PDF 人工结构化导入开发中）
 
-## 当前执行切片：Reading 按稳定 questionGroupId 选择题组
+## 当前执行切片：Reading PDF 人工确认式多 Passage / 多题组结构化导入
+
+恢复基准为 `D:\Projects\雅思or算法软件项目`、分支 `feat/pdf-import-mvp`、起始 HEAD `174d89266bef4f4816fd075b3614709fb87325d6`；恢复时工作树干净。本轮在现有 Import Center、IELTSPack v1 和 Repository 架构上增量扩展，不做 OCR、样本特判或复杂版面自动识别，也不改变已完成的 Reading 练习页。
+
+| 步骤 | 内容 | 状态 |
+| --- | --- | --- |
+| SI1 | 复核 PDF 适配器、题包 schema、Repository/SQLite/IPC、关闭保存与现有测试边界 | 已完成：确认现有 MVP 仅生成单 Section/单题组，草稿只存在于 React 内存，稳定领域 ID 到最终构建时才生成 |
+| SI2 | 建立带来源快照与一次生成稳定 ID 的结构化草稿模型，实现片段分配、Passage/题组/题目编辑及校验/预览 | 已完成：支持任意 Passage、显式题组/题目成员、同页拆分/跨页合并、重排/移动、阻塞错误与警告；不支持题型必须人工改为现有类型 |
+| SI3 | 通过现有 Repository 增加 SQLite 草稿持久化、恢复、SHA-256 重选核验、明确丢弃与安装失败保留 | 已完成：结构化草稿经 Repository settings 写入工作区 SQLite；关闭前刷新、恢复不预写默认值、重选 SHA 核验、显式丢弃和安装失败保留均已接入 |
+| SI4 | 将结构化流程接入现有 PDF 导入页，同时保留简单单 Passage 路径；补齐至少 10 类自动化测试 | 已完成：简单路径保留；新增 18 个模型测试和 2 个页面流程测试，覆盖稳定 ID、编辑/移动、来源恢复、答案映射、阻塞校验、草稿持久化及失败保留 |
+| SI5 | 生成原创多页文本层 PDF、生成脚本和预期结构，走正常导入链路完成桌面验收 | 进行中：7 页原创文本层 PDF 含 3 Passage、每篇 2 题组、Q18 位于 Passage 3；逐页渲染检查与浏览器正常导入链路已通过，原生 Release 验收待完成 |
+| SI6 | 连续两次前端测试，并执行 lint、Vite build、Cargo test | 已完成：前端连续两次 28 文件、163/163；lint、2004-module Vite build、Cargo 26/26 通过 |
+| SI7 | 单文件备份旧 EXE，构建并独立启动新 Release；在全新 D 盘工作区完成退出/重启恢复证据 | 待开始 |
+| SI8 | 增量更新状态/工作日志/桌面验收/导入文档并建立小型本地提交 | 进行中：实现、测试与浏览器链路证据已回写；待补 Release 原生证据与最终提交 |
+
+发布边界：沿用当前版本，仅生成本地 Windows Release EXE；不生成或安装 MSI/NSIS，不创建 tag/GitHub Release，不推送远程，不删除旧 Release、数据库、题包或验收资料。
+
+## 已完成切片：Reading 按稳定 questionGroupId 选择题组
 
 恢复基准为 `D:\Projects\雅思or算法软件项目`、分支 `feat/pdf-import-mvp`、起始 HEAD `a19e22358c3e6ce9dcb45dadcb39d91e003a6f2f`；恢复时工作树干净。本轮仅在现有 Reading 题目模式中增加题组选择，不改变题包 schema、答案/标记身份、评分范围或 PDF 解析能力。
 

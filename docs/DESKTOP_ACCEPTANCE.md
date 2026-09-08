@@ -21,6 +21,7 @@
 | 原生 Repository 选择 | Tauri 窗口必须使用 `TauriLearningRepository`，失败不得回退 IndexedDB | 实际窗口 `window.__TAURI_INTERNALS__ === true`；运行时工厂选择原生 Repository；真实 SQLite 记录可读 | 设置页 D 盘路径 + SQLite answers/annotations/drafts/versions | 原生验证通过 |
 | 工作区与 SQLite | 选择独立 D 盘目录，创建固定目录和数据库 | 已初始化并持续写入 `D:\IELTS-Workbench-Acceptance-20260905` | 设置页显示规范化工作区及数据库路径；数据库 114,688 字节 | 原生验证通过 |
 | 原创 PDF 导入 | 原生选择文件、读取字节、解析、安装、重开 | 取消、有效导入、重复去重、无效头拒绝均在 Windows 文件对话框中验证 | 原 PDF SHA-256 `2CD82A…BA48`；题包 `pdf-reading-3380bbb850f80d50` 跨重启存在 | 原生验证通过 |
+| Reading PDF 人工结构化导入 | 原生选择文本层 PDF，编辑并恢复 3 Passage/多题组草稿，校验后安装且跨重启恢复 | renderer 正常链路已完成 7 页提取、3 Passage/6 题组/22 题、答案映射、显式忽略、安装和打开 Reading；新 Release/SQLite 验收待完成 | 自动化 163/163；结构校验 0 阻塞错误、22 条人工复核警告 | 已实现，浏览器验证通过 |
 | Reading | 答案和标记跨 Pane 同步，重启恢复 | q01=`true`、q05=`solar panels` 在两 Pane 即时同步；黄色标记在相同内容两侧出现并重启恢复 | SQLite Session `06237ec2…`、answers 2 条、annotation 1 条 | 原生验证通过 |
 | Reading 多 Passage | Passage/全部/按 Passage/范围/单题/整套；Pane 独立滚动、稳定 ID、共享答案/标记、重启恢复 | P2/Q18、Q8–15、Q14–20、Q18、同题/同 Passage、相同文本隔离和整套配对均在新 Release 实际操作；一次退出/重启完整恢复 | SQLite Session `3a372276…`、Q18=`true`、annotations 2 条、视图设置 1 条 | Release 原生验证通过 |
 | Reading 稳定题组选择 | 每 Pane 以稳定 `questionGroupId` 选择完整题组；同组/异组、答案同步、失效状态回退、重启恢复 | 左 P2，右 `northbridge-p3-group-01`；切换 `northbridge-p2-group-02` 后只显示 Q12–15；双 Pane 同组 Q18 同步，退出/重启恢复 | SQLite Session `b894b975…`、Q18=`true`、视图设置含右 `questionScope=group` 与 group ID | Release 原生验证通过 |

@@ -1,0 +1,37 @@
+{
+  "title": "Original Reading Structured Import Sample",
+  "source": "Fully original IELTS Workbench acceptance material",
+  "passages": [
+    {
+      "title": "The Lantern Ledger",
+      "sourcePages": [1, 2],
+      "questionGroups": [
+        { "label": "Questions 1-3 / TRUE FALSE NOT GIVEN", "numbers": [1, 2, 3] },
+        { "label": "Questions 4-6 / Short Answer", "numbers": [4, 5, 6], "maxWords": 2 }
+      ]
+    },
+    {
+      "title": "A Garden After Closing",
+      "sourcePages": [3, 4],
+      "questionGroups": [
+        { "label": "Questions 7-9 / Multiple Choice", "numbers": [7, 8, 9], "sharedOptions": ["A", "B", "C"] },
+        { "label": "Questions 10-13 / Short Answer", "numbers": [10, 11, 12, 13], "maxWords": 3 }
+      ]
+    },
+    {
+      "title": "The Workshop Clock",
+      "sourcePages": [4, 5],
+      "questionGroups": [
+        { "label": "Questions 14-18 / TRUE FALSE NOT GIVEN", "numbers": [14, 15, 16, 17, 18] },
+        { "label": "Questions 19-22 / Sentence Completion", "numbers": [19, 20, 21, 22], "maxWords": 2 }
+      ]
+    }
+  ],
+  "answerKeyPage": 7,
+  "acceptanceConditions": {
+    "question18Passage": 3,
+    "samePageMixedRegions": 4,
+    "passagesAcrossPages": [1, 2, 3],
+    "repeatedText": "Careful records make hidden patterns visible."
+  }
+}
