@@ -107,3 +107,16 @@
 - 原创 `original-multi-passage-pack` 通过系统目录选择、原生预览校验、版权确认和安装命令进入工作区。实际验证全部 21 题、Passage 2 Q8–15、跨 Passage Q14–20、单题 Q18、Pane 独立选择/滚动、目标 Pane 导航、同题答案同步、同 Passage 双份 DOM、相同文本不串标记，以及整套 P1/Q1–7、P2/Q8–15、P3/Q16–21 配对。
 - SQLite Session `3a372276-af6c-42f0-bf0f-00b132ddc1e0` 实际写入 Q18=`true`；`northbridge-p2-paragraph-02` 的 `regional harbour office` 标记为 offsets 53..76。视图设置保存为左 Passage 2、右 single Q18。正常退出后进程结束，再直接启动 Release，从“最近继续”完整恢复选择、答案和标记。
 - 功能源码与原创样本已保存为本地提交 `91c7e77`；未 push、未打 tag，验收数据库、构建产物和工具链未提交。
+
+## 2026-09-08 — Reading 稳定 questionGroupId 选择与 Release 验收
+
+- 从干净的 `feat/pdf-import-mvp` / `a19e22358c3e6ce9dcb45dadcb39d91e003a6f2f` 恢复。复核前端 schema、Rust `QuestionGroupV1` 和全局 ID 注册器后确认：合法 IELTSPack v1 已要求稳定、全局唯一的题组 ID；因此没有数据库/schema 迁移，也没有为非法缺失值生成数组下标或标题派生 ID。
+- Reading 题目选择 union 新增 `group/questionGroupId`。Pane 顶部加入紧凑“题组”下拉，选项显示 Passage、题号摘要和标题/题型；完整题组继续复用原 `QuestionGroup` 渲染，保留说明、字数限制、选项和全部原题目。非连续题号按 ID 精确筛选，不转成 min–max 范围。
+- 两 Pane 分别在现有 `reading.viewState.v1.<sessionId>` 中保存 `questionScope` 与 `questionGroupId`；旧 v1 状态缺少这个未激活字段时静默补默认值，激活题组引用已删除 ID 时保留题组模式、回退到首个有效组并触发现有恢复提示。答案、标记、Review/提交统计身份未改。
+- 新增 8 项测试。开发中两条定向断言曾失败：一条误把包含 short-answer 与 fill-blank 的样本组写成单一 Short Answer，另一条取到了 Q17 的 radio；只修正断言定位，未放宽业务逻辑、测试时间或重试。最终 `npm test` 连续两次均为 27 文件、143/143；`npm run lint` 退出码 0；`npm run build` 转换 2002 modules、退出码 0；Cargo 26/26。
+- 构建前把旧 EXE 复制到 `D:\IELTS-Workbench-Releases\rollback-a19e223-before-question-group-20260908\ielts-workbench.exe`，SHA-256 `B04448D8E8D2ABD6068AB124397B31BE7E828A2B3D2BB79BBF12A825BA73FF89`。`tauri build --no-bundle` 生成新 EXE 12,631,552 字节，时间 `2026-09-08 09:57:11.051 +08:00`，SHA-256 `F87A8E2211FF801D8A9BF270920E2D8E2B5EBF99E059C4E8E35ECDBF436F0D9E`；未生成或安装 MSI/NSIS。
+- 首次目录选择自动化未把键盘地址写入系统对话框，误选上次浏览的样本源目录。应用正常退出后，将此次新增的 `backups/imports/logs/packs/themes`、SQLite 和 `workspace.json` 七项完整移动至 `D:\IELTS-Workbench-Releases\accidental-sample-workspace-20260908-100624`；未删除数据，原样本目录恢复为原有三项且 Git 状态干净。EFS bootstrap 使用原始字节备份/恢复，备份 SHA-256 `EE4F97D6FF4F4A27A50184E9210762271A4D52333611BA8F7DC8A26A6C8617C0`。
+- 随后通过 Release WebView 的真实 Tauri/Rust `initialize_workspace` 命令初始化 `D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908`，并经 Rust `validate_pack_folder` / `install_pack` 安装原创多 Passage 题包。Vite 1420 始终未监听，origin 为 `http://tauri.localhost`。
+- 原生实际操作：左 P2，右 `northbridge-p3-group-01`（Q16–18）；右侧切到 `northbridge-p2-group-02` 时只显示 Q12–15，再切回。双 Pane 同显 P3 group 01 时 Q18 的左右 DOM ID 唯一，从左改答后右侧同步为 `true`。最终回到左 `passage/P2`、右 `questions/group/northbridge-p3-group-01`。
+- SQLite Session `b894b975-a6d3-4560-b34c-b04ab0e73f77` 写入 `northbridge-q18="true"` 和包含稳定 group ID 的 Pane 设置。正常退出后进程及 9231 监听结束；再次直接启动同一 EXE，从“最近继续”恢复两 Pane 选择、Q16–18、Q18=`true` 和完整模块统计 `已答 1/21`，随后再次正常退出。
+- 功能源码提交为 `1b141d8`。未 push、未打 tag；验收工作区、隔离备份、工具链和构建产物均未提交。

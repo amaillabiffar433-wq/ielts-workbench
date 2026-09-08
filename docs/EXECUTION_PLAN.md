@@ -1,6 +1,6 @@
 # IELTS Workbench 执行计划
 
-更新日期：2026-09-07（Reading 稳定题组选择增量开发进行中）
+更新日期：2026-09-08（Reading 稳定题组选择与 Release 验收完成）
 
 ## 当前执行切片：Reading 按稳定 questionGroupId 选择题组
 
@@ -12,8 +12,8 @@
 | G2 | 以 `questionGroupId` 增量实现题组筛选、紧凑下拉、双 Pane 独立选择与安全状态恢复 | 已完成：筛选和持久化均保存稳定题组 ID；失效 ID 保持题组模式并回退至首个有效题组 |
 | G3 | 补齐非连续题号、同 Passage 多题组、双 Pane 同步、无效 ID 回退及旧模式回归测试 | 已完成：新增 8 项测试，覆盖 ID 精确筛选、非连续题号、旧 v1 状态/单 Passage 题包和双 Pane 同步 |
 | G4 | 连续两次前端测试，并执行 lint、Vite build 与 Cargo test | 已完成：两次前端回归均为 27 文件、143/143；lint、2002-module Vite build、Cargo 26/26 通过 |
-| G5 | 备份当前 EXE，生成不含安装包的新 Release，在独立 D 盘工作区完成原生退出/重启验收 | 待执行 |
-| G6 | 回写 CURRENT_STATE、WORK_LOG、DESKTOP_ACCEPTANCE 与 Reading 验收记录，建立小型本地提交 | 待执行 |
+| G5 | 备份当前 EXE，生成不含安装包的新 Release，在独立 D 盘工作区完成原生退出/重启验收 | 已完成：新 EXE 在 1420 关闭时独立启动；稳定题组、双 Pane 答案同步、SQLite 和一次退出/重启恢复通过 |
+| G6 | 回写 CURRENT_STATE、WORK_LOG、DESKTOP_ACCEPTANCE 与 Reading 验收记录，建立小型本地提交 | 已完成：功能提交 `1b141d8`；最终验收证据已回写四份状态文档，未 push、未打 tag |
 
 发布边界：本轮沿用 `0.1.0`，只生成和启动本地 Windows Release EXE；不生成或安装 MSI/NSIS，不创建 changelog/tag/GitHub Release，不推送远程，也不清理旧 Release、数据库或验收资料。
 

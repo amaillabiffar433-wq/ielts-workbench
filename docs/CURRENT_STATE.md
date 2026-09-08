@@ -1,11 +1,13 @@
 # IELTS Workbench 当前状态
 
-更新日期：2026-09-07
+更新日期：2026-09-08
 
 ## 当前仓库
 
 - 项目目录：`D:\Projects\雅思or算法软件项目`
 - 分支：`feat/pdf-import-mvp`
+- Reading 稳定题组选择源码提交：`1b141d8`（按 `questionGroupId` 精确筛选、双 Pane 独立状态、安全恢复与回归测试）
+- 本轮题组选择起始 HEAD：`a19e22358c3e6ce9dcb45dadcb39d91e003a6f2f`
 - Reading 多 Passage 源码提交：`91c7e77`（Pane 独立选择、稳定题号/ID、视图恢复、原创三 Passage 样本）
 - 本轮 Reading 起始 HEAD：`f7fd42af1584714f1b681f1662ce01a4f799b76e`
 - 稳定性与 Release 源码提交：`23527b6`（Rust 首次编译修复、关窗保存、最小权限、D 盘 bundler cache）
@@ -34,9 +36,9 @@
 
 | 范围 | 当前状态 | 证据或说明 |
 | --- | --- | --- |
-| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-07 最终 `npm run lint` 退出码 0；`npm run build` 成功转换 2002 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
-| 默认 `npm test` | 最终源码连续两次通过 | 2026-09-07 两次均为 27/27 文件、135/135 测试；未改超时、重试或全局超时 |
-| Reading 多 Passage、双 Pane、答案与文字标记 | Release 原生验证通过 | 3 Passage / Q1–21；全部、按 Passage、Q14–20、Q18、整套正确配对均通过。双 Pane 同题答案同步、同 Passage DOM ID 唯一，SQLite 写入并在完整退出/重启后读回 |
+| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-08 `npm run lint` 退出码 0；`npm run build` 成功转换 2002 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
+| 默认 `npm test` | 最终源码连续两次通过 | 2026-09-08 两次均为 27/27 文件、143/143 测试；未改超时、重试或全局超时 |
+| Reading 多 Passage、稳定题组、双 Pane、答案与文字标记 | Release 原生验证通过 | 题目模式可按稳定 `questionGroupId` 选择完整题组；非连续题号按 ID 处理。原生验证 P2 / `northbridge-p3-group-01`、切换题组、双 Pane 同组答案同步及 SQLite 退出/重启恢复 |
 | Reading PDF 辅助导入 | 原生验证通过 | Windows 原生文件对话框完成取消、有效 PDF、重复导入和伪 PDF 拒绝；有效样本 SHA-256 未变化，题包重启后仍存在 |
 | Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-07 `cargo test --manifest-path src-tauri/Cargo.toml` 为 26/26；旧 Reading 缺号兼容与 Listening 缺号拒绝均有测试 |
 | 原创 Listening/Writing 媒体 | 原生验证通过 | WAV 在真实 WebView 中播放；Exam 拖动/倍速/重播限制生效；900×560 Task 1 PNG 与 SQLite 草稿/版本均跨重启恢复 |
@@ -46,9 +48,24 @@
 
 ## 当前阻塞与下一步
 
-1. Reading 多 Passage、指定 Passage/题段/单题、整套配对、视图恢复与新 Release 均已完成；没有剩余环境阻塞。
-2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；本轮验收数据位于 `D:\IELTS-Workbench-Reading-Acceptance-20260907`，不得删除。上一轮 `D:\IELTS-Workbench-Acceptance-20260905` 也保持不变。
-3. 下一轮最值得做的是 Reading 按稳定 `questionGroupId` 直接选择题组，让常用练习无需手工输入题号范围，并继续保留题组完整上下文。
+1. Reading 多 Passage、指定 Passage/题段/单题、稳定题组、整套配对、视图恢复与新 Release 均已完成；没有剩余环境阻塞。
+2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；本轮验收数据位于 `D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908`，不得删除。既有两个验收工作区也保持不变。
+3. 下一轮可以进入“PDF 导入 → 多 Passage/题组结构化”，但应继续以人工确认分段为主；当前 PDF MVP 仍只生成一个 Passage/题组，没有 OCR 或复杂自动拆分。
+
+## 2026-09-08 Reading 稳定题组 Release 验收摘要
+
+- 题目模式新增“题组”；下拉项以 Passage、题号摘要和题组标题/题型显示，实际 value、筛选及持久化始终使用题包原有 `questionGroupId`。IELTSPack v1 的前端与 Rust 校验本就要求题组 ID 稳定且全局唯一，因此未迁移数据库、未伪造旧 ID。
+- 独立工作区：`D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908`；SQLite：同目录 `ielts-workbench.sqlite3`；Session：`b894b975-a6d3-4560-b34c-b04ab0e73f77`。原创样本经真实 Rust `validate_pack_folder` 与 `install_pack` 命令校验、安装，source hash 为 `c9d663898631b8478382cd7d5a8d60bb7be9c94ba972bbb9ab0ba5c263f8d0c5`。
+- Release 在 Vite 1420 未监听时从 `http://tauri.localhost` 独立启动。Pane A 选择 Passage 2；Pane B 选择稳定 ID `northbridge-p3-group-01`，只显示 Q16–18 及完整题组说明。切换到 `northbridge-p2-group-02` 时只显示 Q12–15，再切回后状态正常。
+- 双 Pane 同显 `northbridge-p3-group-01` 时，Q18 DOM ID 分别为 `left-pane-northbridge-q18-section` 与 `right-pane-northbridge-q18-section`；从左侧改答后右侧同步为 `true`。最终恢复左 `passage/P2`、右 `questions/group/northbridge-p3-group-01`，完整退出并从“最近继续”重启后，选择、Q16–18 视图、Q18=`true` 和完整统计 `已答 1/21` 均恢复。
+- 自动化新增 8 项测试，覆盖稳定 ID、同 Passage 多组、非连续题号、双 Pane、答案同步、失效 ID、安全加载旧 v1 状态和旧单 Passage 题包；最终两次标准前端回归均为 143/143，Cargo 26/26、lint、Vite build 均通过。
+- 自动化目录框首次没有接受键盘地址，错误选择了上次使用的样本目录。原题包三项源文件未被覆盖；新增的 7 个工作区项在正常退出后完整移动到 `D:\IELTS-Workbench-Releases\accidental-sample-workspace-20260908-100624` 隔离保留，样本目录恢复为 `modules`、`manifest.json`、`README.md`，Git 状态恢复干净。原 bootstrap 备份 SHA-256 `EE4F97D6FF4F4A27A50184E9210762271A4D52333611BA8F7DC8A26A6C8617C0` 已核验，随后由真实 Tauri/Rust 命令初始化正确工作区。
+
+## 2026-09-08 Reading 题组 Release EXE
+
+- 可直接运行：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`。
+- 修改时间：`2026-09-08 09:57:11.051 +08:00`；大小：12,631,552 字节；SHA-256：`F87A8E2211FF801D8A9BF270920E2D8E2B5EBF99E059C4E8E35ECDBF436F0D9E`。
+- 上一版已单文件备份到 `D:\IELTS-Workbench-Releases\rollback-a19e223-before-question-group-20260908\ielts-workbench.exe`，SHA-256 `B04448D8E8D2ABD6068AB124397B31BE7E828A2B3D2BB79BBF12A825BA73FF89`；新旧大小、时间和哈希均不同。本轮使用 `tauri build --no-bundle`，没有生成、覆盖或安装 MSI/NSIS。
 
 ## 2026-09-07 Reading 多 Passage Release 验收摘要
 

@@ -1,6 +1,6 @@
 # IELTS Workbench Windows 桌面验收记录
 
-更新日期：2026-09-07
+更新日期：2026-09-08
 
 状态定义：`未开始`、`已实现但未原生验证`、`浏览器验证通过`、`环境阻塞`、`验证失败`、`待人工验收`、`原生验证通过`。
 
@@ -12,6 +12,7 @@
 - 测试工作区：`D:\IELTS-Workbench-Acceptance-20260905`（独立、可写，不指向用户真实学习数据）。
 - SQLite：`D:\IELTS-Workbench-Acceptance-20260905\ielts-workbench.sqlite3`。
 - Reading 多 Passage Release 工作区：`D:\IELTS-Workbench-Reading-Acceptance-20260907`；SQLite 位于同目录，未修改上一轮工作区。
+- Reading 稳定题组 Release 工作区：`D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908`；SQLite 位于同目录，既有工作区均未修改。
 
 ## 验收矩阵
 
@@ -22,11 +23,12 @@
 | 原创 PDF 导入 | 原生选择文件、读取字节、解析、安装、重开 | 取消、有效导入、重复去重、无效头拒绝均在 Windows 文件对话框中验证 | 原 PDF SHA-256 `2CD82A…BA48`；题包 `pdf-reading-3380bbb850f80d50` 跨重启存在 | 原生验证通过 |
 | Reading | 答案和标记跨 Pane 同步，重启恢复 | q01=`true`、q05=`solar panels` 在两 Pane 即时同步；黄色标记在相同内容两侧出现并重启恢复 | SQLite Session `06237ec2…`、answers 2 条、annotation 1 条 | 原生验证通过 |
 | Reading 多 Passage | Passage/全部/按 Passage/范围/单题/整套；Pane 独立滚动、稳定 ID、共享答案/标记、重启恢复 | P2/Q18、Q8–15、Q14–20、Q18、同题/同 Passage、相同文本隔离和整套配对均在新 Release 实际操作；一次退出/重启完整恢复 | SQLite Session `3a372276…`、Q18=`true`、annotations 2 条、视图设置 1 条 | Release 原生验证通过 |
+| Reading 稳定题组选择 | 每 Pane 以稳定 `questionGroupId` 选择完整题组；同组/异组、答案同步、失效状态回退、重启恢复 | 左 P2，右 `northbridge-p3-group-01`；切换 `northbridge-p2-group-02` 后只显示 Q12–15；双 Pane 同组 Q18 同步，退出/重启恢复 | SQLite Session `b894b975…`、Q18=`true`、视图设置含右 `questionScope=group` 与 group ID | Release 原生验证通过 |
 | Listening | 播放可听原创音频，验证 Study/Exam 限制 | `duration=4`、`readyState=4`，播放时间推进；Exam 无原生 controls/Transcript，拖动回弹、倍速复原、结束禁重播 | 实际 WebView audio 状态与 Exam 控件状态 | 原生验证通过 |
 | Writing | 自动保存、版本、提交、Task 1 图片、快速关窗 | 900×560 图表加载；草稿、manual、submitted 均写入 SQLite；快速关窗缺陷修复并复测 | 输入后 120 ms 关窗，445 ms 退出；最后文字重启恢复 | 原生验证通过 |
 | 两轮完整重启 | 正常退出后重新启动两次，恢复题包和用户状态 | 两轮均恢复题包、Reading 答案/标记、Writing 草稿与图片并正常退出 | 两次退出分别为 273 ms、281 ms | 原生验证通过 |
 | 2026-09-06 Release 独立运行（历史） | 关闭 Vite 后启动 Release，可加载 PDF worker/媒体/SQLite | 1420 未监听时从 `http://tauri.localhost` 启动；PDF worker、WAV、PNG、SQLite 读写和一次退出/恢复均通过 | 历史 EXE SHA-256 `89131796…25CD`；现已单文件备份 | 原生验证通过 |
-| Reading Release 独立运行 | 不运行 Vite，直接启动本轮 EXE，恢复新 Reading 状态 | 1420 未监听；`http://tauri.localhost`；三 Passage 与 SQLite 正常，一次正常退出/重启恢复通过 | 新 EXE SHA-256 `B04448D8…FF89` | 原生验证通过 |
+| Reading Release 独立运行 | 不运行 Vite，直接启动最新 EXE，恢复新 Reading 状态 | 1420 未监听；`http://tauri.localhost`；稳定题组与 SQLite 正常，一次正常退出/重启恢复通过 | 最新 EXE SHA-256 `F87A8E22…F0D9E` | 原生验证通过 |
 | Windows 安装包 | 生成安装包；未获授权前不执行系统安装 | 标准 `npm run tauri build` 同时生成 MSI 与 NSIS，未执行安装 | MSI `75E21DB0…29D7`；NSIS `8F1A5A98…36B` | 原生构建通过，安装未授权 |
 
 ## 原生环境（2026-09-05 已安装）
@@ -98,3 +100,15 @@ npm run tauri dev
 - 视图设置键 `reading.viewState.v1.3a372276-af6c-42f0-bf0f-00b132ddc1e0` 保存左 `passage/P2`、右 `questions/single/18`。正常关窗后进程和 9230 均结束；直接重启 EXE，从“最近继续”恢复该选择、Q18=`true` 和 Passage 2 标记。
 - 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；修改时间 `2026-09-07 18:26:56.593 +08:00`；12,631,040 字节；SHA-256 `B04448D8E8D2ABD6068AB124397B31BE7E828A2B3D2BB79BBF12A825BA73FF89`。Vite 1420 未监听，origin 为 `http://tauri.localhost`。
 - 本轮只生成独立 EXE，`--no-bundle` 未重建 MSI/NSIS，也未执行任何安装程序。最终回归：前端 27 文件、135/135 连续两次；lint 与 Vite build 通过；Cargo 26/26。
+
+## 2026-09-08 Reading 稳定题组 Release 证据
+
+- 新工作区：`D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908`；数据库：`D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908\ielts-workbench.sqlite3`；Session：`b894b975-a6d3-4560-b34c-b04ab0e73f77`。运行时是 `http://tauri.localhost` 的真实 Tauri Release，Vite 1420 未监听。
+- 原创 `original-multi-passage-pack` 经 Rust `validate_pack_folder` 校验为 valid、0 errors、0 warnings，再由 `install_pack` 安装到该工作区；source hash `c9d663898631b8478382cd7d5a8d60bb7be9c94ba972bbb9ab0ba5c263f8d0c5`。
+- Pane A 实际选择 Passage 2，显示 ferry 正文；Pane B 以稳定 value `northbridge-p3-group-01` 显示 Questions 16–18、Passage 3 归属和完整 TFNG 说明。题组下拉显示 Passage、题号摘要和题型，而持久化字段保持原 group ID。
+- Pane B 切换 `northbridge-p2-group-02` 时 DOM 仅含 Q12、Q13、Q14、Q15；没有混入同 Passage 的 Q8–11。切回 group 01 后 Q16–18 恢复。
+- 两 Pane 同显 `northbridge-p3-group-01` 时，Q18 节点分别为 `left-pane-northbridge-q18-section` / `right-pane-northbridge-q18-section`；左侧改为 True 后右侧即时同步。随后切回最终状态：左 `passage/northbridge-passage-02`，右 `questions/group/northbridge-p3-group-01`。
+- SQLite 在退出前读到 answer `northbridge-q18="true"`，Pane 设置 JSON 含左右各自 `questionGroupId`，且右 scope 为 `group`。正常退出后 PID 与 9231 均结束；重新启动 EXE、点击“继续”后，两 Pane 选择、Q16–18、Q18=True 和 `已答 1/21` 全部恢复，再次正常退出。
+- 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；12,631,552 字节；`2026-09-08 09:57:11.051 +08:00`；SHA-256 `F87A8E2211FF801D8A9BF270920E2D8E2B5EBF99E059C4E8E35ECDBF436F0D9E`。旧 EXE 已单文件备份；本轮没有生成、覆盖或安装 MSI/NSIS。
+- 最终自动化：`npm test` 连续两次均为 27 文件、143/143；`npm run lint` 和 `npm run build` 退出码 0（2002 modules）；Cargo 26/26。既有全部、Passage、范围、单题、整套、Writing 关窗等回归继续通过。
+- 安全处置：首次系统目录框自动化误选样本源目录后，新增工作区项全部移动至 `D:\IELTS-Workbench-Releases\accidental-sample-workspace-20260908-100624` 隔离保留；原题包源文件未覆盖、样本目录恢复、Git 干净。后续正确工作区通过真实 `initialize_workspace` Rust 命令初始化。
