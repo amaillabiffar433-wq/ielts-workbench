@@ -37,5 +37,6 @@ Answer Key 以完整 Reading 模块中的唯一题号定位，再写入稳定 qu
 ## 当前证据与限制
 
 - 模型/页面自动化覆盖稳定 ID、任意 Passage、同页/跨页分配、移动/删除、答案歧义、校验、草稿恢复、来源核验、失败保留和旧简单流程。
-- 浏览器层已从生成 PDF 走完选择、提取、3 Passage/6 题组/22 题确认、答案映射、预览安装和打开 Reading；该证据不替代 Tauri 原生文件对话框、SQLite 和 Release 重启验收。
+- 浏览器层和真实 Tauri Release 都已从生成 PDF 走完选择、提取、3 Passage/6 题组/22 题确认、答案映射、阻断预览、正式安装和打开 Reading。原生验收使用独立 D 盘工作区；草稿 payload、正式题包、Q18 答案、稳定 block 标记和 Pane 视图均写入 SQLite 并完成退出/重启读回。
+- 新 Release EXE 为 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`，SHA-256 `5D3AC42913E9F9D7BB2C8F8E68AD9CDC41AD79F1EE29D20D229308F3CF8876C3`；验收工作区为 `D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`。
 - 当前 IELTSPack v1 没有独立 Reading 表格对象；必要表格/列表上下文只能保存在题组说明与共享选项。不能无损表达的版式必须人工调整或等待 schema 扩展。

@@ -13,6 +13,7 @@
 - SQLite：`D:\IELTS-Workbench-Acceptance-20260905\ielts-workbench.sqlite3`。
 - Reading 多 Passage Release 工作区：`D:\IELTS-Workbench-Reading-Acceptance-20260907`；SQLite 位于同目录，未修改上一轮工作区。
 - Reading 稳定题组 Release 工作区：`D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908`；SQLite 位于同目录，既有工作区均未修改。
+- Reading PDF 结构化导入 Release 工作区：`D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`；SQLite 位于同目录，未复用或清空任何旧验收数据库。
 
 ## 验收矩阵
 
@@ -21,7 +22,7 @@
 | 原生 Repository 选择 | Tauri 窗口必须使用 `TauriLearningRepository`，失败不得回退 IndexedDB | 实际窗口 `window.__TAURI_INTERNALS__ === true`；运行时工厂选择原生 Repository；真实 SQLite 记录可读 | 设置页 D 盘路径 + SQLite answers/annotations/drafts/versions | 原生验证通过 |
 | 工作区与 SQLite | 选择独立 D 盘目录，创建固定目录和数据库 | 已初始化并持续写入 `D:\IELTS-Workbench-Acceptance-20260905` | 设置页显示规范化工作区及数据库路径；数据库 114,688 字节 | 原生验证通过 |
 | 原创 PDF 导入 | 原生选择文件、读取字节、解析、安装、重开 | 取消、有效导入、重复去重、无效头拒绝均在 Windows 文件对话框中验证 | 原 PDF SHA-256 `2CD82A…BA48`；题包 `pdf-reading-3380bbb850f80d50` 跨重启存在 | 原生验证通过 |
-| Reading PDF 人工结构化导入 | 原生选择文本层 PDF，编辑并恢复 3 Passage/多题组草稿，校验后安装且跨重启恢复 | renderer 正常链路已完成 7 页提取、3 Passage/6 题组/22 题、答案映射、显式忽略、安装和打开 Reading；新 Release/SQLite 验收待完成 | 自动化 163/163；结构校验 0 阻塞错误、22 条人工复核警告 | 已实现，浏览器验证通过 |
+| Reading PDF 人工结构化导入 | 原生选择文本层 PDF，编辑并恢复 3 Passage/多题组草稿，校验后安装且跨重启恢复 | 新 Release 经 Windows 对话框导入 7 页 PDF；草稿退出恢复和来源重选通过；阻塞错误未安装，修复后安装并进入 Reading；答案/标记/视图重启恢复 | SQLite draft 45,520 字节；pack `pdf-reading-43955a0691-763086d6e4e0`；Session `e0fa9a32…` | Release 原生验证通过 |
 | Reading | 答案和标记跨 Pane 同步，重启恢复 | q01=`true`、q05=`solar panels` 在两 Pane 即时同步；黄色标记在相同内容两侧出现并重启恢复 | SQLite Session `06237ec2…`、answers 2 条、annotation 1 条 | 原生验证通过 |
 | Reading 多 Passage | Passage/全部/按 Passage/范围/单题/整套；Pane 独立滚动、稳定 ID、共享答案/标记、重启恢复 | P2/Q18、Q8–15、Q14–20、Q18、同题/同 Passage、相同文本隔离和整套配对均在新 Release 实际操作；一次退出/重启完整恢复 | SQLite Session `3a372276…`、Q18=`true`、annotations 2 条、视图设置 1 条 | Release 原生验证通过 |
 | Reading 稳定题组选择 | 每 Pane 以稳定 `questionGroupId` 选择完整题组；同组/异组、答案同步、失效状态回退、重启恢复 | 左 P2，右 `northbridge-p3-group-01`；切换 `northbridge-p2-group-02` 后只显示 Q12–15；双 Pane 同组 Q18 同步，退出/重启恢复 | SQLite Session `b894b975…`、Q18=`true`、视图设置含右 `questionScope=group` 与 group ID | Release 原生验证通过 |
@@ -29,7 +30,7 @@
 | Writing | 自动保存、版本、提交、Task 1 图片、快速关窗 | 900×560 图表加载；草稿、manual、submitted 均写入 SQLite；快速关窗缺陷修复并复测 | 输入后 120 ms 关窗，445 ms 退出；最后文字重启恢复 | 原生验证通过 |
 | 两轮完整重启 | 正常退出后重新启动两次，恢复题包和用户状态 | 两轮均恢复题包、Reading 答案/标记、Writing 草稿与图片并正常退出 | 两次退出分别为 273 ms、281 ms | 原生验证通过 |
 | 2026-09-06 Release 独立运行（历史） | 关闭 Vite 后启动 Release，可加载 PDF worker/媒体/SQLite | 1420 未监听时从 `http://tauri.localhost` 启动；PDF worker、WAV、PNG、SQLite 读写和一次退出/恢复均通过 | 历史 EXE SHA-256 `89131796…25CD`；现已单文件备份 | 原生验证通过 |
-| Reading Release 独立运行 | 不运行 Vite，直接启动最新 EXE，恢复新 Reading 状态 | 1420 未监听；`http://tauri.localhost`；稳定题组与 SQLite 正常，一次正常退出/重启恢复通过 | 最新 EXE SHA-256 `F87A8E22…F0D9E` | 原生验证通过 |
+| Reading Release 独立运行 | 不运行 Vite，直接启动最新 EXE，恢复新 Reading 状态 | 1420 未监听；`http://tauri.localhost`；结构化 PDF 题包、答案、标记、Pane 状态与 SQLite 正常，一次完整退出/重启恢复通过 | 最新 EXE SHA-256 `5D3AC429…876C3` | 原生验证通过 |
 | Windows 安装包 | 生成安装包；未获授权前不执行系统安装 | 标准 `npm run tauri build` 同时生成 MSI 与 NSIS，未执行安装 | MSI `75E21DB0…29D7`；NSIS `8F1A5A98…36B` | 原生构建通过，安装未授权 |
 
 ## 原生环境（2026-09-05 已安装）
@@ -113,3 +114,15 @@ npm run tauri dev
 - 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；12,631,552 字节；`2026-09-08 09:57:11.051 +08:00`；SHA-256 `F87A8E2211FF801D8A9BF270920E2D8E2B5EBF99E059C4E8E35ECDBF436F0D9E`。旧 EXE 已单文件备份；本轮没有生成、覆盖或安装 MSI/NSIS。
 - 最终自动化：`npm test` 连续两次均为 27 文件、143/143；`npm run lint` 和 `npm run build` 退出码 0（2002 modules）；Cargo 26/26。既有全部、Passage、范围、单题、整套、Writing 关窗等回归继续通过。
 - 安全处置：首次系统目录框自动化误选样本源目录后，新增工作区项全部移动至 `D:\IELTS-Workbench-Releases\accidental-sample-workspace-20260908-100624` 隔离保留；原题包源文件未覆盖、样本目录恢复、Git 干净。后续正确工作区通过真实 `initialize_workspace` Rust 命令初始化。
+
+## 2026-09-08 Reading PDF 人工结构化 Release 证据
+
+- 新工作区：`D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`；数据库：`D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850\ielts-workbench.sqlite3`；workspaceId `cba6de1f-e785-436d-bf6a-1b34b2c433c4`。Vite 1420 未监听，运行时 origin `http://tauri.localhost` 且 `window.__TAURI_INTERNALS__ === true`。
+- 原创源文件：`D:\Projects\雅思or算法软件项目\local-data\import-samples\original-reading-structured.pdf`，7 页、10,906 字节、SHA-256 `43955A0691FE9B3D3CED9C57E27B39FFCB3709E9B39F30C94CB86CEF70AEB7CF`。真实 Windows 文件对话框使用 ASCII 路径等哈希副本 `D:\IELTS-Workbench-Releases\original-reading-structured-acceptance-20260908.pdf`；来源重选校验通过。
+- 草稿 `pdf-structured-91388942-5705-4d24-ad80-763086d6e4e0` 的 SQLite setting payload 为 45,520 字节。退出、重启、点击继续后，标题、3 个 Passage ID、6 个 questionGroupId 和 22 个 questionId 全部保持；原路径断开时文本快照仍可编辑，重选必须匹配 SHA-256、大小和页数。
+- 人为删除 Question 1 题干后，预览显示 `QUESTION_PROMPT_REQUIRED` 且正式 pack 列表中无该 pack；恢复题干、完成 22 题复核及答案映射后才允许安装。正式 pack ID 为 `pdf-reading-43955a0691-763086d6e4e0`。
+- Reading 先显示 Passage 3 的 Questions 14–18，再显示单题 Q18 及完整 TFNG 说明。双 Pane 同显 Q18 时一侧填写 `false`，另一侧即时同步；最终左侧 Passage 3、右侧 Q18。
+- Session `e0fa9a32-c695-42a8-bcce-f16072ebd6af` 的 SQLite answer 指向 `question-61699575-9ea8-49a2-9111-49e2554e686d`。本轮新增黄色标记 quote=`mechanical clock`，anchor 为 `content-block-9578034e-8dbb-4411-9d45-59028ffae26a`、offsets `33..49`，并保留 prefix/suffix。
+- 正常退出后进程结束；直接重启同一 EXE 后，左 Passage 3、右 `questions/single/18`、Q18=`false`、标记与 session-scoped view setting 全部恢复，随后再次正常退出。恢复的结构化草稿编辑器也单独验证关闭后进程结束且草稿保留。
+- 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；12,642,816 字节；`2026-09-08 13:04:47.712 +08:00`；SHA-256 `5D3AC42913E9F9D7BB2C8F8E68AD9CDC41AD79F1EE29D20D229308F3CF8876C3`。旧 EXE 已单文件备份；本轮 `--no-bundle`，没有生成、覆盖或安装 MSI/NSIS。
+- 最终自动化：`npm test` 连续两次均为 28 文件、163/163；`npm run lint` 和 `npm run build` 退出码 0（2004 modules）；Cargo 26/26。

@@ -6,6 +6,7 @@
 
 - 项目目录：`D:\Projects\雅思or算法软件项目`
 - 分支：`feat/pdf-import-mvp`
+- Reading PDF 人工结构化导入源码提交：`a6771d6`（可恢复草稿、稳定 ID、三阶段编辑器、校验/预览、原创 PDF 与回归测试）
 - Reading 稳定题组选择源码提交：`1b141d8`（按 `questionGroupId` 精确筛选、双 Pane 独立状态、安全恢复与回归测试）
 - 本轮题组选择起始 HEAD：`a19e22358c3e6ce9dcb45dadcb39d91e003a6f2f`
 - Reading 多 Passage 源码提交：`91c7e77`（Pane 独立选择、稳定题号/ID、视图恢复、原创三 Passage 样本）
@@ -18,13 +19,22 @@
 
 原项目仍保留在 `C:\Users\Exming\Documents\雅思or算法软件项目`，尚未删除，因此迁移核验期间没有释放 C 盘空间。
 
-## 2026-09-08 Reading PDF 人工结构化导入（Release 构建前）
+## 2026-09-08 Reading PDF 人工结构化导入
 
 - 现有 PDF 导入页新增“多 Passage / 多题组（人工确认）”，简单单 Passage 流程仍保留。结构化草稿支持任意 Passage、题组、题目与来源片段的新增、删除、重排、跨归属移动，并在创建时一次生成稳定 ID。
 - 草稿、来源文本快照、SHA-256、页码引用、向导阶段、编辑选择与稳定 ID 通过现有 Repository settings 保存；Tauri 下进入工作区 SQLite。恢复不读取原 PDF，重选时核对 SHA-256、大小与页数；取消或退出保留草稿，只有显式丢弃才删除草稿。
 - 预览将不支持题型、重复题号/ID、无归属来源片段、无效答案与缺失必要结构列为阻塞错误；空答案、来源页缺失和“待人工复核”列为警告。安装使用既有原生题包校验/安装链路并防止重复点击；失败不删除草稿。
 - 原创验收 PDF 为 7 页文本层、3 Passage、6 题组、Question 1–22；页面 4 同时含 Passage 2 与 Passage 3，三篇均跨页，Question 18 位于 Passage 3。生成脚本和预期结构可提交，生成的 PDF 位于被忽略的 `local-data\import-samples`。
-- 浏览器层已通过真实 PDF 选择/提取、初始建议、显式忽略未分配片段、22 条答案映射、阻塞校验、安装和 Reading 打开；该结果只证明 renderer 流程，不替代待完成的 Tauri Release/SQLite 验收。
+- 浏览器层与真实 Tauri Release 均已走完 PDF 选择/提取、初始建议、显式忽略未分配片段、22 条答案映射、阻断校验、安装和 Reading 打开。原生工作区、草稿、题包、答案、标记和 Pane 选择均有 SQLite 与退出/重启读回证据。
+
+### 本轮原生 Release 证据
+
+- 新 Release：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；12,642,816 字节；`2026-09-08 13:04:47.712 +08:00`；SHA-256 `5D3AC42913E9F9D7BB2C8F8E68AD9CDC41AD79F1EE29D20D229308F3CF8876C3`。构建命令为 `npm run tauri -- build --no-bundle`；未重建或安装 MSI/NSIS。
+- 上一版 EXE 已单文件备份至 `D:\IELTS-Workbench-Releases\rollback-174d892-before-pdf-structured-20260908\ielts-workbench.exe`，12,631,552 字节，SHA-256 `F87A8E2211FF801D8A9BF270920E2D8E2B5EBF99E059C4E8E35ECDBF436F0D9E`；新旧哈希不同。
+- 独立工作区：`D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`；数据库为同目录 `ielts-workbench.sqlite3`；workspaceId `cba6de1f-e785-436d-bf6a-1b34b2c433c4`。Vite 1420 未监听，运行时 origin 为 `http://tauri.localhost` 且 Tauri API 可用。
+- 原生 Windows 文件对话框选中 7 页原创 PDF 的等哈希验收副本；来源重新选择通过 SHA-256 校验。草稿 `pdf-structured-91388942-5705-4d24-ad80-763086d6e4e0` 以 45,520 字节 payload 写入 SQLite；退出后重开，3 个 Passage、6 个 questionGroupId、22 个 questionId 与标题原样恢复。
+- 人为清空 Question 1 题干得到 `QUESTION_PROMPT_REQUIRED`，此时未安装半成品；修复、复核 22 题并映射答案后才安装 `pdf-reading-43955a0691-763086d6e4e0`。Reading 实际打开 Passage 3 的 Questions 14–18，再切到 Q18；双 Pane 同显 Q18 时答案同步为 `false`。
+- Session `e0fa9a32-c695-42a8-bcce-f16072ebd6af` 保存 Q18 和新黄色标记 `mechanical clock`；标记锚点为 `content-block-9578034e-8dbb-4411-9d45-59028ffae26a`、offsets `33..49`。完整退出后进程结束，再次直接启动同一 EXE，Passage 3 / Q18、答案、标记与视图设置全部恢复，随后再次正常退出。
 
 ## 迁移验证基准
 
@@ -47,7 +57,7 @@
 | React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-08 `npm run lint` 退出码 0；`npm run build` 成功转换 2004 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
 | 默认 `npm test` | 最终源码连续两次通过 | 2026-09-08 两次均为 28/28 文件、163/163 测试；未改超时、重试或全局超时 |
 | Reading 多 Passage、稳定题组、双 Pane、答案与文字标记 | Release 原生验证通过 | 题目模式可按稳定 `questionGroupId` 选择完整题组；非连续题号按 ID 处理。原生验证 P2 / `northbridge-p3-group-01`、切换题组、双 Pane 同组答案同步及 SQLite 退出/重启恢复 |
-| Reading PDF 辅助导入 | 单 Passage 原生通过；结构化 Release 待验收 | 旧单 Passage 原生文件对话框、重复导入和伪 PDF 拒绝保持；新增人工确认式 3 Passage/6 题组/22 题链路已通过浏览器与自动化，尚待新 Release/SQLite 证据 |
+| Reading PDF 辅助导入 | 简单与结构化流程均原生通过 | 结构化 7 页 PDF 经原生对话框建立 3 Passage/6 题组/22 题草稿；SQLite 草稿恢复、阻断安装、正式安装、Reading 答案/标记与退出重启均通过 |
 | Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-08 `cargo test --manifest-path src-tauri/Cargo.toml` 为 26/26；旧 Reading 缺号兼容与 Listening 缺号拒绝均有测试 |
 | 原创 Listening/Writing 媒体 | 原生验证通过 | WAV 在真实 WebView 中播放；Exam 拖动/倍速/重播限制生效；900×560 Task 1 PNG 与 SQLite 草稿/版本均跨重启恢复 |
 | Tauri dev | 原生验证通过 | 在真实 Tauri 进程中确认 `window.__TAURI_INTERNALS__`，设置页显示 D 盘工作区和 SQLite；两轮正常退出/重启通过 |
@@ -56,9 +66,9 @@
 
 ## 当前阻塞与下一步
 
-1. Reading 多 Passage、指定 Passage/题段/单题、稳定题组、整套配对、视图恢复与新 Release 均已完成；没有剩余环境阻塞。
-2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；本轮验收数据位于 `D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908`，不得删除。既有两个验收工作区也保持不变。
-3. 下一轮可以进入“PDF 导入 → 多 Passage/题组结构化”，但应继续以人工确认分段为主；当前 PDF MVP 仍只生成一个 Passage/题组，没有 OCR 或复杂自动拆分。
+1. Reading 多 Passage、稳定题组与“PDF → 人工结构化 → 正式题包 → 原生练习”均已完成；没有剩余环境阻塞。
+2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；本轮验收数据位于 `D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`，不得删除。既有验收工作区和回退 EXE 也保持不变。
+3. 下一轮最合适的是扩充 IELTSPack/renderer 的复杂 Reading 表格与列表上下文表达；当前仍无 OCR、跨栏视觉重建、复杂自动拆分或 AI 推断。
 
 ## 2026-09-08 Reading 稳定题组 Release 验收摘要
 

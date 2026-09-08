@@ -131,3 +131,10 @@
 - 原创样本脚本生成 7 页文本层 PDF：3 Passage、每篇 2 题组、Question 1–22、Q18 位于 Passage 3、页面 4 混合区域、跨页正文、共享选项和字数限制。PDF 已用 `pdfinfo`/`pdftotext` 检查并逐页渲染目视复核，不含 Cambridge 或第三方内容。
 - 浏览器层通过正常文件选择/提取链路生成 3 Passage/6 题组/22 题，映射全部答案，显式忽略 7 个未分配片段后结构校验通过；安装后 Reading 显示 Passage 3 的 Q14–18 题组。浏览器证据不计作 Tauri 原生验收。
 - 最终自动化门槛：`npm test` 连续两次均为 28 文件、163/163；`npm run lint` 退出码 0；`npm run build` 转换 2004 modules、退出码 0；Cargo 26/26。未改测试重试、断言或全局超时。
+- 结构化导入实现、测试、原创样本和首轮文档已提交为 `a6771d6`。构建前只备份上一版 EXE 到 `D:\IELTS-Workbench-Releases\rollback-174d892-before-pdf-structured-20260908\ielts-workbench.exe`；未复制约 8 GiB target，未重建或安装 MSI/NSIS。
+- `npm run tauri -- build --no-bundle` 退出码 0，生成 12,642,816 字节的新 EXE，时间 `2026-09-08 13:04:47.712 +08:00`，SHA-256 `5D3AC42913E9F9D7BB2C8F8E68AD9CDC41AD79F1EE29D20D229308F3CF8876C3`；与备份旧 EXE 的 `F87A8E…F0D9E` 不同。
+- 新建 `D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`，Rust 返回 workspaceId `cba6de1f-e785-436d-bf6a-1b34b2c433c4` 和同目录 SQLite。Vite 1420 关闭，Release origin 为 `http://tauri.localhost`、Tauri runtime 为真。
+- 使用真实 Windows 文件对话框选择原创 PDF 等哈希验收副本。草稿 `pdf-structured-91388942-5705-4d24-ad80-763086d6e4e0` 写入 SQLite settings（payload 45,520 字节）；先退出并重开后，3 Passage、6 group、22 question 的全部稳定 ID 与标题一致，随后重新选择来源并通过 SHA-256/大小/页数核验。
+- 原生向导明确忽略未处理片段后，故意清空 Question 1 题干得到 `QUESTION_PROMPT_REQUIRED`；原生 pack 列表没有半成品。恢复题干、完成 22 题人工复核和答案映射后，结构校验通过并安装 `pdf-reading-43955a0691-763086d6e4e0`。
+- Reading 实际查看 Passage 3、Questions 14–18 和单题 Q18；双 Pane 同显 Q18 时一侧写入 `false`，另一侧同步。随后在 Passage 3 新建黄色标记 `mechanical clock`。SQLite Session `e0fa9a32-c695-42a8-bcce-f16072ebd6af` 读到稳定 questionId 的答案与 `blockId + offsets 33..49 + quote/prefix/suffix` 标记。
+- 完整正常退出后 PID 和 WebView 调试监听结束；再次直接启动同一 EXE，从“最近继续”恢复左 Passage 3、右 Q18、Q18=`false`、黄色标记和 Pane 设置，随后第二次正常退出。另一次在恢复的结构化草稿编辑器内直接关闭也正常结束进程，没有删除草稿。
