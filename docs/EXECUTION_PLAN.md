@@ -1,8 +1,23 @@
 # IELTS Workbench 执行计划
 
-更新日期：2026-09-07（Reading 多 Passage 增量开发与 Release 验收完成）
+更新日期：2026-09-07（Reading 稳定题组选择增量开发进行中）
 
-## 当前执行切片：Reading 多 Passage、题段与单题选择
+## 当前执行切片：Reading 按稳定 questionGroupId 选择题组
+
+恢复基准为 `D:\Projects\雅思or算法软件项目`、分支 `feat/pdf-import-mvp`、起始 HEAD `a19e22358c3e6ce9dcb45dadcb39d91e003a6f2f`；恢复时工作树干净。本轮仅在现有 Reading 题目模式中增加题组选择，不改变题包 schema、答案/标记身份、评分范围或 PDF 解析能力。
+
+| 步骤 | 内容 | 状态 |
+| --- | --- | --- |
+| G1 | 读取规则、领域 schema、题组模型、Pane 状态及持久化实现，确认稳定 ID 与兼容性边界 | 已完成：IELTSPack v1 的前端与 Rust 校验均要求稳定且全局唯一的 `questionGroupId`；不存在合法但缺失该 ID 的 v1 题组 |
+| G2 | 以 `questionGroupId` 增量实现题组筛选、紧凑下拉、双 Pane 独立选择与安全状态恢复 | 已完成：筛选和持久化均保存稳定题组 ID；失效 ID 保持题组模式并回退至首个有效题组 |
+| G3 | 补齐非连续题号、同 Passage 多题组、双 Pane 同步、无效 ID 回退及旧模式回归测试 | 已完成：新增 8 项测试，覆盖 ID 精确筛选、非连续题号、旧 v1 状态/单 Passage 题包和双 Pane 同步 |
+| G4 | 连续两次前端测试，并执行 lint、Vite build 与 Cargo test | 已完成：两次前端回归均为 27 文件、143/143；lint、2002-module Vite build、Cargo 26/26 通过 |
+| G5 | 备份当前 EXE，生成不含安装包的新 Release，在独立 D 盘工作区完成原生退出/重启验收 | 待执行 |
+| G6 | 回写 CURRENT_STATE、WORK_LOG、DESKTOP_ACCEPTANCE 与 Reading 验收记录，建立小型本地提交 | 待执行 |
+
+发布边界：本轮沿用 `0.1.0`，只生成和启动本地 Windows Release EXE；不生成或安装 MSI/NSIS，不创建 changelog/tag/GitHub Release，不推送远程，也不清理旧 Release、数据库或验收资料。
+
+## 已完成切片：Reading 多 Passage、题段与单题选择
 
 恢复基准为 `D:\Projects\雅思or算法软件项目`、分支 `feat/pdf-import-mvp`、起始 HEAD `f7fd42af1584714f1b681f1662ce01a4f799b76e`；恢复时工作树干净。现有题包、SQLite、原创 PDF/音频/图表及上一版 Release 均只读保护，不重新迁移、不删除 C 盘副本、不推送远程。
 

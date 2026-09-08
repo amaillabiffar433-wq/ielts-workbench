@@ -5,6 +5,7 @@ import { TextDocument, type CreateAnnotationInput } from "../../../components/Te
 import type { ReadingModule } from "../../../domain";
 import { answerKey, useWorkbenchStore } from "../../../stores/workbenchStore";
 import {
+  buildReadingQuestionGroupOptions,
   groupSelectedReadingQuestions,
   passageLabel,
   questionSelectionLabel,
@@ -31,6 +32,7 @@ const paneOptions = [
 const questionScopeOptions: ReadonlyArray<{ value: ReadingQuestionScope; label: string }> = [
   { value: "all", label: "全部" },
   { value: "passage", label: "按 Passage" },
+  { value: "group", label: "题组" },
   { value: "range", label: "题段" },
   { value: "single", label: "单题" },
 ];
@@ -123,6 +125,7 @@ export function ReadingPane({
   const restoredScrollTop = paneState.scrollPositions[contentKey] ?? 0;
   const selectedSectionIndex = module.sections.findIndex((section) => section.id === paneState.passageId);
   const selectedSection = module.sections[selectedSectionIndex] ?? module.sections[0];
+  const questionGroupOptions = useMemo(() => buildReadingQuestionGroupOptions(entries), [entries]);
   const questionSelection = paneQuestionSelection(paneState);
   const selectionResult = useMemo(
     () => selectReadingQuestions(entries, questionSelection),
@@ -210,6 +213,21 @@ export function ReadingPane({
                   >
                     {module.sections.map((section, index) => (
                       <option key={section.id} value={section.id}>Passage {index + 1}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {paneState.questionScope === "group" && (
+                <label>
+                  <span className="sr-only">{side === "left" ? "左" : "右"}窗格题组</span>
+                  <select
+                    aria-label={`${side === "left" ? "左" : "右"}窗格题组`}
+                    className="select reading-pane__group-selector"
+                    onChange={(event) => updatePane({ questionGroupId: event.target.value })}
+                    value={paneState.questionGroupId}
+                  >
+                    {questionGroupOptions.map((option) => (
+                      <option key={option.questionGroupId} value={option.questionGroupId}>{option.label}</option>
                     ))}
                   </select>
                 </label>

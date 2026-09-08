@@ -136,6 +136,66 @@ describe("ReadingPage multi-passage selection", () => {
     expect(document.querySelectorAll('[data-question-id^="northbridge-q"]')).toHaveLength(1);
   });
 
+  it("selects exactly one complete group by its stable questionGroupId", async () => {
+    renderReading();
+    await screen.findByTestId("reading-split-workspace");
+
+    fireEvent.change(screen.getByLabelText("右窗格题目范围类型"), { target: { value: "group" } });
+    const groupSelector = screen.getByLabelText("右窗格题组");
+    expect(within(groupSelector).getByRole("option", { name: /Passage 2.*Questions 12–15.*Mixed Questions/ }))
+      .toHaveValue("northbridge-p2-group-02");
+    fireEvent.change(groupSelector, { target: { value: "northbridge-p2-group-02" } });
+
+    const rightPane = screen.getByRole("region", { name: "右窗格" });
+    expect(groupSelector).toHaveValue("northbridge-p2-group-02");
+    expect(within(rightPane).getByText("Questions 12–15")).toBeInTheDocument();
+    expect(within(rightPane).getByText("Complete each answer using no more than three words from Passage 2."))
+      .toBeInTheDocument();
+    expect(rightPane.querySelector('[data-question-group-id="northbridge-p2-group-02"]')).toBeInTheDocument();
+    expect(rightPane.querySelector('[data-question-group-id="northbridge-p2-group-01"]')).not.toBeInTheDocument();
+    expect(rightPane.querySelectorAll('[data-question-id^="northbridge-q"]')).toHaveLength(4);
+    expect(within(rightPane).getByText("Who provides the initial tide predictions?")).toBeInTheDocument();
+    expect(within(rightPane).queryByText("Why does the ferry timetable change every week?")).not.toBeInTheDocument();
+  });
+
+  it("keeps different group choices independent and synchronizes one group shown in both Panes", async () => {
+    renderReading();
+    await screen.findByTestId("reading-split-workspace");
+    fireEvent.change(screen.getByLabelText("左窗格内容"), { target: { value: "questions" } });
+    fireEvent.change(screen.getByLabelText("左窗格题目范围类型"), { target: { value: "group" } });
+    fireEvent.change(screen.getByLabelText("右窗格题目范围类型"), { target: { value: "group" } });
+    const leftGroup = screen.getByLabelText("左窗格题组");
+    const rightGroup = screen.getByLabelText("右窗格题组");
+    fireEvent.change(leftGroup, { target: { value: "northbridge-p2-group-01" } });
+    fireEvent.change(rightGroup, { target: { value: "northbridge-p3-group-01" } });
+    expect(leftGroup).toHaveValue("northbridge-p2-group-01");
+    expect(rightGroup).toHaveValue("northbridge-p3-group-01");
+    expect(screen.getByRole("region", { name: "左窗格" }).querySelector('[data-question-id="northbridge-q08"]')).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "右窗格" }).querySelector('[data-question-id="northbridge-q18"]')).toBeInTheDocument();
+
+    fireEvent.change(leftGroup, { target: { value: "northbridge-p3-group-01" } });
+    const leftId = questionContainerId("left-pane", "northbridge-q18");
+    const rightId = questionContainerId("right-pane", "northbridge-q18");
+    await waitFor(() => {
+      expect(document.getElementById(leftId)).toBeInTheDocument();
+      expect(document.getElementById(rightId)).toBeInTheDocument();
+    });
+    expect(leftId).not.toBe(rightId);
+    const leftFalse = within(document.getElementById(leftId) as HTMLElement).getByRole("radio", { name: "False" });
+    const rightFalse = within(document.getElementById(rightId) as HTMLElement).getByRole("radio", { name: "False" });
+    fireEvent.click(leftFalse);
+    await waitFor(() => {
+      expect(leftFalse).toBeChecked();
+      expect(rightFalse).toBeChecked();
+    });
+
+    fireEvent.change(rightGroup, { target: { value: "northbridge-p2-group-02" } });
+    fireEvent.change(rightGroup, { target: { value: "northbridge-p3-group-01" } });
+    expect(within(document.getElementById(leftId) as HTMLElement).getByRole("radio", { name: "False" })).toBeChecked();
+    expect(within(document.getElementById(rightId) as HTMLElement).getByRole("radio", { name: "False" })).toBeChecked();
+    expect(screen.getByText("已答 1/21")).toBeInTheDocument();
+  });
+
   it("keeps Pane selections independent and synchronizes one logical answer in two Q18 views", async () => {
     renderReading();
     await screen.findByTestId("reading-split-workspace");
@@ -222,7 +282,7 @@ describe("ReadingPage multi-passage selection", () => {
     const saved = {
       ...defaults,
       left: { ...defaults.left, passageId: "northbridge-passage-02", scrollPositions: { "passage:northbridge-passage-02": 180 } },
-      right: { ...defaults.right, questionScope: "single" as const, singleNumber: 18 },
+      right: { ...defaults.right, questionScope: "group" as const, questionGroupId: "northbridge-p3-group-01" },
     };
     const loadSetting = vi.fn((key: string) => key === readingViewStateSettingKey(session.sessionId)
       ? new Promise<string | null>((resolve) => { resolveView = resolve; })
@@ -238,7 +298,9 @@ describe("ReadingPage multi-passage selection", () => {
     resolveView?.(JSON.stringify(saved));
 
     expect(await screen.findByText("Passage 2 · A Ferry Timetable Written by Tides")).toBeInTheDocument();
-    expect(screen.getByLabelText("右窗格单题题号")).toHaveValue(18);
+    expect(screen.getByLabelText("右窗格题组")).toHaveValue("northbridge-p3-group-01");
+    expect(screen.getByRole("region", { name: "右窗格" }).querySelector('[data-question-id="northbridge-q18"]'))
+      .toBeInTheDocument();
     const leftPane = screen.getByRole("region", { name: "左窗格" });
     expect(within(leftPane).getByText(/The Northbridge foot ferry crosses/)).toBeInTheDocument();
     expect(document.querySelector<HTMLElement>('[data-pane-scroll="left"]')?.scrollTop).toBe(180);

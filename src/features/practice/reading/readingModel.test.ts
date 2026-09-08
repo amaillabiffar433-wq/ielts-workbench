@@ -4,6 +4,7 @@ import type { ReadingModule } from "../../../domain";
 import { originalDemoPack } from "../../../infrastructure/demo/originalDemoPack";
 import {
   buildReadingQuestionEntries,
+  buildReadingQuestionGroupOptions,
   groupSelectedReadingQuestions,
   selectReadingQuestions,
 } from "./readingModel";
@@ -18,6 +19,37 @@ function multiPassageModule(): ReadingModule {
       { ...original.sections[0], id: "section-2", title: "Two", questionGroups: [{ ...original.sections[0].questionGroups[0], id: "group-2", questions: original.sections[0].questionGroups[0].questions.slice(0, 2).map((question, index) => ({ ...question, id: `second-q-${index + 1}`, number: index + 3 })) }] },
       { ...original.sections[0], id: "section-3", title: "Three", questionGroups: [{ ...original.sections[0].questionGroups[0], id: "group-3", questions: original.sections[0].questionGroups[0].questions.slice(0, 2).map((question, index) => ({ ...question, id: `third-q-${index + 1}`, number: index + 5 })) }] },
     ],
+  };
+}
+
+function moduleWithNonContinuousGroup(): ReadingModule {
+  const module = multiPassageModule();
+  const questions = module.sections[0].questionGroups[0].questions;
+  return {
+    ...module,
+    sections: [{
+      ...module.sections[0],
+      questionGroups: [
+        {
+          ...module.sections[0].questionGroups[0],
+          id: "stable-matching-group",
+          title: "Questions 14, 18 / Matching Headings",
+          questions: [
+            { ...questions[0], id: "matching-q14", number: 14 },
+            { ...questions[1], id: "matching-q18", number: 18 },
+          ],
+        },
+        {
+          ...module.sections[0].questionGroups[0],
+          id: "stable-other-group",
+          title: "Questions 15–16 / Other Group",
+          questions: [
+            { ...questions[0], id: "other-q15", number: 15 },
+            { ...questions[1], id: "other-q16", number: 16 },
+          ],
+        },
+      ],
+    }],
   };
 }
 
@@ -67,5 +99,49 @@ describe("Reading question selection", () => {
         : section),
     } as ReadingModule;
     expect(buildReadingQuestionEntries(fixture)[2]).toMatchObject({ displayNumber: 3, moduleOrder: 2 });
+  });
+
+  it("selects one stable group without mixing sibling groups or filling number gaps", () => {
+    const entries = buildReadingQuestionEntries(moduleWithNonContinuousGroup());
+    const result = selectReadingQuestions(entries, {
+      kind: "group",
+      questionGroupId: "stable-matching-group",
+    });
+    expect(result.error).toBeNull();
+    expect(result.entries.map((entry) => ({
+      number: entry.displayNumber,
+      questionId: entry.question.id,
+      questionGroupId: entry.group.id,
+      sectionId: entry.section.id,
+    }))).toEqual([
+      { number: 14, questionId: "matching-q14", questionGroupId: "stable-matching-group", sectionId: "section-1" },
+      { number: 18, questionId: "matching-q18", questionGroupId: "stable-matching-group", sectionId: "section-1" },
+    ]);
+    expect(result.entries.some((entry) => entry.question.id === "other-q15")).toBe(false);
+    expect(groupSelectedReadingQuestions(result.entries)).toHaveLength(1);
+  });
+
+  it("uses stable group IDs for options and reports a removed group explicitly", () => {
+    const entries = buildReadingQuestionEntries(moduleWithNonContinuousGroup());
+    const options = buildReadingQuestionGroupOptions(entries);
+    expect(options.map((option) => option.questionGroupId)).toEqual([
+      "stable-matching-group",
+      "stable-other-group",
+    ]);
+    expect(options[0].label).toBe("Passage 1 · One · Questions 14, 18 · Matching Headings");
+    expect(selectReadingQuestions(entries, { kind: "group", questionGroupId: "removed-group" }).error)
+      .toContain("题组已不存在");
+  });
+
+  it("keeps the existing single-Passage pack selectable by its stored group ID", () => {
+    const reading = originalDemoPack.modules.find((candidate) => candidate.type === "reading");
+    if (!reading || reading.type !== "reading") throw new Error("Reading fixture missing");
+    const entries = buildReadingQuestionEntries(reading);
+    const storedGroupId = reading.sections[0].questionGroups[0].id;
+    const selected = selectReadingQuestions(entries, { kind: "group", questionGroupId: storedGroupId });
+    expect(selected.error).toBeNull();
+    expect(selected.entries.map((entry) => entry.group.id)).toEqual(
+      Array(reading.sections[0].questionGroups[0].questions.length).fill(storedGroupId),
+    );
   });
 });

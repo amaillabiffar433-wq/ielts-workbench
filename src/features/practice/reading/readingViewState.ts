@@ -6,13 +6,14 @@ import {
 } from "./readingModel";
 
 export type ReadingPaneView = "passage" | "questions" | "whole";
-export type ReadingQuestionScope = "all" | "passage" | "range" | "single";
+export type ReadingQuestionScope = "all" | "passage" | "group" | "range" | "single";
 
 export type ReadingPaneState = {
   readonly view: ReadingPaneView;
   readonly passageId: string;
   readonly questionScope: ReadingQuestionScope;
   readonly questionPassageId: string;
+  readonly questionGroupId: string;
   readonly rangeStart: number;
   readonly rangeEnd: number;
   readonly singleNumber: number;
@@ -61,6 +62,7 @@ export function createDefaultReadingViewState(module: ReadingModule): ReadingVie
     passageId: firstSectionId,
     questionScope: "all" as const,
     questionPassageId: firstSectionId,
+    questionGroupId: entries[0]?.group.id ?? "",
     rangeStart: firstQuestionNumber,
     rangeEnd: lastQuestionNumber,
     singleNumber: firstQuestionNumber,
@@ -77,6 +79,7 @@ export function paneQuestionSelection(state: ReadingPaneState): ReadingQuestionS
   switch (state.questionScope) {
     case "all": return { kind: "all" };
     case "passage": return { kind: "passage", sectionId: state.questionPassageId };
+    case "group": return { kind: "group", questionGroupId: state.questionGroupId };
     case "range": return { kind: "range", start: state.rangeStart, end: state.rangeEnd };
     case "single": return { kind: "single", number: state.singleNumber };
   }
@@ -88,6 +91,7 @@ export function readingPaneContentKey(state: ReadingPaneState): string {
   const selection = paneQuestionSelection(state);
   if (selection.kind === "all") return "questions:all";
   if (selection.kind === "passage") return `questions:passage:${selection.sectionId}`;
+  if (selection.kind === "group") return `questions:group:${selection.questionGroupId}`;
   if (selection.kind === "single") return `questions:single:${selection.number}`;
   return `questions:range:${selection.start}-${selection.end}`;
 }
@@ -101,6 +105,7 @@ function normalizePane(
   let recovered = false;
   const sectionIds = new Set(module.sections.map((section) => section.id));
   const entries = buildReadingQuestionEntries(module);
+  const questionGroupIds = new Set(entries.map((entry) => entry.group.id));
 
   const view = input.view === "passage" || input.view === "questions" || input.view === "whole"
     ? input.view
@@ -120,11 +125,18 @@ function normalizePane(
 
   let questionScope: ReadingQuestionScope = input.questionScope === "all"
       || input.questionScope === "passage"
+      || input.questionScope === "group"
       || input.questionScope === "range"
       || input.questionScope === "single"
     ? input.questionScope
     : fallback.questionScope;
   if (questionScope !== input.questionScope) recovered = true;
+
+  const questionGroupId = typeof input.questionGroupId === "string"
+      && questionGroupIds.has(input.questionGroupId)
+    ? input.questionGroupId
+    : fallback.questionGroupId;
+  if (questionScope === "group" && questionGroupId !== input.questionGroupId) recovered = true;
 
   const rangeStart = numberOr(input.rangeStart, fallback.rangeStart);
   const rangeEnd = numberOr(input.rangeEnd, fallback.rangeEnd);
@@ -138,6 +150,7 @@ function normalizePane(
     passageId,
     questionScope,
     questionPassageId,
+    questionGroupId,
     rangeStart,
     rangeEnd,
     singleNumber,

@@ -16,6 +16,7 @@ export type ReadingQuestionEntry = {
 export type ReadingQuestionSelection =
   | { readonly kind: "all" }
   | { readonly kind: "passage"; readonly sectionId: string }
+  | { readonly kind: "group"; readonly questionGroupId: string }
   | { readonly kind: "range"; readonly start: number; readonly end: number }
   | { readonly kind: "single"; readonly number: number };
 
@@ -30,6 +31,11 @@ export type SelectedReadingQuestionGroup = {
   readonly group: ReadingQuestionGroup;
   readonly groupIndex: number;
   readonly entries: readonly ReadingQuestionEntry[];
+};
+
+export type ReadingQuestionGroupOption = SelectedReadingQuestionGroup & {
+  readonly questionGroupId: string;
+  readonly label: string;
 };
 
 export function buildReadingQuestionEntries(module: ReadingModule): ReadingQuestionEntry[] {
@@ -84,6 +90,13 @@ export function selectReadingQuestions(
     return selected.length > 0
       ? { entries: selected, error: null }
       : { entries: [], error: "所选 Passage 已不存在或不包含题目。" };
+  }
+
+  if (selection.kind === "group") {
+    const selected = entries.filter((entry) => entry.group.id === selection.questionGroupId);
+    return selected.length > 0
+      ? { entries: selected, error: null }
+      : { entries: [], error: "所选题组已不存在或不包含题目。" };
   }
 
   if (selection.kind === "single") {
@@ -147,6 +160,43 @@ export function passageLabel(section: ReadingSection, sectionIndex: number): str
   return `Passage ${sectionIndex + 1} · ${section.title}`;
 }
 
+const questionTypeLabels: Readonly<Record<Question["type"], string>> = {
+  "single-choice": "Single Choice",
+  "true-false-not-given": "True / False / Not Given",
+  "short-answer": "Short Answer",
+  "fill-blank": "Fill in the Blank",
+};
+
+function questionNumberLabel(entries: readonly ReadingQuestionEntry[]): string {
+  const numbers = entries.map((entry) => entry.displayNumber);
+  if (numbers.length === 1) return `Question ${numbers[0]}`;
+  const isContinuous = numbers.every((number, index) => index === 0 || number === numbers[index - 1] + 1);
+  return isContinuous
+    ? `Questions ${numbers[0]}–${numbers.at(-1)}`
+    : `Questions ${numbers.join(", ")}`;
+}
+
+function questionGroupDescriptor(group: SelectedReadingQuestionGroup): string {
+  const title = group.group.title?.trim() ?? "";
+  const titleWithoutNumberPrefix = title.replace(
+    /^questions?\s+\d+(?:(?:\s*[-–—]\s*\d+)|(?:\s*,\s*\d+)*)\s*(?:[/:·—-]\s*)?/i,
+    "",
+  ).trim();
+  if (titleWithoutNumberPrefix) return titleWithoutNumberPrefix;
+  const questionTypes = [...new Set(group.entries.map((entry) => entry.question.type))];
+  return questionTypes.length === 1 ? questionTypeLabels[questionTypes[0]] : "Mixed Questions";
+}
+
+export function buildReadingQuestionGroupOptions(
+  entries: readonly ReadingQuestionEntry[],
+): ReadingQuestionGroupOption[] {
+  return groupSelectedReadingQuestions(entries).map((group) => ({
+    ...group,
+    questionGroupId: group.group.id,
+    label: `${passageLabel(group.section, group.sectionIndex)} · ${questionNumberLabel(group.entries)} · ${questionGroupDescriptor(group)}`,
+  }));
+}
+
 export function questionSelectionLabel(
   selection: ReadingQuestionSelection,
   entries: readonly ReadingQuestionEntry[],
@@ -160,6 +210,11 @@ export function questionSelectionLabel(
     const sectionIndex = module.sections.findIndex((section) => section.id === selection.sectionId);
     const section = module.sections[sectionIndex];
     return section ? `${passageLabel(section, sectionIndex)} 的题目` : "所选 Passage 的题目";
+  }
+  if (selection.kind === "group") {
+    return buildReadingQuestionGroupOptions(entries).find(
+      (option) => option.questionGroupId === selection.questionGroupId,
+    )?.label ?? "所选题组";
   }
   if (selection.kind === "single") return `Question ${selection.number}`;
   return `Question ${selection.start}–${selection.end}`;

@@ -105,7 +105,8 @@
 }
 
 .reading-pane__passage-selector,
-.reading-pane__scope-selector {
+.reading-pane__scope-selector,
+.reading-pane__group-selector {
   min-height: 31px;
   padding: 4px 7px;
   font-size: 12px;
@@ -117,6 +118,11 @@
 
 .reading-pane__scope-selector {
   width: 98px;
+}
+
+.reading-pane__group-selector {
+  width: min(310px, 42vw);
+  min-width: 180px;
 }
 
 .reading-pane__number-range {
