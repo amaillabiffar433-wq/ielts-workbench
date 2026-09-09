@@ -25,6 +25,7 @@ import {
   SaveWritingDraftInputSchema,
   SessionSnapshotSchema,
   WorkspaceSummarySchema,
+  WorkspaceBackupSummarySchema,
   WritingDraftSchema,
   WritingVersionSchema,
   deriveRecentSessionId,
@@ -44,6 +45,7 @@ import {
   type SessionSnapshot,
   type WritingDraft,
   type WritingVersion,
+  type WorkspaceBackupSummary,
 } from "./LearningRepository";
 
 export type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -247,6 +249,7 @@ function mapSessionSnapshot(input: unknown): SessionSnapshot {
     status: session?.status ?? "in-progress",
     ...(session ? { startedAt: session.startedAt, updatedAt: session.updatedAt } : {}),
     ...(session?.completedAt == null ? {} : { submittedAt: session.completedAt }),
+    elapsedSeconds: session?.elapsedSeconds ?? 0,
     answers: raw.answers.map(mapAnswer),
     annotations: raw.annotations.map(mapAnnotation),
   });
@@ -330,6 +333,23 @@ export class TauriLearningRepository implements LearningRepository {
       recentSessions,
       recentSessionId: deriveRecentSessionId(recentSessions),
     });
+  }
+
+  async createWorkspaceBackup(destinationParent: string): Promise<WorkspaceBackupSummary> {
+    const validatedPath = z.string().trim().min(1).parse(destinationParent);
+    return WorkspaceBackupSummarySchema.parse(await this.invokeCommand("create_workspace_backup", {
+      destinationParent: validatedPath,
+    }));
+  }
+
+  async restoreWorkspaceBackup(backupPath: string, destinationParent: string): Promise<BootstrapState> {
+    const validatedBackupPath = z.string().trim().min(1).parse(backupPath);
+    const validatedDestination = z.string().trim().min(1).parse(destinationParent);
+    RawWorkspaceInfoSchema.parse(await this.invokeCommand("restore_workspace_backup", {
+      backupPath: validatedBackupPath,
+      destinationParent: validatedDestination,
+    }));
+    return this.getBootstrapState();
   }
 
   async listInstalledPacks(): Promise<InstalledPackSummary[]> {
@@ -452,6 +472,15 @@ export class TauriLearningRepository implements LearningRepository {
     return mapSessionSnapshot(
       await this.invokeCommand("submit_session", { sessionId: validatedSessionId }),
     );
+  }
+
+  async updateSessionElapsed(sessionId: string, elapsedSeconds: number): Promise<void> {
+    const validatedSessionId = StableIdSchema.parse(sessionId);
+    const validatedElapsed = z.number().int().nonnegative().safe().parse(elapsedSeconds);
+    RawPracticeSessionSchema.parse(await this.invokeCommand("update_session_elapsed", {
+      sessionId: validatedSessionId,
+      elapsedSeconds: validatedElapsed,
+    }));
   }
 
   async saveAnswer(input: SaveAnswerInput): Promise<AnswerRecord> {

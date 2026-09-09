@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock3, Columns2, ListChecks } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { CheckCircle2, Clock3, Columns2, Flag, ListChecks } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { questionContainerId } from "../../../components/QuestionRenderer/questionDomIds";
@@ -7,8 +7,10 @@ import { SplitWorkspace, type SplitLayout } from "../../../components/SplitWorks
 import { SaveStatus } from "../../../components/common/SaveStatus";
 import { SegmentedControl } from "../../../components/common/SegmentedControl";
 import type { ReadingModule } from "../../../domain";
+import type { SessionSnapshot } from "../../../infrastructure/repositories/LearningRepository";
 import { answerKey, useWorkbenchStore } from "../../../stores/workbenchStore";
 import { usePracticeRoutePack } from "../usePracticeRoutePack";
+import { derivePracticeElapsed, formatPracticeTime } from "../practiceTimer";
 import { ReadingPane } from "./ReadingPane";
 import {
   paneInstanceId,
@@ -32,21 +34,48 @@ type QuestionNavigationTarget = {
   readonly questionId: string;
 };
 
-function formatTime(totalSeconds: number): string {
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
-  const seconds = (totalSeconds % 60).toString().padStart(2, "0");
-  return `${minutes}:${seconds}`;
-}
-
-function usePracticeTimer(mode: PracticeMode): string {
-  const [elapsed, setElapsed] = useState(0);
+function usePracticeTimer(
+  mode: PracticeMode,
+  session: SessionSnapshot | null,
+  persistElapsed: (sessionId: string, elapsedSeconds: number) => Promise<void>,
+): { readonly label: string; readonly elapsedSeconds: number; readonly warning: string | null } {
+  const [result, setResult] = useState({ elapsedSeconds: session?.elapsedSeconds ?? 0, warning: null as string | null });
+  const latestElapsed = useRef(result.elapsedSeconds);
+  const sessionId = session?.sessionId;
+  const sessionStatus = session?.status;
+  const sessionStartedAt = session?.startedAt;
+  const persistedSeconds = session?.elapsedSeconds ?? 0;
   useEffect(() => {
-    setElapsed(0);
-    const started = Date.now();
-    const timer = window.setInterval(() => setElapsed(Math.floor((Date.now() - started) / 1000)), 1000);
-    return () => window.clearInterval(timer);
-  }, [mode]);
-  return mode === "exam" ? formatTime(Math.max(0, 60 * 60 - elapsed)) : formatTime(elapsed);
+    if (!sessionId || sessionStatus !== "in-progress") return;
+    const mountedAt = Date.now();
+    const tick = () => {
+      const next = derivePracticeElapsed(mode, persistedSeconds, sessionStartedAt, mountedAt, Date.now());
+      latestElapsed.current = next.elapsedSeconds;
+      setResult(next);
+    };
+    tick();
+    const tickTimer = window.setInterval(tick, 1_000);
+    const persist = () => {
+      void persistElapsed(sessionId, latestElapsed.current).catch(() => {
+        // The store exposes the persistence failure through its visible error state.
+      });
+    };
+    const persistTimer = window.setInterval(persist, 10_000);
+    const persistWhenHidden = () => {
+      if (document.visibilityState === "hidden") persist();
+    };
+    document.addEventListener("visibilitychange", persistWhenHidden);
+    return () => {
+      window.clearInterval(tickTimer);
+      window.clearInterval(persistTimer);
+      document.removeEventListener("visibilitychange", persistWhenHidden);
+      persist();
+    };
+  }, [mode, persistElapsed, persistedSeconds, sessionId, sessionStartedAt, sessionStatus]);
+  return {
+    ...result,
+    label: mode === "exam" ? formatPracticeTime(Math.max(0, 60 * 60 - result.elapsedSeconds)) : formatPracticeTime(result.elapsedSeconds),
+  };
 }
 
 export function ReadingWorkbench() {
@@ -72,7 +101,11 @@ export function ReadingWorkbench() {
   const submitSession = useWorkbenchStore((state) => state.submitSession);
   const loadSetting = useWorkbenchStore((state) => state.loadSetting);
   const saveSetting = useWorkbenchStore((state) => state.saveSetting);
-  const timer = usePracticeTimer(mode);
+  const updateSessionElapsed = useWorkbenchStore((state) => state.updateSessionElapsed);
+  const questionFlags = useWorkbenchStore((state) => state.questionFlags);
+  const toggleQuestionFlag = useWorkbenchStore((state) => state.toggleQuestionFlag);
+  const flushPendingSaves = useWorkbenchStore((state) => state.flushPendingSaves);
+  const timer = usePracticeTimer(mode, session, updateSessionElapsed);
 
   const module = useMemo(
     () => activePack?.modules.find(
@@ -272,19 +305,22 @@ export function ReadingWorkbench() {
           options={[{ value: "study", label: "Study" }, { value: "exam", label: "Exam" }]}
           value={mode}
         />
-        {viewStateNotice && <span className="reading-view-notice" role="status">{viewStateNotice}</span>}
+        {(viewStateNotice || timer.warning) && <span className="reading-view-notice" role="status">{viewStateNotice ?? timer.warning}</span>}
         <div className="practice-toolbar__spacer" />
         <SaveStatus state={saveState} />
-        <span aria-label={mode === "exam" ? `考试剩余时间 ${timer}` : `练习用时 ${timer}`} className="practice-timer" role="timer">
-          <Clock3 aria-hidden="true" size={16} />{timer}
+        <span aria-label={mode === "exam" ? `考试剩余时间 ${timer.label}` : `练习用时 ${timer.label}`} className="practice-timer" role="timer">
+          <Clock3 aria-hidden="true" size={16} />{timer.label}
         </span>
         <button
           className="button button--primary"
           disabled={submitting}
           onClick={async () => {
-            if (!window.confirm("提交后进入复盘页面？本轮答案已自动保存。")) return;
+            const unanswered = questionEntries.length - answeredCount;
+            if (!window.confirm(`提交后进入复盘页面。当前未答 ${unanswered} 题、标记待检查 ${questionFlags.size} 题；确定提交吗？`)) return;
             setSubmitting(true);
             try {
+              await flushPendingSaves();
+              await updateSessionElapsed(session.sessionId, timer.elapsedSeconds);
               await submitSession(session.sessionId);
               navigate("/review");
             } catch {
@@ -311,23 +347,26 @@ export function ReadingWorkbench() {
         />
       </div>
       <footer className="question-navigator" aria-label="题号导航">
-        <div className="question-navigator__summary"><ListChecks aria-hidden="true" size={17} />已答 {answeredCount}/{questionEntries.length}</div>
+        <div className="question-navigator__summary"><ListChecks aria-hidden="true" size={17} />已答 {answeredCount}/{questionEntries.length} · 未答 {questionEntries.length - answeredCount} · 标记 {questionFlags.size}</div>
         <div className="question-navigator__numbers">
           {questionEntries.map((entry) => {
             const value = answers[answerKey(session.sessionId, entry.question.id)]?.value;
             const answered = Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0;
             const targetSide: PaneSide = paneShowsQuestions(viewState.right.view) ? "right" : paneShowsQuestions(viewState.left.view) ? "left" : "right";
+            const flagged = questionFlags.has(entry.question.id);
             return (
+              <span className="question-navigator__item" key={entry.question.id}>
               <button
                 aria-controls={questionContainerId(paneInstanceId(targetSide), entry.question.id)}
                 aria-label={`跳到第 ${entry.displayNumber} 题，${answered ? "已答" : "未答"}，${targetSide === "right" ? "右" : "左"}窗格`}
                 className={answered ? "is-answered" : undefined}
-                key={entry.question.id}
                 onClick={() => navigateToQuestion(entry)}
                 type="button"
               >
                 {entry.displayNumber}<span className="sr-only">{answered ? "已答" : "未答"}</span>
               </button>
+              <button aria-label={`${flagged ? "取消" : "添加"}第 ${entry.displayNumber} 题待检查标记`} className={flagged ? "is-flagged" : "question-navigator__flag"} onClick={() => void toggleQuestionFlag(session.sessionId, entry.question.id)} type="button"><Flag aria-hidden="true" size={11} /></button>
+              </span>
             );
           })}
         </div>

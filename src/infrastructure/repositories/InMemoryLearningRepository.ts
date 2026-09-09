@@ -32,6 +32,7 @@ import type {
   SaveAnswerInput,
   SaveWritingDraftInput,
   SessionSnapshot,
+  WorkspaceBackupSummary,
   WorkspaceSummary,
   WritingDraft,
   WritingVersion,
@@ -267,6 +268,24 @@ export class InMemoryLearningRepository implements LearningRepository {
     return this.getBootstrapState();
   }
 
+  async createWorkspaceBackup(destinationParent: string): Promise<WorkspaceBackupSummary> {
+    if (!this.workspace) throw new Error("Workspace is not configured");
+    const parent = destinationParent.trim().replace(/[\\/]+$/u, "");
+    if (!parent) throw new Error("Backup destination cannot be empty");
+    return {
+      path: `${parent}\\ielts-workbench-backup-memory`,
+      createdAt: this.now().toISOString(),
+      sourceWorkspaceId: this.workspace.id ?? "in-memory-workspace",
+      fileCount: 1,
+      totalBytes: 0,
+      databaseSha256: "0".repeat(64),
+    };
+  }
+
+  async restoreWorkspaceBackup(_backupPath: string, destinationParent: string): Promise<BootstrapState> {
+    return this.initializeWorkspace(`${destinationParent.trim().replace(/[\\/]+$/u, "")}\\IELTS-Workbench-Restored-memory`);
+  }
+
   async listInstalledPacks(): Promise<InstalledPackSummary[]> {
     return [...this.packs.values()]
       .map((pack) => toPackSummary(pack, this.packInstalledAt.get(pack.manifest.id)))
@@ -377,6 +396,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       status: "in-progress",
       startedAt: timestamp,
       updatedAt: timestamp,
+      elapsedSeconds: 0,
       answers: [],
       annotations: [],
     });
@@ -403,6 +423,9 @@ export class InMemoryLearningRepository implements LearningRepository {
     if (!session) {
       throw new Error(`Session does not exist: ${validatedSessionId}`);
     }
+    if (session.status === "submitted") {
+      return deepFreeze(cloneJson(session));
+    }
     if (session.status !== "in-progress") {
       throw new Error(`Only an in-progress session can be submitted: ${validatedSessionId}`);
     }
@@ -417,6 +440,22 @@ export class InMemoryLearningRepository implements LearningRepository {
     this.sessions.set(validatedSessionId, submitted);
     await this.persist();
     return deepFreeze(cloneJson(submitted));
+  }
+
+  async updateSessionElapsed(sessionId: string, elapsedSeconds: number): Promise<void> {
+    const validatedSessionId = StableIdSchema.parse(sessionId);
+    if (!Number.isSafeInteger(elapsedSeconds) || elapsedSeconds < 0) throw new Error("Elapsed time must be a non-negative safe integer");
+    const validatedElapsed = elapsedSeconds;
+    const session = this.sessions.get(validatedSessionId);
+    if (!session) throw new Error(`Session does not exist: ${validatedSessionId}`);
+    if (session.status !== "in-progress") throw new Error(`Session is immutable after submission: ${validatedSessionId}`);
+    const updated: SessionSnapshot = deepFreeze({
+      ...session,
+      elapsedSeconds: Math.max(session.elapsedSeconds ?? 0, validatedElapsed),
+      updatedAt: this.now().toISOString(),
+    });
+    this.sessions.set(validatedSessionId, updated);
+    await this.persist();
   }
 
   async saveAnswer(input: SaveAnswerInput): Promise<AnswerRecord> {

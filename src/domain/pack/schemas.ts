@@ -87,7 +87,10 @@ export const QuestionSourceSchema = z
     sourceBlock: z.string().trim().min(1),
     detectedType: z.enum([
       "single-choice",
+      "multiple-choice",
       "true-false-not-given",
+      "yes-no-not-given",
+      "matching",
       "short-answer",
       "fill-blank",
       "matching-headings",
@@ -123,6 +126,37 @@ export const TrueFalseNotGivenQuestionSchema = z
   })
   .strict();
 
+export const YesNoNotGivenQuestionSchema = z
+  .object({
+    ...questionBaseShape,
+    type: z.literal("yes-no-not-given"),
+    correctAnswer: z.enum(["yes", "no", "not-given"]).optional(),
+  })
+  .strict();
+
+export const MultipleChoiceQuestionSchema = z
+  .object({
+    ...questionBaseShape,
+    type: z.literal("multiple-choice"),
+    options: z.array(ChoiceOptionSchema).min(2),
+    selectionCount: z.number().int().min(2).max(8),
+    additionalNumbers: z.array(z.number().int().positive()).max(7).default([]),
+    scoringMode: z.enum(["exact-set", "per-correct-option"]),
+    correctOptionIds: z.array(StableIdSchema).max(8).default([]),
+  })
+  .strict();
+
+export const MatchingQuestionSchema = z
+  .object({
+    ...questionBaseShape,
+    type: z.literal("matching"),
+    matchingKind: z.enum(["headings", "information", "features", "sentence-endings"]),
+    options: z.array(ChoiceOptionSchema).min(2),
+    allowOptionReuse: z.boolean(),
+    correctOptionId: StableIdSchema.optional(),
+  })
+  .strict();
+
 export const ShortAnswerQuestionSchema = z
   .object({
     ...questionBaseShape,
@@ -147,12 +181,15 @@ export const FillBlankQuestionSchema = z
 export const QuestionSchema = z
   .discriminatedUnion("type", [
     SingleChoiceQuestionSchema,
+    MultipleChoiceQuestionSchema,
     TrueFalseNotGivenQuestionSchema,
+    YesNoNotGivenQuestionSchema,
+    MatchingQuestionSchema,
     ShortAnswerQuestionSchema,
     FillBlankQuestionSchema,
   ])
   .superRefine((question, context) => {
-    if (question.type === "single-choice") {
+    if (question.type === "single-choice" || question.type === "matching") {
       const optionIds = question.options.map((option) => option.id);
       if (new Set(optionIds).size !== optionIds.length) {
         context.addIssue({
@@ -167,6 +204,36 @@ export const QuestionSchema = z
           path: ["correctOptionId"],
           message: "correctOptionId must reference one of the question options",
         });
+      }
+    }
+
+    if (question.type === "multiple-choice") {
+      const optionIds = question.options.map((option) => option.id);
+      if (new Set(optionIds).size !== optionIds.length) {
+        context.addIssue({ code: "custom", path: ["options"], message: "Option IDs must be unique within a question" });
+      }
+      if (question.selectionCount > optionIds.length) {
+        context.addIssue({ code: "custom", path: ["selectionCount"], message: "selectionCount cannot exceed the number of options" });
+      }
+      const correctIds = question.correctOptionIds;
+      if (new Set(correctIds).size !== correctIds.length || correctIds.some((id) => !optionIds.includes(id))) {
+        context.addIssue({ code: "custom", path: ["correctOptionIds"], message: "correctOptionIds must be unique references to this question's options" });
+      }
+      if (correctIds.length !== 0 && correctIds.length !== question.selectionCount) {
+        context.addIssue({ code: "custom", path: ["correctOptionIds"], message: "A scorable multiple-choice question requires exactly selectionCount correct options" });
+      }
+      const numbers = [question.number, ...question.additionalNumbers];
+      if (new Set(numbers).size !== numbers.length) {
+        context.addIssue({ code: "custom", path: ["additionalNumbers"], message: "Associated question numbers must be unique" });
+      }
+      if (question.additionalNumbers.length > 0) {
+        if (numbers.length !== question.selectionCount || question.scoringMode !== "per-correct-option" || question.points !== question.selectionCount) {
+          context.addIssue({
+            code: "custom",
+            path: ["additionalNumbers"],
+            message: "Multiple-number selection sets require per-correct-option scoring and one point/number per required selection",
+          });
+        }
       }
     }
 
@@ -266,10 +333,31 @@ export const QuestionContextTableSchema = z
     });
   });
 
+export const QuestionContextCompletionPartSchema = z.discriminatedUnion("kind", [
+  z.object({ id: StableIdSchema, kind: z.literal("text"), text: QuestionContextTextSchema }).strict(),
+  z.object({ id: StableIdSchema, kind: z.literal("answer"), questionId: StableIdSchema }).strict(),
+]);
+
+export const QuestionContextCompletionSchema = z
+  .object({
+    id: StableIdSchema,
+    type: z.literal("completion"),
+    style: z.enum(["summary", "notes"]),
+    title: z.string().trim().min(1).max(200).optional(),
+    parts: z.array(QuestionContextCompletionPartSchema).min(2).max(100),
+  })
+  .strict()
+  .superRefine((block, context) => {
+    if (!block.parts.some((part) => part.kind === "text") || !block.parts.some((part) => part.kind === "answer")) {
+      context.addIssue({ code: "custom", path: ["parts"], message: "Completion context requires both text and at least one answer slot" });
+    }
+  });
+
 export const QuestionContextBlockSchema = z.discriminatedUnion("type", [
   QuestionContextParagraphSchema,
   QuestionContextListSchema,
   QuestionContextTableSchema,
+  QuestionContextCompletionSchema,
 ]);
 
 export const QuestionGroupSchema = z
@@ -287,6 +375,26 @@ export const QuestionGroupSchema = z
     let nodeCount = group.contextBlocks?.length ?? 0;
     (group.contextBlocks ?? []).forEach((block, blockIndex) => {
       if (block.type === "list") nodeCount += block.items.length;
+      if (block.type === "completion") {
+        nodeCount += block.parts.length;
+        block.parts.forEach((part, partIndex) => {
+          if (part.kind !== "answer") return;
+          const path = ["contextBlocks", blockIndex, "parts", partIndex, "questionId"];
+          const question = questions.get(part.questionId);
+          if (!question) {
+            context.addIssue({ code: "custom", path, message: "A completion answer slot must reference a question in the same question group" });
+            return;
+          }
+          if (question.type !== "short-answer" && question.type !== "fill-blank") {
+            context.addIssue({ code: "custom", path, message: "Only short-answer and fill-blank questions can be bound inside completion context" });
+          }
+          if (boundQuestionIds.has(part.questionId)) {
+            context.addIssue({ code: "custom", path, message: "A question may have only one primary answer position in structured context" });
+          }
+          boundQuestionIds.add(part.questionId);
+        });
+        return;
+      }
       if (block.type !== "table") return;
       nodeCount += block.rows.length + block.rows.reduce((sum, row) => sum + row.cells.length, 0);
       block.rows.forEach((row, rowIndex) => {
@@ -346,7 +454,7 @@ const moduleIdentityShape = {
 
 export const ReadingModuleSchema = z
   .object({
-    schemaVersion: z.union([z.literal(1), z.literal(2)]),
+    schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
     ...moduleIdentityShape,
     type: z.literal("reading"),
     sections: z.array(ReadingSectionSchema).min(1),
@@ -363,6 +471,30 @@ export const ReadingModuleSchema = z
               message: "Structured question context requires Reading module schemaVersion 2",
             });
           }
+        });
+      });
+    }
+    if (module.schemaVersion < 3) {
+      module.sections.forEach((section, sectionIndex) => {
+        section.questionGroups.forEach((group, groupIndex) => {
+          group.questions.forEach((question, questionIndex) => {
+            if (["multiple-choice", "yes-no-not-given", "matching"].includes(question.type)) {
+              context.addIssue({
+                code: "custom",
+                path: ["sections", sectionIndex, "questionGroups", groupIndex, "questions", questionIndex, "type"],
+                message: "Advanced Reading question types require schemaVersion 3",
+              });
+            }
+          });
+          (group.contextBlocks ?? []).forEach((block, blockIndex) => {
+            if (block.type === "completion") {
+              context.addIssue({
+                code: "custom",
+                path: ["sections", sectionIndex, "questionGroups", groupIndex, "contextBlocks", blockIndex],
+                message: "Completion context requires Reading module schemaVersion 3",
+              });
+            }
+          });
         });
       });
     }
@@ -400,6 +532,15 @@ export const ListeningModuleSchema = z
   .superRefine((module, context) => {
     module.sections.forEach((section, sectionIndex) => {
       section.questionGroups.forEach((group, groupIndex) => {
+        group.questions.forEach((question, questionIndex) => {
+          if (["multiple-choice", "yes-no-not-given", "matching"].includes(question.type)) {
+            context.addIssue({
+              code: "custom",
+              path: ["sections", sectionIndex, "questionGroups", groupIndex, "questions", questionIndex, "type"],
+              message: "Advanced question types are currently supported only by Reading module schemaVersion 3",
+            });
+          }
+        });
         if (group.contextBlocks !== undefined) {
           context.addIssue({
             code: "custom",
@@ -770,6 +911,11 @@ const IELTSPackStrictSchema = z
                     recordId(cell.id, [...blockPath, "rows", rowIndex, "cells", cellIndex, "id"]),
                   );
                 });
+              }
+              if (block.type === "completion") {
+                block.parts.forEach((part, partIndex) =>
+                  recordId(part.id, [...blockPath, "parts", partIndex, "id"]),
+                );
               }
             });
           }

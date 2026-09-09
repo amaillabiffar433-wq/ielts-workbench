@@ -178,6 +178,33 @@ pub fn submit_session(
 }
 
 #[tauri::command]
+pub fn update_session_elapsed(
+    state: State<'_, AppBackend>,
+    session_id: String,
+    elapsed_seconds: u64,
+) -> CommandResult<PracticeSessionRecord> {
+    let (_, connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    repositories::update_session_elapsed(&connection, &session_id, elapsed_seconds).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn create_workspace_backup(
+    state: State<'_, AppBackend>,
+    destination_parent: String,
+) -> CommandResult<crate::models::WorkspaceBackupSummary> {
+    state.create_workspace_backup(&destination_parent).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn restore_workspace_backup(
+    state: State<'_, AppBackend>,
+    backup_path: String,
+    destination_parent: String,
+) -> CommandResult<WorkspaceInfo> {
+    state.restore_workspace_backup(&backup_path, &destination_parent).map_err(Into::into)
+}
+
+#[tauri::command]
 pub fn save_answer(
     state: State<'_, AppBackend>,
     input: SaveAnswerInput,

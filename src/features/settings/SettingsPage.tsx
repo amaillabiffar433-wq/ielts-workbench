@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Bot, Database, FolderOpen, HardDriveDownload, MonitorCog, ShieldCheck } from "lucide-react";
 import { PageHeader } from "../../components/common/PageHeader";
 import { SegmentedControl } from "../../components/common/SegmentedControl";
-import { pickWorkspaceDirectory } from "../../infrastructure/workspace/folderPicker";
+import { pickBackupDestinationDirectory, pickRestoreDestinationDirectory, pickWorkspaceBackupDirectory, pickWorkspaceDirectory } from "../../infrastructure/workspace/folderPicker";
 import { useWorkbenchStore } from "../../stores/workbenchStore";
 import "./SettingsPage.css";
 
@@ -13,10 +13,14 @@ export function SettingsPage() {
   const initializeWorkspace = useWorkbenchStore((state) => state.initializeWorkspace);
   const loadSetting = useWorkbenchStore((state) => state.loadSetting);
   const saveSetting = useWorkbenchStore((state) => state.saveSetting);
+  const createWorkspaceBackup = useWorkbenchStore((state) => state.createWorkspaceBackup);
+  const restoreWorkspaceBackup = useWorkbenchStore((state) => state.restoreWorkspaceBackup);
   const [theme, setTheme] = useState<Theme>("light");
   const [fontSize, setFontSize] = useState(17);
   const [lineHeight, setLineHeight] = useState(1.78);
   const [switching, setSwitching] = useState(false);
+  const [backupBusy, setBackupBusy] = useState(false);
+  const [backupMessage, setBackupMessage] = useState<string | null>(null);
 
   useEffect(() => {
     void Promise.all([loadSetting("appearance.theme"), loadSetting("appearance.readingFontSize"), loadSetting("appearance.readingLineHeight")])
@@ -79,7 +83,26 @@ export function SettingsPage() {
         </div>
       </section>
       <div className="settings-two-column">
-        <section className="settings-section settings-section--placeholder"><header><HardDriveDownload aria-hidden="true" size={19} /><div><h2>数据备份</h2><p>下一阶段</p></div></header><p>迁移前备份与可验证恢复流程已保留设计位置。本轮不会执行不透明复制或删除。</p><button className="button" disabled type="button">备份功能尚未启用</button></section>
+        <section className="settings-section"><header><HardDriveDownload aria-hidden="true" size={19} /><div><h2>数据备份与恢复</h2><p>一致性 SQLite 快照 + 题包/资源 + SHA-256 清单</p></div></header><p>导出会新建独立备份目录；恢复会先校验全部文件，再新建工作区并切换。不会覆盖当前数据库，也不包含源码、node_modules 或 target。</p><div className="pdf-actions"><button className="button" disabled={backupBusy || !workspace} onClick={async () => {
+          const destination = await pickBackupDestinationDirectory();
+          if (!destination) return;
+          setBackupBusy(true); setBackupMessage(null);
+          try {
+            const result = await createWorkspaceBackup(destination);
+            setBackupMessage(`备份完成：${result.path} · ${result.fileCount} 个文件 · SQLite SHA-256 ${result.databaseSha256}`);
+          } catch (error) { setBackupMessage(`备份失败：${error instanceof Error ? error.message : String(error)}`); }
+          finally { setBackupBusy(false); }
+        }} type="button">{backupBusy ? "处理中…" : "导出完整备份"}</button><button className="button" disabled={backupBusy} onClick={async () => {
+          const backupPath = await pickWorkspaceBackupDirectory();
+          if (!backupPath) return;
+          const destination = await pickRestoreDestinationDirectory();
+          if (!destination) return;
+          if (!window.confirm(`将校验备份并在以下父目录中新建独立工作区：\n${destination}\n当前工作区不会被覆盖。恢复成功后切换到新工作区，继续吗？`)) return;
+          setBackupBusy(true); setBackupMessage(null);
+          try { await restoreWorkspaceBackup(backupPath, destination); setBackupMessage("恢复完成并已切换到新工作区；请从题库核对题包和历史。" ); }
+          catch (error) { setBackupMessage(`恢复失败，当前工作区保持原状：${error instanceof Error ? error.message : String(error)}`); }
+          finally { setBackupBusy(false); }
+        }} type="button">从备份恢复到新工作区</button></div>{backupMessage && <p aria-live="polite" className="workspace-backup-message">{backupMessage}</p>}</section>
         <section className="settings-section settings-section--placeholder"><header><Bot aria-hidden="true" size={19} /><div><h2>AI Provider</h2><p>未配置 · 默认离线</p></div></header><p>密钥未来只进入 Rust 安全凭据层，不进入 React、localStorage、日志或普通 SQLite 字段。</p><button className="button" disabled type="button">Provider 尚未启用</button></section>
       </div>
     </div>

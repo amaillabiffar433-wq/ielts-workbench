@@ -1,4 +1,5 @@
 mod backend;
+mod backup;
 mod commands;
 mod error;
 mod models;
@@ -27,6 +28,9 @@ pub fn run() {
             commands::load_session,
             commands::list_recent_sessions,
             commands::submit_session,
+            commands::update_session_elapsed,
+            commands::create_workspace_backup,
+            commands::restore_workspace_backup,
             commands::save_answer,
             commands::save_annotation,
             commands::delete_annotation,

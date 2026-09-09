@@ -255,7 +255,7 @@ impl PackModuleV1 {
 
     fn has_supported_schema_version(&self) -> bool {
         match self {
-            Self::Reading(module) => matches!(module.schema_version, 1 | 2),
+            Self::Reading(module) => matches!(module.schema_version, 1 | 2 | 3),
             Self::Listening(module) => module.schema_version == 1,
             Self::Writing(module) => module.schema_version == 1,
         }
@@ -436,6 +436,8 @@ enum QuestionContextBlockV2 {
     List(QuestionContextListV2),
     #[serde(rename = "table")]
     Table(QuestionContextTableV2),
+    #[serde(rename = "completion")]
+    Completion(QuestionContextCompletionV3),
 }
 
 impl QuestionContextBlockV2 {
@@ -444,6 +446,7 @@ impl QuestionContextBlockV2 {
             Self::Paragraph(block) => &block.id,
             Self::List(block) => &block.id,
             Self::Table(block) => &block.id,
+            Self::Completion(block) => &block.id,
         }
     }
 
@@ -455,6 +458,10 @@ impl QuestionContextBlockV2 {
                 .rows
                 .iter()
                 .any(|row| row.cells.iter().any(|cell| cell.id == block_id)),
+            Self::Completion(block) => block.parts.iter().any(|part| match part {
+                QuestionContextCompletionPartV3::Text { id, .. }
+                | QuestionContextCompletionPartV3::Answer { id, .. } => id == block_id,
+            }),
         }
     }
 }
@@ -513,12 +520,45 @@ struct QuestionContextTableCellV2 {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct QuestionContextCompletionV3 {
+    id: String,
+    style: QuestionContextCompletionStyleV3,
+    title: Option<String>,
+    parts: Vec<QuestionContextCompletionPartV3>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum QuestionContextCompletionStyleV3 {
+    Summary,
+    Notes,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+enum QuestionContextCompletionPartV3 {
+    Text { id: String, text: String },
+    Answer {
+        id: String,
+        #[serde(rename = "questionId")]
+        question_id: String,
+    },
+}
+
+#[derive(Debug, Deserialize)]
 #[serde(tag = "type")]
 enum QuestionV1 {
     #[serde(rename = "single-choice")]
     SingleChoice(SingleChoiceQuestionV1),
     #[serde(rename = "true-false-not-given")]
     TrueFalseNotGiven(TrueFalseNotGivenQuestionV1),
+    #[serde(rename = "yes-no-not-given")]
+    YesNoNotGiven(YesNoNotGivenQuestionV3),
+    #[serde(rename = "multiple-choice")]
+    MultipleChoice(MultipleChoiceQuestionV3),
+    #[serde(rename = "matching")]
+    Matching(MatchingQuestionV3),
     #[serde(rename = "short-answer")]
     ShortAnswer(ShortAnswerQuestionV1),
     #[serde(rename = "fill-blank")]
@@ -530,6 +570,9 @@ impl QuestionV1 {
         match self {
             Self::SingleChoice(question) => &question.id,
             Self::TrueFalseNotGiven(question) => &question.id,
+            Self::YesNoNotGiven(question) => &question.id,
+            Self::MultipleChoice(question) => &question.id,
+            Self::Matching(question) => &question.id,
             Self::ShortAnswer(question) => &question.id,
             Self::FillBlank(question) => &question.id,
         }
@@ -565,6 +608,78 @@ struct TrueFalseNotGivenQuestionV1 {
     explanation: Option<String>,
     source: Option<QuestionSourceV1>,
     correct_answer: Option<TrueFalseNotGivenAnswer>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct YesNoNotGivenQuestionV3 {
+    id: String,
+    number: Option<u32>,
+    prompt: String,
+    #[serde(default = "default_question_points")]
+    points: u32,
+    explanation: Option<String>,
+    source: Option<QuestionSourceV1>,
+    correct_answer: Option<YesNoNotGivenAnswerV3>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum YesNoNotGivenAnswerV3 {
+    Yes,
+    No,
+    NotGiven,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MultipleChoiceQuestionV3 {
+    id: String,
+    number: Option<u32>,
+    prompt: String,
+    #[serde(default = "default_question_points")]
+    points: u32,
+    explanation: Option<String>,
+    source: Option<QuestionSourceV1>,
+    options: Vec<ChoiceOptionV1>,
+    selection_count: u32,
+    #[serde(default)]
+    additional_numbers: Vec<u32>,
+    scoring_mode: MultipleChoiceScoringModeV3,
+    #[serde(default)]
+    correct_option_ids: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+enum MultipleChoiceScoringModeV3 {
+    ExactSet,
+    PerCorrectOption,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MatchingQuestionV3 {
+    id: String,
+    number: Option<u32>,
+    prompt: String,
+    #[serde(default = "default_question_points")]
+    points: u32,
+    explanation: Option<String>,
+    source: Option<QuestionSourceV1>,
+    matching_kind: MatchingKindV3,
+    options: Vec<ChoiceOptionV1>,
+    allow_option_reuse: bool,
+    correct_option_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum MatchingKindV3 {
+    Headings,
+    Information,
+    Features,
+    SentenceEndings,
 }
 
 #[derive(Debug, Deserialize)]
@@ -624,7 +739,10 @@ struct QuestionSourceV1 {
 #[serde(rename_all = "kebab-case")]
 enum DetectedQuestionTypeV1 {
     SingleChoice,
+    MultipleChoice,
     TrueFalseNotGiven,
+    YesNoNotGiven,
+    Matching,
     ShortAnswer,
     FillBlank,
     MatchingHeadings,
@@ -1849,7 +1967,7 @@ fn validate_module_schema(
     if !module.has_supported_schema_version() {
         errors.push(issue(
             "UNSUPPORTED_MODULE_SCHEMA_VERSION",
-            "Reading modules support schemaVersion 1 or 2; Listening and Writing modules require schemaVersion 1.",
+            "Reading modules support schemaVersion 1, 2, or 3; Listening and Writing modules require schemaVersion 1.",
             Some(&format!("{file_path}#schemaVersion")),
         ));
     }
@@ -1882,7 +2000,8 @@ fn validate_module_schema(
                 validate_reading_section(
                     section,
                     &format!("{file_path}#sections[{section_index}]"),
-                    reading.schema_version == 2,
+                    reading.schema_version >= 2,
+                    reading.schema_version >= 3,
                     stable_ids,
                     errors,
                 );
@@ -1936,6 +2055,7 @@ fn validate_reading_section(
     section: &ReadingSectionV1,
     path: &str,
     allow_structured_context: bool,
+    allow_reading_v3: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
@@ -1960,6 +2080,7 @@ fn validate_reading_section(
         path,
         true,
         allow_structured_context,
+        allow_reading_v3,
         stable_ids,
         errors,
     );
@@ -2004,6 +2125,7 @@ fn validate_listening_section(
     validate_question_groups(
         &section.question_groups,
         path,
+        false,
         false,
         false,
         stable_ids,
@@ -2103,6 +2225,7 @@ fn validate_question_groups(
     section_path: &str,
     allow_missing_numbers: bool,
     allow_structured_context: bool,
+    allow_reading_v3: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
@@ -2142,6 +2265,7 @@ fn validate_question_groups(
                 question,
                 &format!("{group_path}.questions[{question_index}]"),
                 allow_missing_numbers,
+                allow_reading_v3,
                 stable_ids,
                 errors,
             );
@@ -2150,7 +2274,7 @@ fn validate_question_groups(
             if !allow_structured_context {
                 errors.push(issue(
                     "STRUCTURED_CONTEXT_REQUIRES_READING_V2",
-                    "Structured question context is supported only by Reading module schemaVersion 2.",
+                    "Structured question context is supported only by Reading module schemaVersion 2 or 3.",
                     Some(&format!("{group_path}.contextBlocks")),
                 ));
             } else {
@@ -2158,6 +2282,7 @@ fn validate_question_groups(
                     context_blocks,
                     &group.questions,
                     &group_path,
+                    allow_reading_v3,
                     stable_ids,
                     errors,
                 );
@@ -2170,6 +2295,7 @@ fn validate_question_context(
     blocks: &[QuestionContextBlockV2],
     questions: &[QuestionV1],
     group_path: &str,
+    allow_reading_v3: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
@@ -2269,6 +2395,65 @@ fn validate_question_context(
                     }
                 }
             }
+            QuestionContextBlockV2::Completion(completion) => {
+                if !allow_reading_v3 {
+                    errors.push(issue(
+                        "COMPLETION_CONTEXT_REQUIRES_READING_V3",
+                        "Summary and notes completion context requires Reading schemaVersion 3.",
+                        Some(&block_path),
+                    ));
+                }
+                let _ = &completion.style;
+                if completion.title.as_ref().is_some_and(|title| title.chars().count() > 200) {
+                    errors.push(issue(
+                        "QUESTION_CONTEXT_TITLE_LIMIT",
+                        "Completion context titles may contain at most 200 characters.",
+                        Some(&format!("{block_path}.title")),
+                    ));
+                }
+                node_count += completion.parts.len();
+                if completion.parts.len() < 2 || completion.parts.len() > 100 {
+                    errors.push(issue(
+                        "QUESTION_CONTEXT_COMPLETION_SIZE",
+                        "A completion context requires 2 to 100 text or answer parts.",
+                        Some(&format!("{block_path}.parts")),
+                    ));
+                }
+                for (part_index, part) in completion.parts.iter().enumerate() {
+                    let part_path = format!("{block_path}.parts[{part_index}]");
+                    match part {
+                        QuestionContextCompletionPartV3::Text { id, text } => {
+                            stable_ids.record(id, &format!("{part_path}.id"), errors);
+                            validate_question_context_text(text, &format!("{part_path}.text"), errors);
+                        }
+                        QuestionContextCompletionPartV3::Answer { id, question_id } => {
+                            stable_ids.record(id, &format!("{part_path}.id"), errors);
+                            let Some(question) = question_by_id.get(question_id.as_str()) else {
+                                errors.push(issue(
+                                    "QUESTION_CONTEXT_REFERENCE_INVALID",
+                                    "A completion answer binding must reference a question in the same question group.",
+                                    Some(&format!("{part_path}.questionId")),
+                                ));
+                                continue;
+                            };
+                            if !question.supports_table_binding() {
+                                errors.push(issue(
+                                    "QUESTION_CONTEXT_TYPE_UNSUPPORTED",
+                                    "Only short-answer and fill-blank questions can be bound inside completion context.",
+                                    Some(&format!("{part_path}.questionId")),
+                                ));
+                            }
+                            if !bound_question_ids.insert(question_id.as_str()) {
+                                errors.push(issue(
+                                    "QUESTION_CONTEXT_BINDING_DUPLICATE",
+                                    "A question may have only one primary answer position in structured context.",
+                                    Some(&format!("{part_path}.questionId")),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     if node_count > MAX_QUESTION_CONTEXT_NODES {
@@ -2294,6 +2479,7 @@ fn validate_question(
     question: &QuestionV1,
     path: &str,
     allow_missing_number: bool,
+    allow_reading_v3: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
@@ -2371,6 +2557,123 @@ fn validate_question(
             validate_question_source(question.source.as_ref(), path, errors);
             let _ = &question.correct_answer;
         }
+        QuestionV1::YesNoNotGiven(question) => {
+            validate_question_base(
+                &question.id,
+                question.number,
+                &question.prompt,
+                question.points,
+                question.explanation.as_deref(),
+                path,
+                allow_missing_number,
+                stable_ids,
+                errors,
+            );
+            validate_question_source(question.source.as_ref(), path, errors);
+            if !allow_reading_v3 {
+                errors.push(issue(
+                    "QUESTION_TYPE_REQUIRES_READING_V3",
+                    "Yes/No/Not Given questions require Reading schemaVersion 3.",
+                    Some(&format!("{path}.type")),
+                ));
+            }
+            let _ = &question.correct_answer;
+        }
+        QuestionV1::MultipleChoice(question) => {
+            validate_question_base(
+                &question.id,
+                question.number,
+                &question.prompt,
+                question.points,
+                question.explanation.as_deref(),
+                path,
+                allow_missing_number,
+                stable_ids,
+                errors,
+            );
+            validate_question_source(question.source.as_ref(), path, errors);
+            if !allow_reading_v3 {
+                errors.push(issue(
+                    "QUESTION_TYPE_REQUIRES_READING_V3",
+                    "Multiple-choice questions require Reading schemaVersion 3.",
+                    Some(&format!("{path}.type")),
+                ));
+            }
+            let option_ids = validate_choice_options(&question.options, path, stable_ids, errors);
+            if !(2..=8).contains(&question.selection_count)
+                || question.selection_count as usize > question.options.len()
+            {
+                errors.push(issue(
+                    "INVALID_MULTIPLE_CHOICE_SELECTION_COUNT",
+                    "selectionCount must be between 2 and 8 and cannot exceed the number of options.",
+                    Some(&format!("{path}.selectionCount")),
+                ));
+            }
+            if question.correct_option_ids.len() != question.selection_count as usize
+                || question.correct_option_ids.iter().any(|id| !option_ids.contains(id.as_str()))
+                || question.correct_option_ids.iter().collect::<HashSet<_>>().len() != question.correct_option_ids.len()
+            {
+                errors.push(issue(
+                    "INVALID_MULTIPLE_CHOICE_ANSWER",
+                    "correctOptionIds must contain exactly selectionCount unique references from this question.",
+                    Some(&format!("{path}.correctOptionIds")),
+                ));
+            }
+            let number_count = 1 + question.additional_numbers.len();
+            let numbers = question.additional_numbers.iter().collect::<HashSet<_>>();
+            if question.number.is_some_and(|number| numbers.contains(&number))
+                || numbers.len() != question.additional_numbers.len()
+            {
+                errors.push(issue(
+                    "INVALID_MULTIPLE_CHOICE_NUMBERS",
+                    "additionalNumbers must be positive and unique and must not repeat the primary number.",
+                    Some(&format!("{path}.additionalNumbers")),
+                ));
+            }
+            if !question.additional_numbers.is_empty()
+                && (question.scoring_mode != MultipleChoiceScoringModeV3::PerCorrectOption
+                    || number_count != question.selection_count as usize
+                    || question.points != question.selection_count)
+            {
+                errors.push(issue(
+                    "AMBIGUOUS_MULTIPLE_CHOICE_SCORING",
+                    "A multi-number question requires per-correct-option scoring, one number per selection, and matching points.",
+                    Some(path),
+                ));
+            }
+        }
+        QuestionV1::Matching(question) => {
+            validate_question_base(
+                &question.id,
+                question.number,
+                &question.prompt,
+                question.points,
+                question.explanation.as_deref(),
+                path,
+                allow_missing_number,
+                stable_ids,
+                errors,
+            );
+            validate_question_source(question.source.as_ref(), path, errors);
+            if !allow_reading_v3 {
+                errors.push(issue(
+                    "QUESTION_TYPE_REQUIRES_READING_V3",
+                    "Matching questions require Reading schemaVersion 3.",
+                    Some(&format!("{path}.type")),
+                ));
+            }
+            let option_ids = validate_choice_options(&question.options, path, stable_ids, errors);
+            if let Some(correct_option_id) = &question.correct_option_id {
+                if !option_ids.contains(correct_option_id.as_str()) {
+                    errors.push(issue(
+                        "INVALID_CORRECT_OPTION_REFERENCE",
+                        "correctOptionId must reference an option in the same matching question.",
+                        Some(&format!("{path}.correctOptionId")),
+                    ));
+                }
+            }
+            let _ = (&question.matching_kind, question.allow_option_reuse);
+        }
         QuestionV1::ShortAnswer(question) => {
             validate_question_base(
                 &question.id,
@@ -2423,6 +2726,48 @@ fn validate_question(
             let _ = question.case_sensitive;
         }
     }
+}
+
+fn validate_choice_options<'a>(
+    options: &'a [ChoiceOptionV1],
+    path: &str,
+    stable_ids: &mut StableIdRegistry,
+    errors: &mut Vec<ValidationIssue>,
+) -> HashSet<&'a str> {
+    if options.len() < 2 {
+        errors.push(issue(
+            "TOO_FEW_CHOICE_OPTIONS",
+            "Choice and matching questions require at least two options.",
+            Some(&format!("{path}.options")),
+        ));
+    }
+    let mut option_ids = HashSet::new();
+    for (option_index, option) in options.iter().enumerate() {
+        let option_path = format!("{path}.options[{option_index}]");
+        stable_ids.record(&option.id, &format!("{option_path}.id"), errors);
+        if !option_ids.insert(option.id.as_str()) {
+            errors.push(issue(
+                "DUPLICATE_OPTION_ID",
+                "Choice option IDs must be unique within a question.",
+                Some(&format!("{option_path}.id")),
+            ));
+        }
+        if !non_blank(&option.label) || utf16_len(&option.label) > 16 {
+            errors.push(issue(
+                "INVALID_OPTION_LABEL",
+                "Choice option labels must contain 1-16 non-whitespace characters.",
+                Some(&format!("{option_path}.label")),
+            ));
+        }
+        if !non_blank(&option.text) {
+            errors.push(issue(
+                "INVALID_OPTION_TEXT",
+                "Choice option text must contain non-whitespace text.",
+                Some(&format!("{option_path}.text")),
+            ));
+        }
+    }
+    option_ids
 }
 
 fn validate_question_source(
@@ -3255,6 +3600,21 @@ mod tests {
                 "media/images/original-workshop-attendance.png",
             ]
         );
+    }
+
+    #[test]
+    fn validates_the_complete_original_reading_v3_sample() {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("samples")
+            .join("original-daily-reading-pack");
+        let module_json = fs::read_to_string(path.join("modules/reading.json")).unwrap();
+        serde_json::from_str::<PackModuleV1>(&module_json)
+            .expect("the complete sample must deserialize as a native Reading module");
+        let report = validate_pack_folder(path.to_str().unwrap());
+        assert!(report.valid, "{:?}", report.errors);
+        assert!(report.source_hash.is_some());
+        assert!(report.media_references.is_empty());
     }
 
     #[test]

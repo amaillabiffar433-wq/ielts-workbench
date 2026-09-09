@@ -231,7 +231,7 @@ form-action 'none'
 - 日志与错误对象不含 fixture 中的 sentinel secret/essay/path；
 - CSP/capability 不出现未批准的宽权限。
 
-具体命令和手工验收见 [TESTING.md](TESTING.md)。当前环境缺少 Rust/Cargo/MSVC，因此 Rust、Tauri 与 Windows 打包安全链路尚不能在本机验证；不能把静态代码审阅写成测试通过。
+具体命令和手工验收见 [TESTING.md](TESTING.md)。当前 D 盘 Rust/Cargo、MSVC、Windows SDK 与 WebView2 环境可用；每轮仍必须实际运行 Cargo 测试和对应 Tauri 构建，不能把环境存在或静态代码审阅写成测试通过。
 
 ## 12. Reading PDF 辅助导入边界
 
@@ -242,3 +242,10 @@ form-action 'none'
 - Web/Vite 开发回退把状态放入当前 origin 的 IndexedDB，不使用 `localStorage`。它只用于 renderer 开发与测试，不代替桌面工作区的 SQLite 安全边界。
 - Tauri 的 `install_generated_pack` 只接受完整且经双端校验的 `manifest + modules` 对象，序列化大小上限为 64 MiB，只允许 Reading/Listening/Writing 固定模块名，并只在已校验工作区下创建应用自有暂存目录。安装仍复用现有防覆盖、路径边界和原子安装检查。
 - 真实或私人 PDF、提取文本、页面渲染、数据库和解析缓存由 `.gitignore` 排除；提交前必须同时检查暂存区与已跟踪文件，不能仅依赖扩展名规则。
+
+## 13. 本地备份与恢复边界
+
+- 备份必须由用户选择位于当前工作区之外的父目录；应用只在其中创建唯一的新目录，不允许把活动工作区递归备份到自己内部。
+- 活动数据库使用 SQLite online backup API 生成一致性快照。题包及其托管资源、PDF 导入草稿资源和主题一并复制；不包含源码、依赖、构建缓存、工具链或日志。
+- `backup-manifest.json` 最后写入，并包含每个文件的相对路径、长度与 SHA-256。恢复在创建任何成功工作区前校验支持版本、清单重复项、路径边界、symlink/reparse point、文件存在性、长度和哈希。
+- 恢复目标只能是用户选择的已有绝对父目录且不能是盘符根；应用在其下新建唯一工作区和新的 workspaceId，不覆盖当前 SQLite。复制后执行 `PRAGMA integrity_check`；失败时只清理由本次操作创建的半成品目标，当前工作区和 bootstrap 不切换。

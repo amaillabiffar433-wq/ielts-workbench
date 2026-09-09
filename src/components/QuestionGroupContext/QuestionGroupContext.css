@@ -64,6 +64,34 @@
   overscroll-behavior-inline: contain;
 }
 
+.question-context__completion {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.8rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--surface-canvas);
+}
+
+.question-context__completion h4 { margin: 0; }
+
+.question-context__completion-flow {
+  line-height: 2.35;
+  white-space: pre-wrap;
+}
+
+.question-context__completion--notes .question-context__completion-flow {
+  padding-left: 1rem;
+  border-left: 3px solid var(--border-strong);
+}
+
+.question-context__completion-answer {
+  display: inline-block;
+  min-width: 11rem;
+  margin: 0 0.35rem;
+  vertical-align: middle;
+}
+
 .question-context__table {
   border-collapse: collapse;
   min-width: 32rem;

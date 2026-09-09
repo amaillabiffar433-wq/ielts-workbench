@@ -6,8 +6,8 @@ import { SaveStatus } from "../../components/common/SaveStatus";
 import { QuestionGroupContext } from "../../components/QuestionGroupContext/QuestionGroupContext";
 import { boundQuestionIdsFromContext } from "../../components/QuestionGroupContext/questionGroupContextModel";
 import { StructuredContextEditor } from "./StructuredContextEditor";
+import { StructuredBatchPanel } from "./StructuredBatchPanel";
 import {
-  applyStructuredAnswerKey,
   assignSourceSegments,
   createStructuredGroup,
   createStructuredPassage,
@@ -27,8 +27,11 @@ import {
 } from "./structuredImportModel";
 
 const supportedQuestionTypes = [
-  ["single-choice", "Multiple Choice"],
+  ["single-choice", "Single Choice / 单选"],
+  ["multiple-choice", "Multiple Choice / 多选"],
   ["true-false-not-given", "TRUE / FALSE / NOT GIVEN"],
+  ["yes-no-not-given", "YES / NO / NOT GIVEN"],
+  ["matching", "Matching / 匹配"],
   ["short-answer", "Short Answer"],
   ["fill-blank", "Sentence Completion"],
 ] as const;
@@ -130,12 +133,26 @@ export function StructuredImportEditor({
   const [activePassageId, setActivePassageId] = useState(draft.editorState.activePassageId ?? draft.passages[0]?.id ?? "");
   const [activeGroupId, setActiveGroupId] = useState(draft.editorState.activeGroupId ?? draft.passages[0]?.questionGroups[0]?.id ?? "");
   const [activeQuestionId, setActiveQuestionId] = useState(draft.editorState.activeQuestionId ?? draft.passages[0]?.questionGroups[0]?.questions[0]?.id ?? "");
-  const [answerErrors, setAnswerErrors] = useState<readonly string[]>([]);
-  const [invalidAnswerLines, setInvalidAnswerLines] = useState<readonly string[]>([]);
   const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const validation = useMemo(() => validateStructuredImportDraft(draft), [draft]);
   const unassignedSegments = draft.sourceSegments.filter((segment) => segment.disposition.kind === "unassigned");
   const groups = draft.passages.flatMap((passage) => passage.questionGroups.map((group) => ({ passage, group })));
+
+  const locateValidationIssue = (path: string) => {
+    const indices = /^passages\.(\d+)(?:\.questionGroups\.(\d+))?(?:\.questions\.(\d+))?/u.exec(path);
+    if (!indices) return;
+    const passage = draft.passages[Number(indices[1])];
+    const group = indices[2] === undefined ? undefined : passage?.questionGroups[Number(indices[2])];
+    const question = indices[3] === undefined ? undefined : group?.questions[Number(indices[3])];
+    if (!passage) return;
+    setStage("structure");
+    setActivePassageId(passage.id);
+    setActiveGroupId(group?.id ?? "");
+    setActiveQuestionId(question?.id ?? "");
+    window.setTimeout(() => document.querySelector<HTMLElement>(
+      question ? `[data-question-id="${CSS.escape(question.id)}"]` : group ? `[data-group-id="${CSS.escape(group.id)}"]` : `[data-passage-id="${CSS.escape(passage.id)}"]`,
+    )?.scrollIntoView({ behavior: "smooth", block: "center" }), 0);
+  };
 
   const setStage = (currentStage: StructuredImportDraft["currentStage"]) => {
     onChange(touchStructuredDraft(draft, { currentStage }));
@@ -208,17 +225,11 @@ export function StructuredImportEditor({
     setActiveQuestionId("");
   };
 
-  const applyAnswers = () => {
-    const result = applyStructuredAnswerKey(draft, draft.answerKeyText);
-    setAnswerErrors(result.errors);
-    setInvalidAnswerLines(result.invalidLines);
-    if (result.errors.length === 0 && result.invalidLines.length === 0) onChange(result.draft);
-  };
-
   const removeQuestion = (group: StructuredGroupDraft, question: StructuredQuestionDraft) => {
     const isBound = group.contextBlocks.some((block) => block.type === "table"
-      && block.rows.some((row) => row.cells.some((cell) => cell.questionId === question.id)));
-    if (isBound && !window.confirm(`Question ${question.number} 已绑定到表格。删除题目会同时解除该作答位置，但不会删除已安装题包或历史 Session。确定继续吗？`)) return;
+      ? block.rows.some((row) => row.cells.some((cell) => cell.questionId === question.id))
+      : block.type === "completion" && block.parts.some((part) => part.kind === "answer" && part.questionId === question.id));
+    if (isBound && !window.confirm(`Question ${question.number} 已绑定到结构化作答位置。删除题目会同时解除该位置，但不会删除已安装题包或历史 Session。确定继续吗？`)) return;
     onChange(updateGroup(draft, group.id, (item) => ({
       ...item,
       contextBlocks: item.contextBlocks.map((block) => block.type === "table"
@@ -231,7 +242,9 @@ export function StructuredImportEditor({
                 : cell),
             })),
           }
-        : block),
+        : block.type === "completion"
+          ? { ...block, parts: block.parts.filter((part) => part.kind !== "answer" || part.questionId !== question.id) }
+          : block),
       questions: item.questions.filter((candidate) => candidate.id !== question.id),
     })));
   };
@@ -264,6 +277,8 @@ export function StructuredImportEditor({
       </div>
 
       {draft.currentStage === "structure" && (
+        <>
+        <StructuredBatchPanel draft={draft} onChange={onChange} stage="structure" />
         <div className="pdf-structure-layout">
           <aside className="pdf-source-fragments">
             <header><h3>来源文本快照</h3><span>{unassignedSegments.length} 个未处理片段</span></header>
@@ -312,7 +327,7 @@ export function StructuredImportEditor({
             }} type="button">{draft.initialSuggestionAppliedAt ? "初始建议已锁定" : "按标准标题生成建议"}</button><button className="button" onClick={addPassage} type="button"><Plus size={15} />新增 Passage</button></div></header>
             {suggestionError && <div className="error-banner" role="alert">{suggestionError}</div>}
             {draft.passages.map((passage, passageIndex) => (
-              <article className={`pdf-passage-card${activePassageId === passage.id ? " is-active" : ""}`} key={passage.id} onClick={() => activate(passage.id)}>
+              <article className={`pdf-passage-card${activePassageId === passage.id ? " is-active" : ""}`} data-passage-id={passage.id} key={passage.id} onClick={() => activate(passage.id)}>
                 <header>
                   <strong>Passage {passageIndex + 1}</strong><code>{passage.id}</code>
                   <div className="pdf-actions">
@@ -326,7 +341,7 @@ export function StructuredImportEditor({
                 <p className="pdf-source-reference">来源页：{passage.contentBlocks.flatMap((block) => block.sourcePages).join(", ") || "人工输入 / 尚未分配"}</p>
 
                 {passage.questionGroups.map((group, groupIndex) => (
-                  <section className={`pdf-group-card${activeGroupId === group.id ? " is-active" : ""}`} key={group.id} onClick={(event) => { event.stopPropagation(); activate(passage.id, group.id); }}>
+                  <section className={`pdf-group-card${activeGroupId === group.id ? " is-active" : ""}`} data-group-id={group.id} key={group.id} onClick={(event) => { event.stopPropagation(); activate(passage.id, group.id); }}>
                     <header>
                       <strong>题组 {groupIndex + 1}</strong><code>{group.id}</code>
                       <div className="pdf-actions">
@@ -354,7 +369,7 @@ export function StructuredImportEditor({
                     />
 
                     {group.questions.map((question, questionIndex) => (
-                      <article className={`pdf-structured-question${activeQuestionId === question.id ? " is-active" : ""}`} key={question.id} onClick={(event) => { event.stopPropagation(); activate(passage.id, group.id, question.id); }}>
+                      <article className={`pdf-structured-question${activeQuestionId === question.id ? " is-active" : ""}`} data-question-id={question.id} key={question.id} onClick={(event) => { event.stopPropagation(); activate(passage.id, group.id, question.id); }}>
                         <header><strong>Question {question.number}</strong><code>{question.id}</code><div className="pdf-actions"><button aria-label={`上移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === 0} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex - 1) }))); }} type="button"><ArrowUp size={14} /></button><button aria-label={`下移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === group.questions.length - 1} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex + 1) }))); }} type="button"><ArrowDown size={14} /></button><button aria-label={`删除 Question ${question.number}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); removeQuestion(group, question); }} type="button"><Trash2 size={14} /></button></div></header>
                         <div className="pdf-question-editor__head">
                           <label>题号<input min={1} onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, number: Number(event.target.value) })))} type="number" value={question.number} /></label>
@@ -363,13 +378,15 @@ export function StructuredImportEditor({
                             {(question.type === "matching-headings" || question.type === "unsupported") && <option value={question.type}>{question.type}（需改为支持题型）</option>}
                           </select></label>
                           <label>移动到题组<select aria-label={`Question ${question.number} 所属题组`} onChange={(event) => {
-                            const isBound = group.contextBlocks.some((block) => block.type === "table" && block.rows.some((row) => row.cells.some((cell) => cell.questionId === question.id)));
-                            if (isBound && !window.confirm(`移动 Question ${question.number} 会解除它在当前题组表格中的作答位置。题目和已有答案不会删除。确定继续吗？`)) return;
+                            const isBound = group.contextBlocks.some((block) => block.type === "table" ? block.rows.some((row) => row.cells.some((cell) => cell.questionId === question.id)) : block.type === "completion" && block.parts.some((part) => part.kind === "answer" && part.questionId === question.id));
+                            if (isBound && !window.confirm(`移动 Question ${question.number} 会解除它在当前题组结构化上下文中的作答位置。题目和已有答案不会删除。确定继续吗？`)) return;
                             onChange(moveQuestionBetweenGroups(draft, question.id, event.target.value));
                           }} value={group.id}>{groups.map((entry) => <option key={entry.group.id} value={entry.group.id}>{entry.passage.title} / {entry.group.title}</option>)}</select></label>
                         </div>
                         <label>题干<textarea onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, prompt: event.target.value })))} rows={2} value={question.prompt} /></label>
                         <label>题目自有选项（留空时使用题组共享选项）<textarea onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, options: replaceDraftOptions(item.options, event.target.value) })))} rows={3} value={question.options.map((option) => `${option.label} ${option.text}`).join("\n")} /></label>
+                        {question.type === "multiple-choice" && <div className="pdf-group-fields"><label>选择数量<input max={8} min={2} onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, selectionCount: Number(event.target.value) })))} type="number" value={question.selectionCount} /></label><label>关联的其他题号<input onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, additionalNumbers: event.target.value.split(/[,，\s]+/u).map(Number).filter(Number.isInteger) })))} placeholder="例如 15（留空表示整组 1 分）" value={question.additionalNumbers.join(", ")} /></label><label>计分契约<select onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, scoringMode: event.target.value as "exact-set" | "per-correct-option" })))} value={question.scoringMode}><option value="exact-set">整组完全匹配</option><option value="per-correct-option">每个正确选项 1 分</option></select></label></div>}
+                        {question.type === "matching" && <div className="pdf-group-fields"><label>匹配类别<select onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, matchingKind: event.target.value as StructuredQuestionDraft["matchingKind"] })))} value={question.matchingKind}><option value="headings">段落标题</option><option value="information">段落信息</option><option value="features">人物/类别特征</option><option value="sentence-endings">句子结尾</option></select></label><label className="pdf-review-toggle"><input checked={question.allowOptionReuse} onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, allowOptionReuse: event.target.checked })))} type="checkbox" />允许重复使用选项</label></div>}
                         <label className="pdf-review-toggle"><input checked={!question.needsReview} onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, needsReview: !event.target.checked })))} type="checkbox" />题号、题型、题干与上下文已人工复核</label>
                         <p className="pdf-source-reference">来源页：{question.sourcePages.join(", ") || "人工输入"}</p>
                       </article>
@@ -395,15 +412,12 @@ export function StructuredImportEditor({
             ))}
           </div>
         </div>
+        </>
       )}
 
       {draft.currentStage === "answers" && (
         <div className="pdf-answers-stage">
-          <section className="pdf-answer-editor">
-            <label>粘贴 Answer Key<textarea onChange={(event) => onChange(touchStructuredDraft(draft, { answerKeyText: event.target.value }))} placeholder={'1 FALSE\n2 TRUE\n18 B'} rows={7} value={draft.answerKeyText} /></label>
-            <button className="button" onClick={applyAnswers} type="button">按无歧义题号映射到 questionId</button>
-            {(answerErrors.length > 0 || invalidAnswerLines.length > 0) && <div className="error-banner" role="alert">{[...answerErrors, ...invalidAnswerLines.map((line) => `未识别：${line}`)].join(" ｜ ")}</div>}
-          </section>
+          <StructuredBatchPanel draft={draft} onChange={onChange} stage="answers" />
           {draft.passages.map((passage) => <section className="pdf-answer-map" key={passage.id}><h3>{passage.title}</h3>{passage.questionGroups.map((group) => <div key={group.id}><h4>{group.title || group.id}</h4>{group.questions.map((question) => <label key={question.id}><span>Question {question.number} · {question.prompt || "（缺少题干）"}</span><input onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, answer: event.target.value })))} placeholder="留空 = 未提供 / 不评分" value={question.answer} /></label>)}</div>)}</section>)}
         </div>
       )}
@@ -411,8 +425,8 @@ export function StructuredImportEditor({
       {draft.currentStage === "preview" && (
         <div className="pdf-validation-stage">
           <header><FileCheck2 size={22} /><div><h3>{validation.valid ? "结构校验通过" : `${validation.errors.length} 个阻塞错误`}</h3><p>{validation.warnings.length} 个警告；警告不会阻止安装，但会在题包中保留待复核状态。</p></div></header>
-          {validation.errors.length > 0 && <section className="pdf-validation-list is-error"><h4>阻塞错误</h4>{validation.errors.map((item, index) => <p key={`${item.code}-${index}`}><strong>{item.code}</strong> · {item.message}</p>)}</section>}
-          {validation.warnings.length > 0 && <section className="pdf-validation-list"><h4>警告</h4>{validation.warnings.map((item, index) => <p key={`${item.code}-${index}`}><strong>{item.code}</strong> · {item.message}</p>)}</section>}
+          {validation.errors.length > 0 && <section className="pdf-validation-list is-error"><h4>阻塞错误</h4>{validation.errors.map((item, index) => <p key={`${item.code}-${index}`}><strong>{item.code}</strong> · {item.message} <code>{item.path}</code> <button className="button button--ghost" onClick={() => locateValidationIssue(item.path)} type="button">定位</button></p>)}</section>}
+          {validation.warnings.length > 0 && <section className="pdf-validation-list"><h4>警告</h4>{validation.warnings.map((item, index) => <p key={`${item.code}-${index}`}><strong>{item.code}</strong> · {item.message} <code>{item.path}</code> <button className="button button--ghost" onClick={() => locateValidationIssue(item.path)} type="button">定位</button></p>)}</section>}
           <section className="pdf-structure-preview"><h3>安装预览</h3>{draft.passages.map((passage, passageIndex) => <article key={passage.id}><h4>Passage {passageIndex + 1}: {passage.title}</h4><p>{passage.contentBlocks.map((block) => block.text).join(" ").slice(0, 220)}{passage.contentBlocks.some((block) => block.text.length > 220) ? "…" : ""}</p>{passage.questionGroups.map((group) => <StructuredGroupPreview group={group} key={group.id} />)}</article>)}</section>
           <button className="button button--primary" disabled={!validation.valid || busy} onClick={onInstall} type="button"><CheckCircle2 size={16} />{busy ? "正在安装…" : "确认结构并安装题包"}</button>
         </div>

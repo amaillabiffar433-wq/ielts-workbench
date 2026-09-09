@@ -59,6 +59,7 @@ describe("TauriLearningRepository", () => {
       sessionId: "empty-session",
       mode: "study",
       status: "in-progress",
+      elapsedSeconds: 0,
       answers: [],
       annotations: [],
     });
@@ -156,10 +157,50 @@ describe("TauriLearningRepository", () => {
       startedAt: "2026-09-01T12:00:00.000Z",
       updatedAt: completedAt,
       submittedAt: completedAt,
+      elapsedSeconds: 0,
       answers: [],
       annotations: [],
     });
     expect(receivedArgs).toEqual({ sessionId: "native-session" });
+  });
+
+  it("uses explicit native contracts for elapsed time and consistent backup export", async () => {
+    const calls: Array<{ command: string; args?: Record<string, unknown> }> = [];
+    const repository = new TauriLearningRepository(async <T>(command: string, args?: Record<string, unknown>) => {
+      calls.push({ command, args });
+      if (command === "update_session_elapsed") {
+        return {
+          id: "native-session",
+          packId: "original-demo-pack",
+          testId: "demo-test-01",
+          module: "reading",
+          mode: "study",
+          status: "in-progress",
+          startedAt: "2026-09-09T00:00:00.000Z",
+          updatedAt: "2026-09-09T00:02:00.000Z",
+          completedAt: null,
+          elapsedSeconds: 120,
+        } as T;
+      }
+      if (command === "create_workspace_backup") {
+        return {
+          path: "D:\\IELTS-Backups\\ielts-workbench-backup-20260909-test",
+          createdAt: "2026-09-09T00:02:00.000Z",
+          sourceWorkspaceId: "workspace-id",
+          fileCount: 4,
+          totalBytes: 4096,
+          databaseSha256: "a".repeat(64),
+        } as T;
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+
+    await repository.updateSessionElapsed("native-session", 120);
+    await expect(repository.createWorkspaceBackup("D:\\IELTS-Backups")).resolves.toMatchObject({ fileCount: 4 });
+    expect(calls).toEqual([
+      { command: "update_session_elapsed", args: { sessionId: "native-session", elapsedSeconds: 120 } },
+      { command: "create_workspace_backup", args: { destinationParent: "D:\\IELTS-Backups" } },
+    ]);
   });
 
   it("decodes and length-checks native media payloads", async () => {

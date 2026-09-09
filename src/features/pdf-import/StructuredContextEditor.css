@@ -42,9 +42,39 @@
 }
 
 .structured-context-list-editor,
-.structured-context-table-editor {
+.structured-context-table-editor,
+.structured-context-completion-editor {
   display: grid;
   gap: 0.55rem;
+}
+
+.structured-context-completion-editor__settings,
+.structured-context-completion-editor__actions {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.structured-context-completion-editor__settings label {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.structured-context-completion-editor__settings label:last-child {
+  flex: 1 1 16rem;
+}
+
+.structured-context-completion-part {
+  align-items: center;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: auto minmax(12rem, 1fr) auto auto auto auto;
+}
+
+.structured-context-completion-part label {
+  display: grid;
+  gap: 0.25rem;
 }
 
 .structured-context-list-item {

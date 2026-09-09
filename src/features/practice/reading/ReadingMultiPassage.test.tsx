@@ -267,7 +267,7 @@ describe("ReadingPage multi-passage selection", () => {
     fireEvent.change(rightGroup, { target: { value: "northbridge-p3-group-01" } });
     expect(within(document.getElementById(leftId) as HTMLElement).getByRole("radio", { name: "False" })).toBeChecked();
     expect(within(document.getElementById(rightId) as HTMLElement).getByRole("radio", { name: "False" })).toBeChecked();
-    expect(screen.getByText("已答 1/21")).toBeInTheDocument();
+    expect(screen.getByText(/已答 1\/21 · 未答 20 · 标记 0/)).toBeInTheDocument();
   });
 
   it("keeps Pane selections independent and synchronizes one logical answer in two Q18 views", async () => {
@@ -334,7 +334,7 @@ describe("ReadingPage multi-passage selection", () => {
     workbenchStore.setState({ answers: { [answerKey(session.sessionId, q01.questionId)]: q01, [answerKey(session.sessionId, q18.questionId)]: q18 } });
     renderReading();
     await screen.findByTestId("reading-split-workspace");
-    expect(screen.getByText("已答 2/21")).toBeInTheDocument();
+    expect(screen.getByText(/已答 2\/21 · 未答 19 · 标记 0/)).toBeInTheDocument();
     const leftScroll = document.querySelector<HTMLElement>('[data-pane-scroll="left"]');
     const rightScroll = document.querySelector<HTMLElement>('[data-pane-scroll="right"]');
     const leftScrollTo = vi.fn();
@@ -346,7 +346,7 @@ describe("ReadingPage multi-passage selection", () => {
     await waitFor(() => expect(document.activeElement).toBe(document.getElementById(questionContainerId("right-pane", "northbridge-q18"))));
     expect(rightScrollTo).toHaveBeenCalledTimes(1);
     expect(leftScrollTo).not.toHaveBeenCalled();
-    expect(screen.getByText("已答 2/21")).toBeInTheDocument();
+    expect(screen.getByText(/已答 2\/21 · 未答 19 · 标记 0/)).toBeInTheDocument();
     expect(document.querySelectorAll('[data-question-id^="northbridge-q"]')).toHaveLength(1);
   });
 

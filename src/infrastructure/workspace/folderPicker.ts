@@ -28,3 +28,21 @@ export async function pickPackDirectory(): Promise<string | null> {
   });
   return typeof selected === "string" ? selected : null;
 }
+
+export async function pickBackupDestinationDirectory(): Promise<string | null> {
+  if (!isTauri()) return "D:\\IELTS-Workbench-Backups";
+  const selected = await open({ directory: true, multiple: false, title: "选择备份导出位置（将新建独立备份文件夹）" });
+  return typeof selected === "string" ? selected : null;
+}
+
+export async function pickWorkspaceBackupDirectory(): Promise<string | null> {
+  if (!isTauri()) return "D:\\IELTS-Workbench-Backups\\ielts-workbench-backup-memory";
+  const selected = await open({ directory: true, multiple: false, title: "选择包含 backup-manifest.json 的备份文件夹" });
+  return typeof selected === "string" ? selected : null;
+}
+
+export async function pickRestoreDestinationDirectory(): Promise<string | null> {
+  if (!isTauri()) return "D:\\IELTS-Workbench-Restores";
+  const selected = await open({ directory: true, multiple: false, title: "选择恢复目标父目录（将新建独立工作区）" });
+  return typeof selected === "string" ? selected : null;
+}

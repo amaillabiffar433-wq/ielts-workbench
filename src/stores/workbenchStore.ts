@@ -12,6 +12,7 @@ import type {
   PackValidationReport,
   SaveAnnotationInput,
   SessionSnapshot,
+  WorkspaceBackupSummary,
 } from "../infrastructure/repositories/LearningRepository";
 import { createLearningRepository } from "../infrastructure/repositories/runtime";
 import type { SaveState } from "../components/common/SaveStatus";
@@ -27,14 +28,22 @@ export type WorkbenchState = {
   session: SessionSnapshot | null;
   answers: Readonly<Record<string, AnswerRecord>>;
   annotations: readonly AnnotationRecord[];
+  questionFlags: ReadonlySet<string>;
   saveState: SaveState;
   error: string | null;
   initialize: () => Promise<void>;
   initializeWorkspace: (path: string) => Promise<void>;
+  createWorkspaceBackup: (destinationParent: string) => Promise<WorkspaceBackupSummary>;
+  restoreWorkspaceBackup: (backupPath: string, destinationParent: string) => Promise<void>;
   refreshPacks: () => Promise<void>;
   loadPack: (packId: string) => Promise<IELTSPack | null>;
   ensureSession: (input: CreateSessionInput) => Promise<SessionSnapshot>;
+  loadHistoricalSession: (sessionId: string) => Promise<SessionSnapshot | null>;
+  startNewSession: (input: CreateSessionInput) => Promise<SessionSnapshot>;
   submitSession: (sessionId: string) => Promise<SessionSnapshot>;
+  updateSessionElapsed: (sessionId: string, elapsedSeconds: number) => Promise<void>;
+  toggleQuestionFlag: (sessionId: string, questionId: string) => Promise<void>;
+  flushPendingSaves: () => Promise<void>;
   answerQuestion: (sessionId: string, questionId: string, value: AnswerValue) => Promise<void>;
   addAnnotation: (input: SaveAnnotationInput) => Promise<void>;
   removeAnnotation: (annotationId: string) => Promise<void>;
@@ -59,6 +68,20 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function questionFlagsSettingKey(sessionId: string): string {
+  return `session.questionFlags.${sessionId}`;
+}
+
+function parseQuestionFlags(value: string | null): ReadonlySet<string> {
+  if (!value) return new Set();
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    return Array.isArray(parsed) && parsed.every((item) => typeof item === "string") ? new Set(parsed) : new Set();
+  } catch {
+    return new Set();
+  }
+}
+
 export function createWorkbenchStore(repository: LearningRepository): StoreApi<WorkbenchState> {
   const answerSaveQueues = new Map<string, Promise<AnswerRecord>>();
   const answerRevisions = new Map<string, number>();
@@ -75,6 +98,7 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     session: null,
     answers: {},
     annotations: [],
+    questionFlags: new Set(),
     saveState: "idle",
     error: null,
 
@@ -106,6 +130,7 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     initializeWorkspace: async (path) => {
       set({ bootstrapPhase: "loading", error: null });
       try {
+        await Promise.all([...answerSaveQueues.values()]);
         const bootstrap = await repository.initializeWorkspace(path);
         const firstPack = bootstrap.installedPacks[0];
         const revision = activePackLoadRevision + 1;
@@ -115,7 +140,40 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
           bootstrap,
           installedPacks: bootstrap.installedPacks,
           ...(activePackLoadRevision === revision ? { activePack } : {}),
+          session: null,
+          answers: {},
+          annotations: [],
+          questionFlags: new Set(),
           bootstrapPhase: "ready",
+        });
+      } catch (error) {
+        set({ bootstrapPhase: "error", error: errorMessage(error) });
+        throw error;
+      }
+    },
+
+    createWorkspaceBackup: async (destinationParent) => {
+      await Promise.all([...answerSaveQueues.values()]);
+      return repository.createWorkspaceBackup(destinationParent);
+    },
+
+    restoreWorkspaceBackup: async (backupPath, destinationParent) => {
+      set({ bootstrapPhase: "loading", error: null });
+      try {
+        await Promise.all([...answerSaveQueues.values()]);
+        const bootstrap = await repository.restoreWorkspaceBackup(backupPath, destinationParent);
+        const firstPack = bootstrap.installedPacks[0];
+        const activePack = firstPack ? await repository.loadPack(firstPack.id) : null;
+        set({
+          bootstrap,
+          installedPacks: bootstrap.installedPacks,
+          activePack,
+          session: null,
+          answers: {},
+          annotations: [],
+          questionFlags: new Set(),
+          bootstrapPhase: "ready",
+          saveState: "idle",
         });
       } catch (error) {
         set({ bootstrapPhase: "error", error: errorMessage(error) });
@@ -178,11 +236,13 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
       })();
       try {
         const session = await loadPromise;
+        const questionFlags = parseQuestionFlags(await repository.getSetting(questionFlagsSettingKey(session.sessionId)));
         if (activeSessionLoadRevision === revision) {
           set({
             session,
             answers: answersByKey(session.answers),
             annotations: session.annotations,
+            questionFlags,
             saveState: "idle",
             error: null,
           });
@@ -192,6 +252,41 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
         if (activeSessionLoadRevision === revision) set({ error: errorMessage(error) });
         throw error;
       }
+    },
+
+    loadHistoricalSession: async (sessionId) => {
+      const revision = activeSessionLoadRevision + 1;
+      activeSessionLoadRevision = revision;
+      try {
+        const session = await repository.loadSession(sessionId);
+        if (!session) return null;
+        const [activePack, questionFlags] = await Promise.all([
+          session.packId ? repository.loadPack(session.packId) : Promise.resolve(null),
+          repository.getSetting(questionFlagsSettingKey(session.sessionId)).then(parseQuestionFlags),
+        ]);
+        if (activeSessionLoadRevision === revision) {
+          set({
+            session,
+            ...(activePack ? { activePack } : {}),
+            answers: answersByKey(session.answers),
+            annotations: session.annotations,
+            questionFlags,
+            error: null,
+          });
+        }
+        return session;
+      } catch (error) {
+        if (activeSessionLoadRevision === revision) set({ error: errorMessage(error) });
+        throw error;
+      }
+    },
+
+    startNewSession: async (input) => {
+      const session = await repository.createSession({ ...input, sessionId: undefined });
+      const settingKey = `activeSession.${input.packId}.${input.testId}.${input.moduleType}.${input.mode}`;
+      await repository.setSetting(settingKey, session.sessionId);
+      set({ session, answers: {}, annotations: [], questionFlags: new Set(), saveState: "idle", error: null });
+      return session;
     },
 
     submitSession: async (sessionId) => {
@@ -214,6 +309,38 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
         }
         throw error;
       }
+    },
+
+    updateSessionElapsed: async (sessionId, elapsedSeconds) => {
+      if (get().session?.sessionId === sessionId && get().session?.status !== "in-progress") return;
+      try {
+        await repository.updateSessionElapsed(sessionId, elapsedSeconds);
+        set((state) => state.session?.sessionId === sessionId ? {
+          session: { ...state.session, elapsedSeconds: Math.max(state.session.elapsedSeconds ?? 0, elapsedSeconds) },
+        } : {});
+      } catch (error) {
+        set({ error: errorMessage(error), saveState: "error" });
+        throw error;
+      }
+    },
+
+    toggleQuestionFlag: async (sessionId, questionId) => {
+      const previous = get().questionFlags;
+      const next = new Set(previous);
+      if (next.has(questionId)) next.delete(questionId);
+      else next.add(questionId);
+      set({ questionFlags: next, saveState: "saving", error: null });
+      try {
+        await repository.setSetting(questionFlagsSettingKey(sessionId), JSON.stringify([...next].sort()));
+        set({ saveState: "saved" });
+      } catch (error) {
+        set({ questionFlags: previous, saveState: "error", error: errorMessage(error) });
+        throw error;
+      }
+    },
+
+    flushPendingSaves: async () => {
+      await Promise.all([...answerSaveQueues.values()]);
     },
 
     answerQuestion: async (sessionId, questionId, value) => {

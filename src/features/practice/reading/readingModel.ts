@@ -162,7 +162,10 @@ export function passageLabel(section: ReadingSection, sectionIndex: number): str
 
 const questionTypeLabels: Readonly<Record<Question["type"], string>> = {
   "single-choice": "Single Choice",
+  "multiple-choice": "Multiple Choice",
   "true-false-not-given": "True / False / Not Given",
+  "yes-no-not-given": "Yes / No / Not Given",
+  matching: "Matching",
   "short-answer": "Short Answer",
   "fill-blank": "Fill in the Blank",
 };

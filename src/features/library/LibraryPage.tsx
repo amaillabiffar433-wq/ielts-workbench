@@ -78,6 +78,7 @@ export function LibraryPage() {
   const repository = useWorkbenchStore((state) => state.repository);
   const loadPack = useWorkbenchStore((state) => state.loadPack);
   const refreshPacks = useWorkbenchStore((state) => state.refreshPacks);
+  const loadHistoricalSession = useWorkbenchStore((state) => state.loadHistoricalSession);
   const storeError = useWorkbenchStore((state) => state.error);
   const clearError = useWorkbenchStore((state) => state.clearError);
 
@@ -193,6 +194,7 @@ export function LibraryPage() {
   };
 
   const recentIsResumable = recentSession !== null;
+  const submittedSessions = recentSessions.filter((candidate) => candidate.status === "submitted");
 
   return (
     <main className="page library-page">
@@ -271,6 +273,20 @@ export function LibraryPage() {
             暂无可恢复的未完成练习。可从下方任一模块开始。
           </div>
         )}
+      </section>
+
+      <section aria-labelledby="history-title" className="library-recent-panel">
+        <div className="library-section-heading"><div><h2 id="history-title">练习历史</h2><p>已提交 Session 保持只读；重新练习会另建记录。</p></div><span className="library-summary">{submittedSessions.length} 次已提交</span></div>
+        {submittedSessions.length === 0 ? <div className="recent-empty">暂无已提交练习。</div> : submittedSessions.slice(0, 20).map((history) => (
+          <div className="recent-session-row" key={history.sessionId}>
+            <span className="recent-session-row__icon"><CheckCircle2 aria-hidden="true" size={19} /></span>
+            <div className="recent-session-row__copy"><strong>{history.moduleType ? moduleMeta[history.moduleType].label : "未知模块"} · {history.mode}</strong><span>{new Date(history.submittedAt ?? history.updatedAt).toLocaleString()} · 用时 {Math.floor(history.elapsedSeconds / 60)} 分 {history.elapsedSeconds % 60} 秒</span></div>
+            <button className="button" onClick={async () => {
+              const loaded = await loadHistoricalSession(history.sessionId);
+              if (loaded) navigate("/review");
+            }} type="button">查看复盘</button>
+          </div>
+        ))}
       </section>
 
       <section aria-labelledby="installed-packs-title" className="library-packs-section">

@@ -4,8 +4,8 @@ use rusqlite::Connection;
 
 use crate::{
     error::{BackendError, Result},
-    models::{BootstrapState, WorkspaceInfo},
-    packs, storage,
+    models::{BootstrapState, WorkspaceBackupSummary, WorkspaceInfo},
+    backup, packs, storage,
     workspace::{BootstrapStore, Workspace},
 };
 
@@ -76,6 +76,19 @@ impl AppBackend {
         let workspace = Workspace::open(&config.workspace_path)?;
         let connection = storage::open_database(&workspace.database_path())?;
         Ok((workspace, connection))
+    }
+
+    pub fn create_workspace_backup(&self, destination_parent: &str) -> Result<WorkspaceBackupSummary> {
+        let _guard = self.lock_mutation()?;
+        let (workspace, connection) = self.workspace_and_database()?;
+        backup::create_workspace_backup(&workspace, &connection, destination_parent)
+    }
+
+    pub fn restore_workspace_backup(&self, backup_path: &str, destination_parent: &str) -> Result<WorkspaceInfo> {
+        let _guard = self.lock_mutation()?;
+        let workspace = backup::restore_workspace_backup(backup_path, destination_parent)?;
+        self.bootstrap.save(&workspace)?;
+        workspace.info()
     }
 
     pub fn lock_mutation(&self) -> Result<std::sync::MutexGuard<'_, ()>> {

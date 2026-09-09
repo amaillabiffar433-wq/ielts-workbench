@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, List, Plus, Table2, Text, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowUp, List, Plus, Table2, Text, TextQuote, Trash2 } from "lucide-react";
 
 import { QuestionGroupContext } from "../../components/QuestionGroupContext/QuestionGroupContext";
 import {
@@ -9,6 +9,7 @@ import {
 } from "../../domain";
 import {
   boundStructuredQuestionIds,
+  createStructuredContextCompletion,
   createStructuredContextList,
   createStructuredContextParagraph,
   createStructuredContextTable,
@@ -23,7 +24,9 @@ import "./StructuredContextEditor.css";
 function blockBindingCount(block: StructuredContextBlockDraft): number {
   return block.type === "table"
     ? block.rows.reduce((sum, row) => sum + row.cells.filter((cell) => cell.questionId).length, 0)
-    : 0;
+    : block.type === "completion"
+      ? block.parts.filter((part) => part.kind === "answer").length
+      : 0;
 }
 
 function droppedBindings(
@@ -52,7 +55,7 @@ export function StructuredContextEditor({
   };
   const removeBlock = (block: StructuredContextBlockDraft) => {
     const bindings = blockBindingCount(block);
-    if (bindings > 0 && !window.confirm(`删除此上下文块会解除 ${bindings} 个表格作答位置，但不会删除题目或已有答案。确定继续吗？`)) return;
+    if (bindings > 0 && !window.confirm(`删除此上下文块会解除 ${bindings} 个作答位置，但不会删除题目或已有答案。确定继续吗？`)) return;
     onChange({ ...group, contextBlocks: group.contextBlocks.filter((candidate) => candidate.id !== block.id) });
   };
   const resizeTable = (table: StructuredContextTableDraft, rows: number, columns: number) => {
@@ -74,6 +77,7 @@ export function StructuredContextEditor({
           <button className="button button--ghost" disabled={group.contextBlocks.length >= MAX_QUESTION_CONTEXT_BLOCKS} onClick={() => addBlock(createStructuredContextParagraph())} type="button"><Text size={14} />段落</button>
           <button className="button button--ghost" disabled={group.contextBlocks.length >= MAX_QUESTION_CONTEXT_BLOCKS} onClick={() => addBlock(createStructuredContextList())} type="button"><List size={14} />列表</button>
           <button className="button button--ghost" disabled={group.contextBlocks.length >= MAX_QUESTION_CONTEXT_BLOCKS} onClick={() => addBlock(createStructuredContextTable())} type="button"><Table2 size={14} />表格</button>
+          <button className="button button--ghost" disabled={group.contextBlocks.length >= MAX_QUESTION_CONTEXT_BLOCKS} onClick={() => addBlock(createStructuredContextCompletion())} type="button"><TextQuote size={14} />摘要/笔记</button>
         </div>
       </header>
 
@@ -82,7 +86,7 @@ export function StructuredContextEditor({
       {group.contextBlocks.map((block, blockIndex) => (
         <article className="structured-context-block" key={block.id}>
           <header>
-            <strong>{block.type === "paragraph" ? "段落" : block.type === "list" ? "列表" : "规则表格"}</strong>
+            <strong>{block.type === "paragraph" ? "段落" : block.type === "list" ? "列表" : block.type === "table" ? "规则表格" : "摘要/笔记填空"}</strong>
             <code>{block.id}</code>
             <div>
               <button aria-label="上移上下文块" className="button button--ghost" disabled={blockIndex === 0} onClick={() => onChange({ ...group, contextBlocks: moveArrayItem(group.contextBlocks, blockIndex, blockIndex - 1) })} type="button"><ArrowUp size={13} /></button>
@@ -148,6 +152,51 @@ export function StructuredContextEditor({
                 </table>
               </div>
               <p>改变行列数会保留仍位于范围内的行、单元格 ID 与 questionId 绑定；删除含绑定的位置前会确认。</p>
+            </div>
+          )}
+
+          {block.type === "completion" && (
+            <div className="structured-context-completion-editor">
+              <div className="structured-context-completion-editor__settings">
+                <label>样式<select onChange={(event) => updateBlock(block.id, () => ({ ...block, style: event.target.value as "summary" | "notes" }))} value={block.style}><option value="summary">摘要</option><option value="notes">笔记</option></select></label>
+                <label>标题<input maxLength={200} onChange={(event) => updateBlock(block.id, () => ({ ...block, title: event.target.value }))} value={block.title} /></label>
+              </div>
+              {block.parts.map((part, partIndex) => {
+                const availableQuestions = group.questions.filter((question) => (
+                  (question.type === "short-answer" || question.type === "fill-blank")
+                  && (!boundQuestionIds.has(question.id) || (part.kind === "answer" && question.id === part.questionId))
+                ));
+                return (
+                  <div className="structured-context-completion-part" key={part.id}>
+                    <span>{partIndex + 1}</span>
+                    {part.kind === "text" ? (
+                      <textarea aria-label={`摘要片段 ${partIndex + 1}`} maxLength={4_000} onChange={(event) => updateBlock(block.id, () => ({ ...block, parts: block.parts.map((candidate) => candidate.id === part.id && candidate.kind === "text" ? { ...candidate, text: event.target.value } : candidate) }))} rows={2} value={part.text} />
+                    ) : (
+                      <label>作答位置<select aria-label={`摘要空位 ${partIndex + 1} 题目绑定`} onChange={(event) => updateBlock(block.id, () => ({ ...block, parts: block.parts.map((candidate) => candidate.id === part.id && candidate.kind === "answer" ? { ...candidate, questionId: event.target.value } : candidate) }))} value={part.questionId}>{availableQuestions.map((question) => <option key={question.id} value={question.id}>Q{question.number} · {question.prompt.slice(0, 44)}</option>)}</select></label>
+                    )}
+                    <code>{part.id}</code>
+                    <button aria-label={`上移摘要片段 ${partIndex + 1}`} className="button button--ghost" disabled={partIndex === 0} onClick={() => updateBlock(block.id, () => ({ ...block, parts: moveArrayItem(block.parts, partIndex, partIndex - 1) }))} type="button"><ArrowUp size={13} /></button>
+                    <button aria-label={`下移摘要片段 ${partIndex + 1}`} className="button button--ghost" disabled={partIndex === block.parts.length - 1} onClick={() => updateBlock(block.id, () => ({ ...block, parts: moveArrayItem(block.parts, partIndex, partIndex + 1) }))} type="button"><ArrowDown size={13} /></button>
+                    <button aria-label={`删除摘要片段 ${partIndex + 1}`} className="button button--ghost" disabled={block.parts.length <= 2} onClick={() => {
+                      if (part.kind === "answer" && !window.confirm("删除此摘要空位会解除题目绑定，但不会删除题目或答案。确定继续吗？")) return;
+                      updateBlock(block.id, () => ({ ...block, parts: block.parts.filter((candidate) => candidate.id !== part.id) }));
+                    }} type="button"><Trash2 size={13} /></button>
+                  </div>
+                );
+              })}
+              <div className="structured-context-completion-editor__actions">
+                <button className="button button--ghost" disabled={block.parts.length >= 100} onClick={() => {
+                  const textPart = createStructuredContextCompletion(block.style).parts[0];
+                  updateBlock(block.id, () => ({ ...block, parts: [...block.parts, textPart] }));
+                }} type="button"><Plus size={13} />文字片段</button>
+                <button className="button button--ghost" disabled={block.parts.length >= 100 || group.questions.every((question) => boundQuestionIds.has(question.id) || (question.type !== "short-answer" && question.type !== "fill-blank"))} onClick={() => {
+                  const question = group.questions.find((candidate) => (candidate.type === "short-answer" || candidate.type === "fill-blank") && !boundQuestionIds.has(candidate.id));
+                  if (!question) return;
+                  const partId = createStructuredContextCompletion(block.style).parts[0].id;
+                  updateBlock(block.id, () => ({ ...block, parts: [...block.parts, { id: partId, kind: "answer", questionId: question.id }] }));
+                }} type="button"><Plus size={13} />题目空位</button>
+              </div>
+              <p>文字和作答空位按顺序组成摘要或笔记；同一道题只能有一个主要结构化作答位置。</p>
             </div>
           )}
         </article>

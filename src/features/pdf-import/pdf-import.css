@@ -2,6 +2,54 @@
   min-width: 0;
 }
 
+.pdf-batch-panel {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #d7dddf);
+  border-radius: 10px;
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 0.9rem;
+  padding: 0.9rem;
+}
+
+.pdf-batch-panel > header,
+.pdf-batch-inline,
+.pdf-rule-candidate {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.pdf-batch-panel h3,
+.pdf-batch-panel p {
+  margin: 0;
+}
+
+.pdf-batch-panel label,
+.pdf-batch-preview,
+.pdf-batch-preview article {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.pdf-batch-preview {
+  border-left: 3px solid var(--color-accent, #147d74);
+  gap: 0.65rem;
+  padding-left: 0.75rem;
+}
+
+.pdf-batch-preview article,
+.pdf-rule-candidate {
+  background: var(--color-surface-soft, #f6f8f8);
+  border-radius: 8px;
+  padding: 0.65rem;
+}
+
+.pdf-rule-candidate span {
+  flex: 1 1 20rem;
+}
+
 .pdf-import-steps {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

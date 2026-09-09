@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "id": "original-daily-reading-pack",
+  "title": "Rivermark Reading Practice",
+  "sourceLabel": "IELTS Workbench original complete Reading engineering sample",
+  "edition": "2026.1",
+  "language": "en",
+  "modules": ["reading"],
+  "createdAt": "2026-09-09T00:00:00.000Z",
+  "attribution": "Written from scratch for IELTS Workbench. It is not an official IELTS paper and contains no third-party test content.",
+  "tests": [
+    {
+      "id": "rivermark-test-01",
+      "title": "Original Complete Reading Practice",
+      "moduleIds": ["rivermark-reading-01"]
+    }
+  ],
+  "mediaAssets": []
+}

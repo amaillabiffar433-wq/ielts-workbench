@@ -24,7 +24,7 @@
 
 .review-metrics {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(135px, 1fr));
   gap: 10px;
   margin: 16px 0 26px;
 }

@@ -144,6 +144,13 @@ pub fn submit_session(
             ));
         }
         Some("in-progress") => {}
+        Some("submitted") => {
+            let snapshot = load_session(&transaction, session_id)?.ok_or_else(|| {
+                BackendError::Database(rusqlite::Error::QueryReturnedNoRows)
+            })?;
+            transaction.commit()?;
+            return Ok(snapshot);
+        }
         Some(_) => {
             return Err(BackendError::Conflict(
                 "Only an in-progress practice session can be submitted.".to_string(),
@@ -169,6 +176,30 @@ pub fn submit_session(
     })?;
     transaction.commit()?;
     Ok(snapshot)
+}
+
+pub fn update_session_elapsed(
+    connection: &Connection,
+    session_id: &str,
+    elapsed_seconds: u64,
+) -> Result<PracticeSessionRecord> {
+    validate_stable_id(session_id, "session ID")?;
+    if elapsed_seconds > 9_007_199_254_740_991 {
+        return Err(BackendError::InvalidInput(
+            "Elapsed time must be a JavaScript-safe integer.".to_string(),
+        ));
+    }
+    require_in_progress_session(connection, session_id)?;
+    let updated_at = now_iso();
+    connection.execute(
+        "UPDATE practice_sessions
+         SET elapsed_seconds = MAX(elapsed_seconds, ?2), updated_at = ?3
+         WHERE id = ?1 AND status = 'in-progress'",
+        params![session_id, elapsed_seconds as i64, updated_at],
+    )?;
+    get_session(connection, session_id)?.ok_or_else(|| {
+        BackendError::Database(rusqlite::Error::QueryReturnedNoRows)
+    })
 }
 
 pub fn save_answer(connection: &Connection, input: SaveAnswerInput) -> Result<AnswerRecord> {
@@ -970,10 +1001,8 @@ mod tests {
         assert_eq!(snapshot.answers[0].answer, json!("B"));
 
         let completed_at = session.completed_at.clone();
-        assert!(matches!(
-            submit_session(&mut connection, "submit-session"),
-            Err(BackendError::Conflict(_))
-        ));
+        let repeated = submit_session(&mut connection, "submit-session").unwrap();
+        assert_eq!(repeated.session.as_ref().unwrap().completed_at, completed_at);
         let persisted = load_session(&connection, "submit-session")
             .unwrap()
             .unwrap();

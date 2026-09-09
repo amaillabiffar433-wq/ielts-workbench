@@ -23,7 +23,10 @@ export interface PdfTextFragment {
 
 export type DetectedQuestionType =
   | "single-choice"
+  | "multiple-choice"
   | "true-false-not-given"
+  | "yes-no-not-given"
+  | "matching"
   | "short-answer"
   | "fill-blank"
   | "matching-headings"
@@ -136,7 +139,11 @@ function questionType(instructions: string, prompt: string, options: readonly st
   if (/TRUE\s*\/\s*FALSE\s*\/\s*NOT\s+GIVEN|TRUE,?\s+FALSE\s+OR\s+NOT\s+GIVEN/.test(context)) {
     return "true-false-not-given";
   }
-  if (/MATCH(?:ING)?\s+(?:EACH\s+)?HEADINGS?/.test(context)) return "matching-headings";
+  if (/YES\s*\/\s*NO\s*\/\s*NOT\s+GIVEN|YES,?\s+NO\s+OR\s+NOT\s+GIVEN/.test(context)) {
+    return "yes-no-not-given";
+  }
+  if (/MATCH(?:ING)?\s+(?:EACH\s+)?(?:HEADINGS?|INFORMATION|FEATURES|SENTENCE\s+ENDINGS?)/.test(context)) return "matching";
+  if (/CHOOSE\s+(?:ANY\s+)?(?:TWO|THREE|FOUR|FIVE|2|3|4|5)\b/.test(context)) return "multiple-choice";
   if (options.length >= 2 || /CHOOSE\s+(?:THE\s+)?CORRECT/.test(context)) return "single-choice";
   if (/COMPLETE/.test(context) && /_{3,}|\.{3,}/.test(prompt)) return "fill-blank";
   if (/SHORT\s+ANSWER|NO\s+MORE\s+THAN|COMPLETE/.test(context)) return "short-answer";

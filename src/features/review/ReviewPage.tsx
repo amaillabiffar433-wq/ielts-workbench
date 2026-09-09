@@ -1,7 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, CircleDashed, FileClock, Headphones, Highlighter, Lock, RotateCcw } from "lucide-react";
-import { Link } from "react-router-dom";
-import type { IELTSPack, Question, ReadingModule, WritingModule } from "../../domain";
+import { Link, useNavigate } from "react-router-dom";
+import {
+  displayQuestionAnswer,
+  displayQuestionCorrectAnswer,
+  questionNumberLabel,
+  scoreQuestion,
+  type IELTSPack,
+  type Question,
+  type QuestionAnswerValue,
+  type QuestionScoreStatus,
+  type ReadingModule,
+  type WritingModule,
+} from "../../domain";
 import { QuestionGroupContext } from "../../components/QuestionGroupContext/QuestionGroupContext";
 import { boundQuestionIdsFromContext } from "../../components/QuestionGroupContext/questionGroupContextModel";
 import { PageHeader } from "../../components/common/PageHeader";
@@ -17,31 +28,17 @@ type ReviewPackAttempt = {
 
 type ReviewResult = {
   readonly question: Question;
-  readonly userAnswer: string;
-  readonly status: "unanswered" | "unscored" | "correct" | "incorrect";
+  readonly userAnswer: QuestionAnswerValue | undefined;
+  readonly status: QuestionScoreStatus;
+  readonly earnedPoints: number;
+  readonly scorablePoints: number;
 };
 
-function normalize(value: string): string {
-  return value.trim().toLocaleLowerCase().replace(/\s+/g, " ");
-}
-
-function correctAnswers(question: Question): string[] {
-  switch (question.type) {
-    case "single-choice": return question.correctOptionId ? [question.correctOptionId] : [];
-    case "true-false-not-given": return question.correctAnswer ? [question.correctAnswer] : [];
-    case "short-answer":
-    case "fill-blank": return [...question.acceptableAnswers];
-  }
-}
-
-function displayCorrectAnswer(question: Question): string {
-  if (question.type === "single-choice") {
-    return question.correctOptionId
-      ? question.options.find((option) => option.id === question.correctOptionId)?.text ?? question.correctOptionId
-      : "尚未录入，请人工核对";
-  }
-  if (question.type === "true-false-not-given") return question.correctAnswer?.replace("not-given", "Not Given") ?? "尚未录入，请人工核对";
-  return question.acceptableAnswers.join(" / ") || "尚未录入，请人工核对";
+function formatElapsed(totalSeconds: number): string {
+  const hours = Math.floor(totalSeconds / 3600).toString().padStart(2, "0");
+  const minutes = Math.floor((totalSeconds % 3600) / 60).toString().padStart(2, "0");
+  const seconds = Math.floor(totalSeconds % 60).toString().padStart(2, "0");
+  return `${hours}:${minutes}:${seconds}`;
 }
 
 function ReviewAnswer({ result, inline = false }: { readonly result: ReviewResult; readonly inline?: boolean }) {
@@ -51,26 +48,30 @@ function ReviewAnswer({ result, inline = false }: { readonly result: ReviewResul
       className={`review-answer review-answer--${status}${inline ? " review-answer--inline" : ""}`}
       id={inline ? undefined : `review-question-${question.number}`}
     >
-      <div className="review-answer__number">{question.number}</div>
+      <div className="review-answer__number">{questionNumberLabel(question)}</div>
       <div>
         <div className="review-answer__status">
           {status === "correct" ? <CheckCircle2 aria-hidden="true" size={15} /> : status === "incorrect" ? <AlertCircle aria-hidden="true" size={15} /> : <CircleDashed aria-hidden="true" size={15} />}
           {status === "correct" ? "正确" : status === "incorrect" ? "错误" : status === "unscored" ? "待核对" : "未答"}
         </div>
         <p className="review-answer__prompt">{question.prompt}</p>
-        <dl><div><dt>你的答案</dt><dd>{userAnswer || "（未作答）"}</dd></div><div><dt>正确答案</dt><dd>{displayCorrectAnswer(question)}</dd></div></dl>
+        <dl><div><dt>你的答案</dt><dd>{displayQuestionAnswer(question, userAnswer)}</dd></div><div><dt>正确答案</dt><dd>{displayQuestionCorrectAnswer(question)}</dd></div></dl>
+        {status !== "unscored" && <p className="review-answer__points">本题得分 {result.earnedPoints}/{result.scorablePoints}</p>}
       </div>
     </article>
   );
 }
 
 export function ReviewPage() {
+  const navigate = useNavigate();
   const activePack = useWorkbenchStore((state) => state.activePack);
   const session = useWorkbenchStore((state) => state.session);
   const answers = useWorkbenchStore((state) => state.answers);
   const annotations = useWorkbenchStore((state) => state.annotations);
   const repository = useWorkbenchStore((state) => state.repository);
   const loadPack = useWorkbenchStore((state) => state.loadPack);
+  const startNewSession = useWorkbenchStore((state) => state.startNewSession);
+  const [restarting, setRestarting] = useState(false);
   const [writingVersionCount, setWritingVersionCount] = useState(0);
   const [packAttempt, setPackAttempt] = useState<ReviewPackAttempt | null>(null);
   const activeExamLock = session?.mode === "exam" && session.status === "in-progress";
@@ -107,16 +108,8 @@ export function ReviewPage() {
 
   const results = useMemo(() => questions.map((question) => {
     const record = session ? Object.values(answers).find((answer) => answer.sessionId === session.sessionId && answer.questionId === question.id) : undefined;
-    const userAnswer = typeof record?.value === "string" ? record.value : record?.value.join(", ") ?? "";
-    const knownAnswers = correctAnswers(question);
-    const status = !userAnswer.trim()
-      ? "unanswered" as const
-      : knownAnswers.length === 0
-        ? "unscored" as const
-        : knownAnswers.some((answer) => normalize(answer) === normalize(userAnswer))
-        ? "correct" as const
-        : "incorrect" as const;
-    return { question, userAnswer, status };
+    const score = scoreQuestion(question, record?.value);
+    return { question, userAnswer: record?.value, ...score };
   }), [answers, questions, session]);
 
   const readingGroups = useMemo(() => {
@@ -208,7 +201,10 @@ export function ReviewPage() {
     );
   }
 
-  const correct = results.filter((result) => result.status === "correct").length;
+  const correct = results.reduce((total, result) => total + result.earnedPoints, 0);
+  const scorable = results.reduce((total, result) => total + result.scorablePoints, 0);
+  const correctQuestions = results.filter((result) => result.status === "correct").length;
+  const scorableQuestions = results.filter((result) => result.status !== "unscored").length;
   const incorrect = results.filter((result) => result.status === "incorrect").length;
   const unanswered = results.filter((result) => result.status === "unanswered").length;
   const unscored = results.filter((result) => result.status === "unscored").length;
@@ -217,7 +213,15 @@ export function ReviewPage() {
   return (
     <div className="page review-page">
       <PageHeader
-        actions={<Link className="button" to={route}><RotateCcw aria-hidden="true" size={15} /> 返回练习</Link>}
+        actions={session.status === "submitted" ? <button className="button" disabled={restarting} onClick={async () => {
+          setRestarting(true);
+          try {
+            await startNewSession({ packId: sessionIdentity.packId, testId: sessionIdentity.testId, moduleType: session.moduleType!, mode: session.mode === "exam" ? "exam" : "study" });
+            navigate(buildPracticeRoute(session.moduleType!, { identity: sessionIdentity, mode: session.mode === "exam" ? "exam" : "study" }));
+          } finally {
+            setRestarting(false);
+          }
+        }} type="button"><RotateCcw aria-hidden="true" size={15} />{restarting ? "正在新建…" : "重新练习（新 Session）"}</button> : <Link className="button" to={route}><RotateCcw aria-hidden="true" size={15} /> 返回练习</Link>}
         description="下面是当前 Session 的真实保存记录。此处不提供非官方 IELTS Band 换算。"
         title="本次复盘"
       />
@@ -226,9 +230,11 @@ export function ReviewPage() {
         <div><span>模块</span><strong>{session.moduleType?.toUpperCase() ?? "—"}</strong></div>
         <div><span>模式</span><strong>{session.mode}</strong></div>
         <div><span>状态</span><strong>{session.status}</strong></div>
+        <div><span>实际用时</span><strong>{formatElapsed(session.elapsedSeconds ?? 0)}</strong></div>
       </section>
       <div className="review-metrics">
-        <article><CheckCircle2 aria-hidden="true" /><div><strong>{correct}</strong><span>正确</span></div></article>
+        <article><CheckCircle2 aria-hidden="true" /><div><strong>{correctQuestions}/{scorableQuestions}</strong><span>正确题 / 可评分题</span></div></article>
+        <article><CheckCircle2 aria-hidden="true" /><div><strong>{correct}/{scorable}</strong><span>得分 / 可评分分值</span></div></article>
         <article><AlertCircle aria-hidden="true" /><div><strong>{incorrect}</strong><span>错误</span></div></article>
         <article><CircleDashed aria-hidden="true" /><div><strong>{unanswered}</strong><span>未答</span></div></article>
         <article><CircleDashed aria-hidden="true" /><div><strong>{unscored}</strong><span>待核对</span></div></article>

@@ -131,12 +131,29 @@ describe("InMemoryLearningRepository", () => {
     });
     expect(submitted.answers).toHaveLength(1);
     await expect(repository.loadSession(session.sessionId)).resolves.toEqual(submitted);
-    await expect(repository.submitSession(session.sessionId)).rejects.toThrow(/in-progress/i);
+    await expect(repository.submitSession(session.sessionId)).resolves.toEqual(submitted);
     await expect(repository.saveAnswer({
       sessionId: session.sessionId,
       questionId: "demo-reading-q02",
       value: "false",
     })).rejects.toThrow(/immutable/i);
+  });
+
+  it("persists elapsed time monotonically and freezes it after submission", async () => {
+    const repository = InMemoryLearningRepository.withOriginalDemo({ idFactory: deterministicIds() });
+    const session = await repository.createSession({
+      packId: "original-demo-pack",
+      testId: "demo-test-01",
+      moduleType: "reading",
+      mode: "study",
+    });
+
+    await repository.updateSessionElapsed(session.sessionId, 120);
+    await repository.updateSessionElapsed(session.sessionId, 75);
+    expect((await repository.loadSession(session.sessionId))?.elapsedSeconds).toBe(120);
+
+    await repository.submitSession(session.sessionId);
+    await expect(repository.updateSessionElapsed(session.sessionId, 121)).rejects.toThrow(/immutable/i);
   });
 
   it("exposes ordered durable summaries and derives the newest session", async () => {

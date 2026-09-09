@@ -334,4 +334,42 @@ describe("canonical shared-pane state", () => {
     expect(store.getState().session).toEqual(newerSession);
     expect(store.getState().saveState).toBe("idle");
   });
+
+  it("keeps submitted history while retrying in a new Session and restores per-session flags", async () => {
+    const repository = testRepository();
+    const store = createWorkbenchStore(repository);
+    await store.getState().initialize();
+    const input: CreateSessionInput = {
+      packId: originalDemoPack.manifest.id,
+      testId: originalDemoPack.manifest.tests[0].id,
+      moduleType: "reading",
+      mode: "study",
+    };
+    const original = await store.getState().ensureSession(input);
+    await store.getState().answerQuestion(original.sessionId, "demo-reading-q01", "true");
+    await store.getState().toggleQuestionFlag(original.sessionId, "demo-reading-q01");
+    await store.getState().submitSession(original.sessionId);
+
+    const retry = await store.getState().startNewSession(input);
+    expect(retry.sessionId).not.toBe(original.sessionId);
+    expect(retry.answers).toHaveLength(0);
+    expect(store.getState().questionFlags.size).toBe(0);
+    expect((await repository.loadSession(original.sessionId))?.answers).toHaveLength(1);
+
+    await store.getState().loadHistoricalSession(original.sessionId);
+    expect(store.getState().questionFlags).toEqual(new Set(["demo-reading-q01"]));
+    expect(store.getState().answers[answerKey(original.sessionId, "demo-reading-q01")]?.value).toBe("true");
+  });
+
+  it("clears active learning state after switching to another workspace", async () => {
+    const { store, session } = await readyStore();
+    await store.getState().toggleQuestionFlag(session.sessionId, "demo-reading-q01");
+    await store.getState().initializeWorkspace("D:\\IELTS-Workbench-Other");
+
+    expect(store.getState().bootstrap?.workspace?.path).toBe("D:\\IELTS-Workbench-Other");
+    expect(store.getState().session).toBeNull();
+    expect(store.getState().answers).toEqual({});
+    expect(store.getState().annotations).toEqual([]);
+    expect(store.getState().questionFlags.size).toBe(0);
+  });
 });

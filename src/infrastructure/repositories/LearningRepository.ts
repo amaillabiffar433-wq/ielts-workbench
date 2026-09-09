@@ -23,6 +23,17 @@ export const WorkspaceSummarySchema = z
 
 export type WorkspaceSummary = z.infer<typeof WorkspaceSummarySchema>;
 
+export const WorkspaceBackupSummarySchema = z.object({
+  path: z.string().min(1),
+  createdAt: IsoUtcDateTimeSchema,
+  sourceWorkspaceId: z.string().min(1),
+  fileCount: z.number().int().nonnegative().safe(),
+  totalBytes: z.number().int().nonnegative().safe(),
+  databaseSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+}).strict();
+
+export type WorkspaceBackupSummary = z.infer<typeof WorkspaceBackupSummarySchema>;
+
 export const InstalledPackSummarySchema = z
   .object({
     id: StableIdSchema,
@@ -124,6 +135,7 @@ export const SessionSnapshotSchema = z
     startedAt: IsoUtcDateTimeSchema.optional(),
     updatedAt: IsoUtcDateTimeSchema.optional(),
     submittedAt: IsoUtcDateTimeSchema.optional(),
+    elapsedSeconds: z.number().int().nonnegative().safe().default(0),
     answers: z.array(AnswerRecordSchema).default([]),
     annotations: z.array(AnnotationRecordSchema).default([]),
   })
@@ -139,6 +151,7 @@ export interface SessionSnapshot {
   readonly startedAt?: string;
   readonly updatedAt?: string;
   readonly submittedAt?: string;
+  readonly elapsedSeconds?: number;
   readonly answers: readonly AnswerRecord[];
   readonly annotations: readonly AnnotationRecord[];
 }
@@ -298,6 +311,8 @@ export type BootstrapState = z.infer<typeof BootstrapStateSchema>;
 export interface LearningRepository {
   getBootstrapState(): Promise<BootstrapState>;
   initializeWorkspace(path: string): Promise<BootstrapState>;
+  createWorkspaceBackup(destinationParent: string): Promise<WorkspaceBackupSummary>;
+  restoreWorkspaceBackup(backupPath: string, destinationParent: string): Promise<BootstrapState>;
 
   listInstalledPacks(): Promise<InstalledPackSummary[]>;
   loadPack(packId: string): Promise<IELTSPack | null>;
@@ -310,6 +325,7 @@ export interface LearningRepository {
   listRecentSessions(): Promise<PracticeSessionSummary[]>;
   loadSession(sessionId: string): Promise<SessionSnapshot | null>;
   submitSession(sessionId: string): Promise<SessionSnapshot>;
+  updateSessionElapsed(sessionId: string, elapsedSeconds: number): Promise<void>;
   saveAnswer(input: SaveAnswerInput): Promise<AnswerRecord>;
   saveAnnotation(input: SaveAnnotationInput): Promise<AnnotationRecord>;
   deleteAnnotation(annotationId: string): Promise<void>;

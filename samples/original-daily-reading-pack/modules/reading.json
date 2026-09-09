@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 3,
+  "id": "rivermark-reading-01",
+  "testId": "rivermark-test-01",
+  "type": "reading",
+  "title": "Rivermark Reading Practice",
+  "sections": [
+    {
+      "id": "rivermark-passage-01",
+      "title": "A Library of Street Sounds",
+      "contentBlocks": [
+        { "id": "rivermark-p1-heading", "kind": "heading", "text": "A Library of Street Sounds" },
+        { "id": "rivermark-p1-a", "kind": "paragraph", "text": "A. Rivermark's sound library began when residents noticed that ordinary neighbourhood noises were disappearing from memory. Volunteers recorded market shutters, bicycle bells and the short whistle once used by a ferry guard. The collection was designed as a public history resource, not as a catalogue of noise complaints." },
+        { "id": "rivermark-p1-b", "kind": "paragraph", "text": "B. Recording teams use small handheld devices rather than studio equipment. Before each visit, they note the weather and test the microphone beside a reference tone. This routine does not remove every difference between recordings, but it makes later comparisons more useful." },
+        { "id": "rivermark-p1-c", "kind": "paragraph", "text": "C. Contributors must ask permission before recording an identifiable conversation. Incidental speech is shortened or masked during review, and files containing private information are rejected. A small brass marker was fixed beside the entrance to remind visitors that listening carries responsibilities." },
+        { "id": "rivermark-p1-d", "kind": "paragraph", "text": "D. Each accepted file receives a place, date and plain-language description. The catalogue avoids guessing the identity of an unknown machine or bird. Specialists may later propose a more exact label, but the original description remains visible beside the revision." },
+        { "id": "rivermark-p1-e", "kind": "paragraph", "text": "E. Schools borrow themed sets on local transport and working life. Teachers receive short activity cards, while pupils create their own maps of sounds around the school. The raw recordings remain offline on library tablets unless the contributor has separately approved public release." },
+        { "id": "rivermark-p1-f", "kind": "paragraph", "text": "F. The next phase will add quiet sounds from indoor crafts, which are harder to capture than street events. Organisers will lend padded microphone stands and schedule shorter sessions. They have not promised to collect every traditional craft in the district." }
+      ],
+      "questionGroups": [
+        {
+          "id": "rivermark-p1-g1",
+          "title": "Questions 1–5 / Matching Headings",
+          "instructions": "Choose the correct heading, A–F, for each paragraph. One heading is not used.",
+          "questions": [
+            { "id": "rivermark-q01", "number": 1, "type": "matching", "prompt": "Paragraph B", "matchingKind": "headings", "allowOptionReuse": false, "options": [{"id":"rivermark-q01-a","label":"A","text":"A controlled field routine"},{"id":"rivermark-q01-b","label":"B","text":"Uses in the classroom"},{"id":"rivermark-q01-c","label":"C","text":"Plans for subtle material"},{"id":"rivermark-q01-d","label":"D","text":"Ethical limits on recording"},{"id":"rivermark-q01-e","label":"E","text":"The purpose of the collection"},{"id":"rivermark-q01-f","label":"F","text":"Labels that can be revised"}], "correctOptionId": "rivermark-q01-a" },
+            { "id": "rivermark-q02", "number": 2, "type": "matching", "prompt": "Paragraph C", "matchingKind": "headings", "allowOptionReuse": false, "options": [{"id":"rivermark-q02-a","label":"A","text":"A controlled field routine"},{"id":"rivermark-q02-b","label":"B","text":"Uses in the classroom"},{"id":"rivermark-q02-c","label":"C","text":"Plans for subtle material"},{"id":"rivermark-q02-d","label":"D","text":"Ethical limits on recording"},{"id":"rivermark-q02-e","label":"E","text":"The purpose of the collection"},{"id":"rivermark-q02-f","label":"F","text":"Labels that can be revised"}], "correctOptionId": "rivermark-q02-d" },
+            { "id": "rivermark-q03", "number": 3, "type": "matching", "prompt": "Paragraph D", "matchingKind": "headings", "allowOptionReuse": false, "options": [{"id":"rivermark-q03-a","label":"A","text":"A controlled field routine"},{"id":"rivermark-q03-b","label":"B","text":"Uses in the classroom"},{"id":"rivermark-q03-c","label":"C","text":"Plans for subtle material"},{"id":"rivermark-q03-d","label":"D","text":"Ethical limits on recording"},{"id":"rivermark-q03-e","label":"E","text":"The purpose of the collection"},{"id":"rivermark-q03-f","label":"F","text":"Labels that can be revised"}], "correctOptionId": "rivermark-q03-f" },
+            { "id": "rivermark-q04", "number": 4, "type": "matching", "prompt": "Paragraph E", "matchingKind": "headings", "allowOptionReuse": false, "options": [{"id":"rivermark-q04-a","label":"A","text":"A controlled field routine"},{"id":"rivermark-q04-b","label":"B","text":"Uses in the classroom"},{"id":"rivermark-q04-c","label":"C","text":"Plans for subtle material"},{"id":"rivermark-q04-d","label":"D","text":"Ethical limits on recording"},{"id":"rivermark-q04-e","label":"E","text":"The purpose of the collection"},{"id":"rivermark-q04-f","label":"F","text":"Labels that can be revised"}], "correctOptionId": "rivermark-q04-b" },
+            { "id": "rivermark-q05", "number": 5, "type": "matching", "prompt": "Paragraph F", "matchingKind": "headings", "allowOptionReuse": false, "options": [{"id":"rivermark-q05-a","label":"A","text":"A controlled field routine"},{"id":"rivermark-q05-b","label":"B","text":"Uses in the classroom"},{"id":"rivermark-q05-c","label":"C","text":"Plans for subtle material"},{"id":"rivermark-q05-d","label":"D","text":"Ethical limits on recording"},{"id":"rivermark-q05-e","label":"E","text":"The purpose of the collection"},{"id":"rivermark-q05-f","label":"F","text":"Labels that can be revised"}], "correctOptionId": "rivermark-q05-c" }
+          ]
+        },
+        {
+          "id": "rivermark-p1-g2",
+          "title": "Questions 6–9 / True False Not Given",
+          "instructions": "Decide whether the statements agree with the information in Passage 1. Choose TRUE, FALSE, or NOT GIVEN.",
+          "questions": [
+            { "id": "rivermark-q06", "number": 6, "type": "true-false-not-given", "prompt": "The collection was created to process complaints about urban noise.", "correctAnswer": "false" },
+            { "id": "rivermark-q07", "number": 7, "type": "true-false-not-given", "prompt": "Teams record the weather before making a field recording.", "correctAnswer": "true" },
+            { "id": "rivermark-q08", "number": 8, "type": "true-false-not-given", "prompt": "Every contributor permits their recording to be published online.", "correctAnswer": "false" },
+            { "id": "rivermark-q09", "number": 9, "type": "true-false-not-given", "prompt": "The library has received recordings from more than fifty schools.", "correctAnswer": "not-given" }
+          ]
+        },
+        {
+          "id": "rivermark-p1-g3",
+          "title": "Questions 10–13 / Summary Completion",
+          "instructions": "Complete the summary using NO MORE THAN TWO WORDS from the passage for each answer.",
+          "contextBlocks": [
+            { "id": "rivermark-p1-summary", "type": "completion", "style": "summary", "title": "How the archive works", "parts": [
+              {"id":"rivermark-p1-summary-t1","kind":"text","text":"Field teams check their microphone beside a "},
+              {"id":"rivermark-p1-summary-a10","kind":"answer","questionId":"rivermark-q10"},
+              {"id":"rivermark-p1-summary-t2","kind":"text","text":". During review, incidental speech can be shortened or "},
+              {"id":"rivermark-p1-summary-a11","kind":"answer","questionId":"rivermark-q11"},
+              {"id":"rivermark-p1-summary-t3","kind":"text","text":". Schools use local recordings on library "},
+              {"id":"rivermark-p1-summary-a12","kind":"answer","questionId":"rivermark-q12"},
+              {"id":"rivermark-p1-summary-t4","kind":"text","text":", while future indoor sessions will use padded microphone "},
+              {"id":"rivermark-p1-summary-a13","kind":"answer","questionId":"rivermark-q13"},
+              {"id":"rivermark-p1-summary-t5","kind":"text","text":"."}
+            ]}
+          ],
+          "questions": [
+            { "id": "rivermark-q10", "number": 10, "type": "short-answer", "prompt": "Reference used to test the microphone", "acceptableAnswers": ["reference tone"], "maxWords": 2 },
+            { "id": "rivermark-q11", "number": 11, "type": "short-answer", "prompt": "Treatment of incidental speech", "acceptableAnswers": ["masked"], "maxWords": 1 },
+            { "id": "rivermark-q12", "number": 12, "type": "short-answer", "prompt": "Devices holding the recordings", "acceptableAnswers": ["tablets", "library tablets"], "maxWords": 2 },
+            { "id": "rivermark-q13", "number": 13, "type": "short-answer", "prompt": "Padded equipment for indoor recording", "acceptableAnswers": ["stands", "microphone stands"], "maxWords": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rivermark-passage-02",
+      "title": "The Cooperative Roof Survey",
+      "contentBlocks": [
+        { "id": "rivermark-p2-heading", "kind": "heading", "text": "The Cooperative Roof Survey" },
+        { "id": "rivermark-p2-a", "kind": "paragraph", "text": "A housing cooperative in Rivermark began a roof survey after several buildings experienced minor leaks. The committee's view was that routine observation could help plan repairs, but that volunteers should never replace qualified inspectors. Residents therefore report visible changes from safe indoor positions." },
+        { "id": "rivermark-p2-b", "kind": "paragraph", "text": "Mina Patel designed a colour card for describing stains. She asked residents to compare a mark with the card in daylight rather than naming a colour from memory. Tomas Reed created a simple form for noting dates and room locations. Jun Wei later added a sketch showing where photographs should be taken." },
+        { "id": "rivermark-p2-c", "kind": "paragraph", "text": "The first trial involved six buildings of different ages. Some newer roofs produced more reports simply because their residents submitted forms more regularly. For that reason, the committee refused to rank buildings by the raw number of observations." },
+        { "id": "rivermark-p2-d", "kind": "paragraph", "text": "When a new stain is reported, the maintenance desk checks earlier photographs before contacting a contractor. Urgent signs such as sagging material trigger an immediate professional visit. Small unchanged marks remain on a weekly watch list." },
+        { "id": "rivermark-p2-e", "kind": "paragraph", "text": "The cooperative stores photographs on an encrypted local drive. A printed reference sheet is kept in each building for residents who do not use the digital form. A small brass marker was fixed beside the entrance, but unlike the sound library marker it only identifies the building code." },
+        { "id": "rivermark-p2-f", "kind": "paragraph", "text": "After one year, repair scheduling improved and emergency call-outs fell. The committee says the survey helped staff notice patterns earlier, although weather and a separate gutter programme may also have influenced the result." }
+      ],
+      "questionGroups": [
+        {
+          "id": "rivermark-p2-g1",
+          "title": "Questions 14–17 / Yes No Not Given",
+          "instructions": "Decide whether the statements agree with the views of the cooperative committee. Choose YES, NO, or NOT GIVEN.",
+          "questions": [
+            { "id": "rivermark-q14", "number": 14, "type": "yes-no-not-given", "prompt": "Volunteers should perform the work of professional roof inspectors.", "correctAnswer": "no" },
+            { "id": "rivermark-q15", "number": 15, "type": "yes-no-not-given", "prompt": "Raw report totals are a fair way to compare buildings.", "correctAnswer": "no" },
+            { "id": "rivermark-q16", "number": 16, "type": "yes-no-not-given", "prompt": "The survey probably helped maintenance staff identify patterns sooner.", "correctAnswer": "yes" },
+            { "id": "rivermark-q17", "number": 17, "type": "yes-no-not-given", "prompt": "Every cooperative in the region should adopt the same survey.", "correctAnswer": "not-given" }
+          ]
+        },
+        {
+          "id": "rivermark-p2-g2",
+          "title": "Questions 18–19 / Multiple Choice",
+          "instructions": "Choose TWO answers for each question. Each question is scored as one exact, unordered set.",
+          "questions": [
+            { "id": "rivermark-q18", "number": 18, "type": "multiple-choice", "prompt": "Which TWO actions are part of the reporting system?", "options": [{"id":"rivermark-q18-a","label":"A","text":"Compare stains with a colour card"},{"id":"rivermark-q18-b","label":"B","text":"Climb onto the roof"},{"id":"rivermark-q18-c","label":"C","text":"Record the room location"},{"id":"rivermark-q18-d","label":"D","text":"Rank buildings by report count"}], "selectionCount": 2, "additionalNumbers": [], "scoringMode": "exact-set", "correctOptionIds": ["rivermark-q18-a","rivermark-q18-c"] },
+            { "id": "rivermark-q19", "number": 19, "type": "multiple-choice", "prompt": "Which TWO statements describe how data are handled?", "options": [{"id":"rivermark-q19-a","label":"A","text":"Photographs are stored on a local encrypted drive"},{"id":"rivermark-q19-b","label":"B","text":"All forms are published online"},{"id":"rivermark-q19-c","label":"C","text":"A printed reference sheet is available"},{"id":"rivermark-q19-d","label":"D","text":"Old photographs are deleted immediately"}], "selectionCount": 2, "additionalNumbers": [], "scoringMode": "exact-set", "correctOptionIds": ["rivermark-q19-a","rivermark-q19-c"] }
+          ]
+        },
+        {
+          "id": "rivermark-p2-g3",
+          "title": "Questions 20–23 / Matching Features",
+          "instructions": "Match each contribution with the correct person. Options may be used more than once.",
+          "questions": [
+            { "id": "rivermark-q20", "number": 20, "type": "matching", "prompt": "Designed the stain colour reference", "matchingKind": "features", "allowOptionReuse": true, "options": [{"id":"rivermark-q20-a","label":"A","text":"Mina Patel"},{"id":"rivermark-q20-b","label":"B","text":"Tomas Reed"},{"id":"rivermark-q20-c","label":"C","text":"Jun Wei"}], "correctOptionId": "rivermark-q20-a" },
+            { "id": "rivermark-q21", "number": 21, "type": "matching", "prompt": "Made the date and location form", "matchingKind": "features", "allowOptionReuse": true, "options": [{"id":"rivermark-q21-a","label":"A","text":"Mina Patel"},{"id":"rivermark-q21-b","label":"B","text":"Tomas Reed"},{"id":"rivermark-q21-c","label":"C","text":"Jun Wei"}], "correctOptionId": "rivermark-q21-b" },
+            { "id": "rivermark-q22", "number": 22, "type": "matching", "prompt": "Added guidance for photograph positions", "matchingKind": "features", "allowOptionReuse": true, "options": [{"id":"rivermark-q22-a","label":"A","text":"Mina Patel"},{"id":"rivermark-q22-b","label":"B","text":"Tomas Reed"},{"id":"rivermark-q22-c","label":"C","text":"Jun Wei"}], "correctOptionId": "rivermark-q22-c" },
+            { "id": "rivermark-q23", "number": 23, "type": "matching", "prompt": "Asked observers to avoid relying on memory", "matchingKind": "features", "allowOptionReuse": true, "options": [{"id":"rivermark-q23-a","label":"A","text":"Mina Patel"},{"id":"rivermark-q23-b","label":"B","text":"Tomas Reed"},{"id":"rivermark-q23-c","label":"C","text":"Jun Wei"}], "correctOptionId": "rivermark-q23-a" }
+          ]
+        },
+        {
+          "id": "rivermark-p2-g4",
+          "title": "Questions 24–26 / Table Completion",
+          "instructions": "Complete the table using NO MORE THAN TWO WORDS from the passage.",
+          "contextBlocks": [
+            { "id": "rivermark-p2-table", "type": "table", "hasHeaderRow": true, "hasRowHeaders": true, "rows": [
+              {"id":"rivermark-p2-table-r1","cells":[{"id":"rivermark-p2-table-r1c1","text":"Observation"},{"id":"rivermark-p2-table-r1c2","text":"Response"}]},
+              {"id":"rivermark-p2-table-r2","cells":[{"id":"rivermark-p2-table-r2c1","text":"New stain"},{"id":"rivermark-p2-table-r2c2","text":"Check earlier","questionId":"rivermark-q24"}]},
+              {"id":"rivermark-p2-table-r3","cells":[{"id":"rivermark-p2-table-r3c1","text":"Sagging material"},{"id":"rivermark-p2-table-r3c2","text":"Arrange immediate","questionId":"rivermark-q25"}]},
+              {"id":"rivermark-p2-table-r4","cells":[{"id":"rivermark-p2-table-r4c1","text":"Unchanged small mark"},{"id":"rivermark-p2-table-r4c2","text":"Add to weekly","questionId":"rivermark-q26"}]}
+            ]}
+          ],
+          "questions": [
+            { "id": "rivermark-q24", "number": 24, "type": "short-answer", "prompt": "Earlier evidence checked for a new stain", "acceptableAnswers": ["photographs", "earlier photographs"], "maxWords": 2 },
+            { "id": "rivermark-q25", "number": 25, "type": "short-answer", "prompt": "Immediate response to sagging material", "acceptableAnswers": ["professional visit"], "maxWords": 2 },
+            { "id": "rivermark-q26", "number": 26, "type": "short-answer", "prompt": "List used for a stable small mark", "acceptableAnswers": ["watch list"], "maxWords": 2 }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "rivermark-passage-03",
+      "title": "Experiments with a Moving Garden",
+      "contentBlocks": [
+        { "id": "rivermark-p3-heading", "kind": "heading", "text": "Experiments with a Moving Garden" },
+        { "id": "rivermark-p3-a", "kind": "paragraph", "text": "A. Rivermark's moving garden consists of wheeled planters that can be rearranged for events. The idea emerged when a permanent bed blocked emergency access during a festival. The new containers keep the route clear while bringing seasonal plants into a paved square." },
+        { "id": "rivermark-p3-b", "kind": "paragraph", "text": "B. The first wheels were too small and caught between paving stones. Engineers replaced them with wider recycled-rubber tyres and added foot-operated brakes. Volunteers can now move an empty planter alone, while planted containers are always handled by two people." },
+        { "id": "rivermark-p3-c", "kind": "paragraph", "text": "C. Water is stored in a lower compartment and drawn upward by fabric strips. During a dry-week trial, this system used less water than daily surface watering. The organisers caution that the comparison covered only twelve containers and one type of compost." },
+        { "id": "rivermark-p3-d", "kind": "paragraph", "text": "D. Shop owners initially feared that frequent movement would leave dirty tracks. A removable tray beneath each container now catches loose material. Surveys found that most owners accepted the revised design, although two requested that planters remain away from display windows." },
+        { "id": "rivermark-p3-e", "kind": "paragraph", "text": "E. A small brass marker was fixed beside the entrance to the storage yard. The same sentence appears in another Rivermark passage, but the marker identifies a completely different place. Garden volunteers scan its code to record when each planter leaves and returns." },
+        { "id": "rivermark-p3-f", "kind": "paragraph", "text": "F. Researchers will next compare shade-tolerant herbs with flowering plants in the mobile system. They also plan to measure wheel wear after winter use. No decision has been made about expanding the scheme to other towns." }
+      ],
+      "questionGroups": [
+        {
+          "id": "rivermark-p3-g1",
+          "title": "Questions 27–29 / Matching Information",
+          "instructions": "Which paragraph contains the following information? Choose A–F. A paragraph may be used more than once.",
+          "questions": [
+            { "id": "rivermark-q27", "number": 27, "type": "matching", "prompt": "A limitation of a water-use comparison", "matchingKind": "information", "allowOptionReuse": true, "options": [{"id":"rivermark-q27-a","label":"A","text":"Paragraph A"},{"id":"rivermark-q27-b","label":"B","text":"Paragraph B"},{"id":"rivermark-q27-c","label":"C","text":"Paragraph C"},{"id":"rivermark-q27-d","label":"D","text":"Paragraph D"},{"id":"rivermark-q27-e","label":"E","text":"Paragraph E"},{"id":"rivermark-q27-f","label":"F","text":"Paragraph F"}], "correctOptionId": "rivermark-q27-c" },
+            { "id": "rivermark-q28", "number": 28, "type": "matching", "prompt": "A design change responding to local businesses", "matchingKind": "information", "allowOptionReuse": true, "options": [{"id":"rivermark-q28-a","label":"A","text":"Paragraph A"},{"id":"rivermark-q28-b","label":"B","text":"Paragraph B"},{"id":"rivermark-q28-c","label":"C","text":"Paragraph C"},{"id":"rivermark-q28-d","label":"D","text":"Paragraph D"},{"id":"rivermark-q28-e","label":"E","text":"Paragraph E"},{"id":"rivermark-q28-f","label":"F","text":"Paragraph F"}], "correctOptionId": "rivermark-q28-d" },
+            { "id": "rivermark-q29", "number": 29, "type": "matching", "prompt": "Future research that has not yet begun", "matchingKind": "information", "allowOptionReuse": true, "options": [{"id":"rivermark-q29-a","label":"A","text":"Paragraph A"},{"id":"rivermark-q29-b","label":"B","text":"Paragraph B"},{"id":"rivermark-q29-c","label":"C","text":"Paragraph C"},{"id":"rivermark-q29-d","label":"D","text":"Paragraph D"},{"id":"rivermark-q29-e","label":"E","text":"Paragraph E"},{"id":"rivermark-q29-f","label":"F","text":"Paragraph F"}], "correctOptionId": "rivermark-q29-f" }
+          ]
+        },
+        {
+          "id": "rivermark-p3-g2",
+          "title": "Questions 30–31 / Matching Sentence Endings",
+          "instructions": "Complete each sentence with the correct ending, A–D. Each ending may be used once.",
+          "questions": [
+            { "id": "rivermark-q30", "number": 30, "type": "matching", "prompt": "The original permanent bed was replaced because it", "matchingKind": "sentence-endings", "allowOptionReuse": false, "options": [{"id":"rivermark-q30-a","label":"A","text":"made emergency access difficult."},{"id":"rivermark-q30-b","label":"B","text":"required a different compost."},{"id":"rivermark-q30-c","label":"C","text":"damaged shop windows."},{"id":"rivermark-q30-d","label":"D","text":"used too little water."}], "correctOptionId": "rivermark-q30-a" },
+            { "id": "rivermark-q31", "number": 31, "type": "matching", "prompt": "Wider tyres were introduced because the first wheels", "matchingKind": "sentence-endings", "allowOptionReuse": false, "options": [{"id":"rivermark-q31-a","label":"A","text":"made emergency access difficult."},{"id":"rivermark-q31-b","label":"B","text":"became trapped in the paving."},{"id":"rivermark-q31-c","label":"C","text":"damaged shop windows."},{"id":"rivermark-q31-d","label":"D","text":"used too little water."}], "correctOptionId": "rivermark-q31-b" }
+          ]
+        },
+        {
+          "id": "rivermark-p3-g3",
+          "title": "Questions 32–35 / Single Choice",
+          "instructions": "Choose the correct answer, A, B, or C.",
+          "questions": [
+            { "id": "rivermark-q32", "number": 32, "type": "single-choice", "prompt": "What are the wider tyres made from?", "options": [{"id":"rivermark-q32-a","label":"A","text":"Recycled rubber"},{"id":"rivermark-q32-b","label":"B","text":"Painted steel"},{"id":"rivermark-q32-c","label":"C","text":"Compressed wood"}], "correctOptionId": "rivermark-q32-a" },
+            { "id": "rivermark-q33", "number": 33, "type": "single-choice", "prompt": "How many people move a planted container?", "options": [{"id":"rivermark-q33-a","label":"A","text":"One"},{"id":"rivermark-q33-b","label":"B","text":"Two"},{"id":"rivermark-q33-c","label":"C","text":"Three"}], "correctOptionId": "rivermark-q33-b" },
+            { "id": "rivermark-q34", "number": 34, "type": "single-choice", "prompt": "What lifts water from the lower compartment?", "options": [{"id":"rivermark-q34-a","label":"A","text":"A powered pump"},{"id":"rivermark-q34-b","label":"B","text":"Fabric strips"},{"id":"rivermark-q34-c","label":"C","text":"Rubber tubes"}], "correctOptionId": "rivermark-q34-b" },
+            { "id": "rivermark-q35", "number": 35, "type": "single-choice", "prompt": "What does the storage-yard marker help volunteers record?", "options": [{"id":"rivermark-q35-a","label":"A","text":"Container movements"},{"id":"rivermark-q35-b","label":"B","text":"Daily rainfall"},{"id":"rivermark-q35-c","label":"C","text":"Visitor names"}], "correctOptionId": "rivermark-q35-a" }
+          ]
+        },
+        {
+          "id": "rivermark-p3-g4",
+          "title": "Questions 36–40 / Notes Completion",
+          "instructions": "Complete the notes using NO MORE THAN TWO WORDS from the passage.",
+          "contextBlocks": [
+            { "id": "rivermark-p3-notes", "type": "completion", "style": "notes", "title": "Moving garden design notes", "parts": [
+              {"id":"rivermark-p3-notes-t1","kind":"text","text":"Purpose: keep the emergency route "},
+              {"id":"rivermark-p3-notes-a36","kind":"answer","questionId":"rivermark-q36"},
+              {"id":"rivermark-p3-notes-t2","kind":"text","text":". Wheel safety: use foot-operated "},
+              {"id":"rivermark-p3-notes-a37","kind":"answer","questionId":"rivermark-q37"},
+              {"id":"rivermark-p3-notes-t3","kind":"text","text":". Water trial length: one "},
+              {"id":"rivermark-p3-notes-a38","kind":"answer","questionId":"rivermark-q38"},
+              {"id":"rivermark-p3-notes-t4","kind":"text","text":". Cleanliness: fit a removable "},
+              {"id":"rivermark-p3-notes-a39","kind":"answer","questionId":"rivermark-q39"},
+              {"id":"rivermark-p3-notes-t5","kind":"text","text":". Winter study: measure wheel "},
+              {"id":"rivermark-p3-notes-a40","kind":"answer","questionId":"rivermark-q40"},
+              {"id":"rivermark-p3-notes-t6","kind":"text","text":"."}
+            ]}
+          ],
+          "questions": [
+            { "id": "rivermark-q36", "number": 36, "type": "short-answer", "prompt": "Condition of the emergency route", "acceptableAnswers": ["clear"], "maxWords": 1 },
+            { "id": "rivermark-q37", "number": 37, "type": "fill-blank", "prompt": "Wheel safety uses {{blank}}.", "sentence": "Wheel safety uses {{blank}}.", "acceptableAnswers": ["brakes"], "maxWords": 1 },
+            { "id": "rivermark-q38", "number": 38, "type": "short-answer", "prompt": "Length of the water trial", "acceptableAnswers": ["dry week", "week"], "maxWords": 2 },
+            { "id": "rivermark-q39", "number": 39, "type": "short-answer", "prompt": "Part that catches loose material", "acceptableAnswers": ["tray", "removable tray"], "maxWords": 2 },
+            { "id": "rivermark-q40", "number": 40, "type": "short-answer", "prompt": "Item whose wear will be measured", "acceptableAnswers": ["wear", "wheel wear"], "maxWords": 2 }
+          ]
+        }
+      ]
+    }
+  ]
+}

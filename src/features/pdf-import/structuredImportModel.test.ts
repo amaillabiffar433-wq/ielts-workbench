@@ -286,7 +286,7 @@ describe("structured PDF persistence and pack conversion", () => {
       for (const group of passage.questionGroups as Array<Record<string, unknown>>) delete group.contextBlocks;
     }
     const migrated = StructuredImportDraftSchema.parse(current);
-    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.schemaVersion).toBe(3);
     expect(migrated.passages[0].id).toBe(validDraft().passages[0].id);
     expect(migrated.passages.every((passage) => passage.questionGroups.every((group) => group.contextBlocks.length === 0))).toBe(true);
   });

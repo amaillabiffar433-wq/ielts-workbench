@@ -1,0 +1,19 @@
+{
+  "title": "Rivermark Reading Practice",
+  "passages": 3,
+  "questionNumbers": { "start": 1, "end": 40, "count": 40 },
+  "questionTypes": [
+    "matching-headings",
+    "true-false-not-given",
+    "summary-completion",
+    "yes-no-not-given",
+    "multiple-choice",
+    "matching-features",
+    "table-completion",
+    "matching-information",
+    "matching-sentence-endings",
+    "single-choice",
+    "notes-completion"
+  ],
+  "copyright": "Original IELTS Workbench engineering sample; no third-party test content"
+}

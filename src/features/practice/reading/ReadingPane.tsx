@@ -81,9 +81,23 @@ function QuestionGroups({
         const completeGroupEntries = entries.filter((entry) => entry.group.id === selectedGroup.group.id);
         const renderQuestion = (entry: ReadingQuestionEntry, inline = false) => {
           const value = session ? answers[answerKey(session.sessionId, entry.question.id)]?.value : "";
+          const disabledOptionIds = new Set<string>();
+          if (session && entry.question.type === "matching" && !entry.question.allowOptionReuse) {
+            const selectedLabels = new Set(completeGroupEntries.flatMap((peer) => {
+              if (peer.question.id === entry.question.id || peer.question.type !== "matching") return [];
+              const peerValue = answers[answerKey(session.sessionId, peer.question.id)]?.value;
+              const selectedId = Array.isArray(peerValue) ? peerValue[0] : peerValue;
+              const label = peer.question.options.find((option) => option.id === selectedId)?.label;
+              return label ? [label.toLocaleUpperCase()] : [];
+            }));
+            entry.question.options.forEach((option) => {
+              if (selectedLabels.has(option.label.toLocaleUpperCase())) disabledOptionIds.add(option.id);
+            });
+          }
           return (
             <QuestionRenderer
-              answer={typeof value === "string" ? value : value?.join(", ")}
+              answer={value}
+              disabledOptionIds={disabledOptionIds}
               displayNumber={entry.displayNumber}
               inline={inline}
               instanceId={paneInstanceId(side)}

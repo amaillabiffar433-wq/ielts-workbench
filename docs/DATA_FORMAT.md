@@ -193,7 +193,26 @@ type Question =
     })
   | (QuestionBase & {
       type: "true-false-not-given";
-      correctAnswer: "true" | "false" | "not-given";
+      correctAnswer?: "true" | "false" | "not-given";
+    })
+  | (QuestionBase & {
+      type: "yes-no-not-given";
+      correctAnswer?: "yes" | "no" | "not-given";
+    })
+  | (QuestionBase & {
+      type: "multiple-choice";
+      options: Array<{ id: string; label: string; text: string }>;
+      selectionCount: number;
+      additionalNumbers: number[];
+      scoringMode: "exact-set" | "per-correct-option";
+      correctOptionIds: string[];
+    })
+  | (QuestionBase & {
+      type: "matching";
+      matchingKind: "headings" | "information" | "features" | "sentence-endings";
+      options: Array<{ id: string; label: string; text: string }>;
+      allowOptionReuse: boolean;
+      correctOptionId?: string;
     })
   | (QuestionBase & {
       type: "short-answer";
@@ -230,10 +249,20 @@ type QuestionContextBlock =
         id: string;
         cells: Array<{ id: string; text: string; questionId?: string }>;
       }>;
+    }
+  | {
+      id: string;
+      type: "completion";
+      style: "summary" | "notes";
+      title?: string;
+      parts: Array<
+        | { id: string; kind: "text"; text: string }
+        | { id: string; kind: "answer"; questionId: string }
+      >;
     };
 ```
 
-表格必须保持矩形；`questionId` 只能指向当前题组中的 `short-answer` 或 `fill-blank`，且同一道题在该题组上下文中最多绑定一个主要作答位置。表格绑定只是现有答案控件的显示位置，答案、提交和评分仍使用原 Session + `questionId`，不会创建表格专用答案。
+表格必须保持矩形；表格和 summary/notes completion 中的 `questionId` 只能指向当前题组中的 `short-answer` 或 `fill-blank`，且同一道题在该题组全部上下文中最多绑定一个主要作答位置。上下文绑定只是现有答案控件的显示位置，答案、提交和评分仍使用原 Session + `questionId`，不会创建上下文专用答案。
 
 持久化边界为每题组最多 32 个上下文块、每个列表最多 50 项、表格最多 30 行 × 12 列、每个文本节点最多 4,000 个 Unicode 字符、每题组最多 512 个上下文持久节点。段落 ID、列表项 ID、表格行 ID 和单元格 ID 都参与全题包稳定 ID 唯一性校验；标记锚定段落、列表项或单元格 ID，不锚定数组下标或行列坐标。
 
@@ -243,11 +272,11 @@ type QuestionContextBlock =
 
 ### 3.5 Module
 
-所有模块都包含稳定 `id`、与唯一 Test 一致的 `testId`、`type` 和非空 `title`。Listening 与 Writing 当前只接受模块 `schemaVersion: 1`；Reading 接受 1 或 2。Reading v1 不允许出现 `contextBlocks`，Reading v2 才声明并校验上述结构化上下文。
+所有模块都包含稳定 `id`、与唯一 Test 一致的 `testId`、`type` 和非空 `title`。Listening 与 Writing 当前只接受模块 `schemaVersion: 1`；Reading 接受 1、2 或 3。Reading v1 不允许出现 `contextBlocks`；Reading v2 支持段落、列表和规则表格；Reading v3 在此基础上增加 completion 上下文以及 YNNG、多选和统一 matching 题型契约。
 
 ```ts
 type ReadingModule = {
-  schemaVersion: 1 | 2;
+  schemaVersion: 1 | 2 | 3;
   id: string;
   testId: string;
   type: "reading";
@@ -314,7 +343,7 @@ type IELTSPack = {
 
 该对象通过 Zod 严格校验后深度冻结。未知字段、错误 discriminant、悬空引用、重复 ID 或未声明模块都必须拒绝。
 
-兼容规则是“新应用读取旧数据”：新版继续读取没有 `contextBlocks` 的 Reading v1 包；结构化导入草稿 v1 在读取时确定性升级为草稿 v2，并给每个旧题组补空 `contextBlocks`，既有 Passage、题组、题目和来源 ID 不变。含真实结构化上下文的新题包保留 manifest v1 的固定文件布局，但 `reading.json` 明确写入模块 `schemaVersion: 2`；旧版应用不保证能读取这种新模块。已安装题包仍视为只读，不做原地结构改写。
+兼容规则是“新应用读取旧数据”：新版继续读取 Reading v1/v2；结构化导入旧草稿只做确定性字段补齐，不重建 Passage、题组、题目、选项、上下文或来源 ID。只含段落/列表/表格的题包可继续使用 Reading v2；使用 completion、YNNG、多选或统一 matching 时必须写 Reading v3。manifest 仍保持 IELTSPack v1 固定文件布局；旧版应用不保证读取较新的 Reading 模块版本。已安装题包仍视为只读，不做原地结构改写。
 
 ## 4. 校验与安装
 
@@ -343,6 +372,7 @@ type SessionSnapshot = {
   startedAt?: string;
   updatedAt?: string;
   submittedAt?: string;
+  elapsedSeconds: number;
   answers: AnswerRecord[];
   annotations: AnnotationRecord[];
 };
@@ -356,7 +386,7 @@ type AnswerRecord = {
 };
 ```
 
-答案唯一键为 `(session_id, question_id)`。两个 Pane 读取相同的 `sessionId + questionId` 记录，不创建 left/right 副本。进行中的 Session 可恢复；提交会持久化状态和时间后才进入 Review。
+答案唯一键为 `(session_id, question_id)`。两个 Pane 读取相同的 `sessionId + questionId` 记录，不创建 left/right 副本。进行中的 Session 可恢复；提交会持久化状态和时间后才进入 Review。`elapsedSeconds` 只能单调增加；Study 只累计实际打开练习页的时间，Exam 以持久化 `startedAt` 为基准且重启不重置。题目标记待检查状态按 Session 写入现有受限 settings，不改变题包或答案身份。
 
 ### 5.1 TextAnchor 与 Annotation
 
@@ -453,11 +483,18 @@ PDF 辅助导入只生成现有 `IELTSPack`，不建立平行数据库。为保�
 - `detectedType`：识别出的题型或 `unsupported`；
 - `needsReview`：题型、选项或答案仍需人工确认。
 
-导入题目的标准答案可以暂缺：`single-choice.correctOptionId` 与 `true-false-not-given.correctAnswer` 为可选，简答/填空的 `acceptableAnswers` 可以为空。缺答案表示“未评分/待核对”，不是错误答案；Review 不得据此把用户作答标红。导入后题包仍然只读，实际答案记录和标记仍由 Session/SQLite 所有。
+导入题目的标准答案可以暂缺：单选/匹配的 `correctOptionId`、判断题的 `correctAnswer` 和多选的 `correctOptionIds` 可缺省为空，简答/填空的 `acceptableAnswers` 也可以为空。缺答案表示“未评分/待核对”，不是错误答案，也不进入可评分题数或分值；Review 不得据此把用户作答标红。多选只有在 `selectionCount`、关联题号、`points` 与显式 `scoringMode` 形成无歧义契约时才能安装为可评分配置。导入后题包仍然只读，实际答案记录和标记仍由 Session/SQLite 所有。
 
 生成题包在 Tauri 中先写入工作区 `imports/.install-generated-*` 的应用自有暂存目录，只包含 `manifest.json` 和一个 Reading 模块，再复用现有校验与安装事务。重复 pack ID 或去重键不覆盖既有题包。
 
-## 9. 演进规则
+## 9. 工作区备份与恢复
+
+- 导出目录由用户选择，且必须位于当前工作区之外；应用在其中新建唯一的 `ielts-workbench-backup-*` 文件夹，不覆盖已有文件。
+- `database.sqlite3` 通过 SQLite online backup API 从活动连接生成一致性快照，而不是裸复制 WAL 数据库；`packs/`、`imports/` 和 `themes/` 随后按工作区边界复制。源码、`node_modules`、`target`、日志和工具链不进入备份。
+- 最后写入 `backup-manifest.json`，记录备份 schema、来源 workspaceId、创建时间以及每个文件的相对路径、字节数和 SHA-256。恢复前必须逐项校验版本、路径、类型、大小和哈希，并拒绝 symlink/reparse point、绝对路径、`..`、重复路径、缺失或篡改文件。
+- 恢复只允许在用户选择的非盘符根父目录中新建唯一工作区；新工作区获得新的 workspaceId，当前工作区不被覆盖。恢复失败时清理由应用刚创建的半成品目录，原工作区与 bootstrap 保持不变。
+
+## 10. 演进规则
 
 - 会改变既有字段含义、必填性或读取行为的题包格式变化必须提升 `schemaVersion`。只增加可选、可忽略的来源元数据时可保持 v1，但必须保留旧数据回归测试并同步 Rust/TypeScript 校验器。
 - 数据库结构变化必须新增迁移，不能修改已发布迁移。

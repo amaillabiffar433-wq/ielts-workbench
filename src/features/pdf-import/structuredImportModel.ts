@@ -20,8 +20,8 @@ import {
   type ExtractedPdfPage,
 } from "./pdfImportModel";
 
-export const STRUCTURED_IMPORT_DRAFT_VERSION = 2 as const;
-export const STRUCTURED_IMPORT_PARSER_VERSION = `${PDF_IMPORT_PARSER_VERSION}-structured-2`;
+export const STRUCTURED_IMPORT_DRAFT_VERSION = 3 as const;
+export const STRUCTURED_IMPORT_PARSER_VERSION = `${PDF_IMPORT_PARSER_VERSION}-structured-3`;
 export const STRUCTURED_IMPORT_DRAFT_INDEX_SETTING = "pdfImport.structuredDraftIndex.v1";
 export const MAX_STRUCTURED_IMPORT_DRAFT_SETTING_BYTES = 240 * 1024;
 
@@ -30,13 +30,19 @@ export type StructuredImportStage = "structure" | "answers" | "preview";
 
 const SupportedQuestionTypeSchema = z.enum([
   "single-choice",
+  "multiple-choice",
   "true-false-not-given",
+  "yes-no-not-given",
+  "matching",
   "short-answer",
   "fill-blank",
 ]);
 const DetectedQuestionTypeSchema = z.enum([
   "single-choice",
+  "multiple-choice",
   "true-false-not-given",
+  "yes-no-not-given",
+  "matching",
   "short-answer",
   "fill-blank",
   "matching-headings",
@@ -80,6 +86,11 @@ const DraftQuestionSchema = z.object({
   sourcePages: z.array(z.number().int().positive()),
   sourceBlock: z.string().min(1),
   needsReview: z.boolean(),
+  selectionCount: z.number().int().min(2).max(8).default(2),
+  additionalNumbers: z.array(z.number().int().positive()).max(7).default([]),
+  scoringMode: z.enum(["exact-set", "per-correct-option"]).default("exact-set"),
+  matchingKind: z.enum(["headings", "information", "features", "sentence-endings"]).default("headings"),
+  allowOptionReuse: z.boolean().default(true),
 }).strict();
 
 const DraftContextParagraphSchema = z.object({
@@ -124,10 +135,22 @@ const DraftContextTableSchema = z.object({
   });
 });
 
+const DraftContextCompletionSchema = z.object({
+  id: StableIdSchema,
+  type: z.literal("completion"),
+  style: z.enum(["summary", "notes"]),
+  title: z.string().max(200),
+  parts: z.array(z.discriminatedUnion("kind", [
+    z.object({ id: StableIdSchema, kind: z.literal("text"), text: z.string().max(MAX_QUESTION_CONTEXT_TEXT_LENGTH) }).strict(),
+    z.object({ id: StableIdSchema, kind: z.literal("answer"), questionId: StableIdSchema }).strict(),
+  ])).min(2).max(100),
+}).strict();
+
 const DraftContextBlockSchema = z.discriminatedUnion("type", [
   DraftContextParagraphSchema,
   DraftContextListSchema,
   DraftContextTableSchema,
+  DraftContextCompletionSchema,
 ]);
 
 const DraftGroupSchema = z.object({
@@ -189,7 +212,7 @@ const StructuredImportDraftV2Schema = z.object({
 function migrateLegacyStructuredDraft(input: unknown): unknown {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
   const record = input as Record<string, unknown>;
-  if (record.schemaVersion !== 1 || !Array.isArray(record.passages)) return input;
+  if ((record.schemaVersion !== 1 && record.schemaVersion !== 2) || !Array.isArray(record.passages)) return input;
   return {
     ...record,
     schemaVersion: STRUCTURED_IMPORT_DRAFT_VERSION,
@@ -201,7 +224,24 @@ function migrateLegacyStructuredDraft(input: unknown): unknown {
         ...passageRecord,
         questionGroups: passageRecord.questionGroups.map((group) => (
           typeof group === "object" && group !== null && !Array.isArray(group)
-            ? { ...(group as Record<string, unknown>), contextBlocks: [] }
+            ? {
+                ...(group as Record<string, unknown>),
+                ...((group as Record<string, unknown>).contextBlocks === undefined ? { contextBlocks: [] } : {}),
+                questions: Array.isArray((group as Record<string, unknown>).questions)
+                  ? ((group as Record<string, unknown>).questions as unknown[]).map((question) => (
+                      typeof question === "object" && question !== null && !Array.isArray(question)
+                        ? {
+                            selectionCount: 2,
+                            additionalNumbers: [],
+                            scoringMode: "exact-set",
+                            matchingKind: "headings",
+                            allowOptionReuse: true,
+                            ...(question as Record<string, unknown>),
+                          }
+                        : question
+                    ))
+                  : (group as Record<string, unknown>).questions,
+              }
             : group
         )),
       };
@@ -312,6 +352,11 @@ export function createStructuredQuestion(
     sourcePages: uniqueNumbers(partial.sourcePages ?? []),
     sourceBlock: partial.sourceBlock ?? `manual:${id}`,
     needsReview: partial.needsReview ?? true,
+    selectionCount: partial.selectionCount ?? 2,
+    additionalNumbers: partial.additionalNumbers ? [...partial.additionalNumbers] : [],
+    scoringMode: partial.scoringMode ?? "exact-set",
+    matchingKind: partial.matchingKind ?? "headings",
+    allowOptionReuse: partial.allowOptionReuse ?? true,
   };
 }
 
@@ -372,6 +417,22 @@ export function createStructuredContextTable(
   };
 }
 
+export function createStructuredContextCompletion(
+  style: "summary" | "notes" = "summary",
+  idFactory: StableIdFactory = defaultIdFactory,
+): Extract<StructuredContextBlockDraft, { type: "completion" }> {
+  return {
+    id: idFactory("question-context"),
+    type: "completion",
+    style,
+    title: style === "summary" ? "Summary" : "Notes",
+    parts: [
+      { id: idFactory("question-context-completion-text"), kind: "text", text: "" },
+      { id: idFactory("question-context-completion-text"), kind: "text", text: "" },
+    ],
+  };
+}
+
 export function resizeStructuredContextTable(
   table: StructuredContextTableDraft,
   rowCount: number,
@@ -396,9 +457,11 @@ export function resizeStructuredContextTable(
 }
 
 export function boundStructuredQuestionIds(group: StructuredGroupDraft): Set<string> {
-  return new Set(group.contextBlocks.flatMap((block) => block.type === "table"
-    ? block.rows.flatMap((row) => row.cells.flatMap((cell) => cell.questionId ? [cell.questionId] : []))
-    : []));
+  return new Set(group.contextBlocks.flatMap((block) => {
+    if (block.type === "table") return block.rows.flatMap((row) => row.cells.flatMap((cell) => cell.questionId ? [cell.questionId] : []));
+    if (block.type === "completion") return block.parts.flatMap((part) => part.kind === "answer" ? [part.questionId] : []);
+    return [];
+  }));
 }
 
 export function createStructuredPassage(
@@ -469,6 +532,9 @@ export function touchStructuredDraft(
 function suggestedQuestionType(text: string): StructuredGroupDraft["questionType"] {
   const normalized = text.toLocaleUpperCase();
   if (normalized.includes("TRUE FALSE") || normalized.includes("NOT GIVEN")) return "true-false-not-given";
+  if (normalized.includes("YES NO") && normalized.includes("NOT GIVEN")) return "yes-no-not-given";
+  if (normalized.includes("MATCH") && (normalized.includes("HEADING") || normalized.includes("INFORMATION") || normalized.includes("FEATURE") || normalized.includes("ENDING"))) return "matching";
+  if (/CHOOSE\s+(TWO|THREE|FOUR|FIVE|2|3|4|5)\b/u.test(normalized)) return "multiple-choice";
   if (normalized.includes("MULTIPLE CHOICE") || normalized.includes("CHOOSE")) return "single-choice";
   if (normalized.includes("SENTENCE COMPLETION") || normalized.includes("FILL")) return "fill-blank";
   return "short-answer";
@@ -639,6 +705,11 @@ export function moveQuestionBetweenGroups(
                 : cell),
             })),
           }
+        : block.type === "completion"
+          ? {
+              ...block,
+              parts: block.parts.filter((part) => part.kind !== "answer" || part.questionId !== questionId),
+            }
         : block),
       questions: group.questions.filter((question) => {
         if (question.id === questionId) selected = question;
@@ -874,6 +945,30 @@ export function validateStructuredImportDraft(draftInput: StructuredImportDraft)
             path: `${blockPath}.items.${itemIndex}.id`,
           }));
         }
+        if (block.type === "completion") {
+          contextNodeCount += block.parts.length;
+          if (!block.parts.some((part) => part.kind === "text") || !block.parts.some((part) => part.kind === "answer")) {
+            issues.push(issue("error", "COMPLETION_PARTS_REQUIRED", `${blockPath}.parts`, "摘要／笔记上下文必须同时包含文字和至少一个作答位置。"));
+          }
+          block.parts.forEach((part, partIndex) => {
+            const partPath = `${blockPath}.parts.${partIndex}`;
+            allIds.push({ id: part.id, path: `${partPath}.id` });
+            if (part.kind !== "answer") return;
+            const question = questionById.get(part.questionId);
+            if (!question) {
+              issues.push(issue("error", "CONTEXT_QUESTION_REFERENCE_INVALID", `${partPath}.questionId`, "摘要／笔记作答位置必须引用当前题组内存在的 questionId。"));
+              return;
+            }
+            if (question.type !== "short-answer" && question.type !== "fill-blank") {
+              issues.push(issue("error", "CONTEXT_QUESTION_TYPE_UNSUPPORTED", `${partPath}.questionId`, `Question ${question.number} 的题型不能绑定到摘要／笔记空位。`));
+            }
+            if (boundQuestionIds.has(part.questionId)) {
+              issues.push(issue("error", "CONTEXT_QUESTION_BINDING_DUPLICATE", `${partPath}.questionId`, `Question ${question.number} 已有一个主要上下文作答位置。`));
+            }
+            boundQuestionIds.add(part.questionId);
+          });
+          return;
+        }
         if (block.type !== "table") return;
         contextNodeCount += block.rows.length + block.rows.reduce((sum, row) => sum + row.cells.length, 0);
         block.rows.forEach((row, rowIndex) => {
@@ -905,23 +1000,39 @@ export function validateStructuredImportDraft(draftInput: StructuredImportDraft)
         allIds.push({ id: question.id, path: `${questionPath}.id` });
         validTargets.add(`question:${question.id}`);
         question.options.forEach((option, optionIndex) => allIds.push({ id: option.id, path: `${questionPath}.options.${optionIndex}.id` }));
-        numberOwners.set(question.number, [...(numberOwners.get(question.number) ?? []), question.id]);
+        const ownedNumbers = question.type === "multiple-choice"
+          ? [question.number, ...question.additionalNumbers]
+          : [question.number];
+        ownedNumbers.forEach((number) => numberOwners.set(number, [...(numberOwners.get(number) ?? []), question.id]));
         if (!Number.isInteger(question.number) || question.number < 1) issues.push(issue("error", "QUESTION_NUMBER_INVALID", `${questionPath}.number`, "题号必须是正整数。"));
         if (!question.prompt.trim()) issues.push(issue("error", "QUESTION_PROMPT_REQUIRED", `${questionPath}.prompt`, `Question ${question.number} 缺少题干。`));
         if (!SupportedQuestionTypeSchema.safeParse(question.type).success) {
           issues.push(issue("error", "QUESTION_TYPE_UNSUPPORTED", `${questionPath}.type`, `Question ${question.number} 必须人工改为当前支持的题型；不能把 ${question.type} 伪装为已结构化。`));
         }
         const options = question.options.length > 0 ? question.options : group.sharedOptions;
-        if (question.type === "single-choice" && options.length < 2) issues.push(issue("error", "CHOICE_OPTIONS_REQUIRED", `${questionPath}.options`, `Question ${question.number} 至少需要两个自身或共享选项。`));
-        if (question.type === "single-choice" && options.length >= 2) {
+        if (["single-choice", "multiple-choice", "matching"].includes(question.type) && options.length < 2) issues.push(issue("error", "CHOICE_OPTIONS_REQUIRED", `${questionPath}.options`, `Question ${question.number} 至少需要两个自身或共享选项。`));
+        if (["single-choice", "multiple-choice", "matching"].includes(question.type) && options.length >= 2) {
           const labels = options.map((option) => option.label.toLocaleUpperCase());
           if (new Set(labels).size !== labels.length) issues.push(issue("error", "CHOICE_LABEL_DUPLICATE", `${questionPath}.options`, `Question ${question.number} 的选项标签必须唯一。`));
-          if (question.answer.trim() && !labels.includes(question.answer.trim().toLocaleUpperCase())) {
+          const answerLabels = answerValues(question.answer).map((answer) => answer.toLocaleUpperCase());
+          if (question.answer.trim() && answerLabels.some((answer) => !labels.includes(answer))) {
             issues.push(issue("error", "CHOICE_ANSWER_INVALID", `${questionPath}.answer`, `Question ${question.number} 的答案必须匹配一个选项标签。`));
+          }
+        }
+        if (question.type === "multiple-choice") {
+          const answers = answerValues(question.answer);
+          if (question.selectionCount > options.length) issues.push(issue("error", "MULTI_SELECTION_COUNT_INVALID", `${questionPath}.selectionCount`, `Question ${question.number} 的选择数量不能超过选项数。`));
+          if (answers.length > 0 && answers.length !== question.selectionCount) issues.push(issue("error", "MULTI_ANSWER_COUNT_INVALID", `${questionPath}.answer`, `Question ${question.number} 需要恰好 ${question.selectionCount} 个无序答案。`));
+          if (new Set([question.number, ...question.additionalNumbers]).size !== 1 + question.additionalNumbers.length) issues.push(issue("error", "MULTI_NUMBER_DUPLICATE", `${questionPath}.additionalNumbers`, "多选关联题号不能重复。"));
+          if (question.additionalNumbers.length > 0 && (question.additionalNumbers.length + 1 !== question.selectionCount || question.scoringMode !== "per-correct-option")) {
+            issues.push(issue("error", "MULTI_SCORING_AMBIGUOUS", questionPath, "关联多个题号的多选必须逐正确选项计分，且题号数等于选择数。"));
           }
         }
         if (question.type === "true-false-not-given" && question.answer.trim() && !normalizeBooleanAnswer(question.answer)) {
           issues.push(issue("error", "TFNG_ANSWER_INVALID", `${questionPath}.answer`, `Question ${question.number} 的答案必须是 TRUE、FALSE 或 NOT GIVEN。`));
+        }
+        if (question.type === "yes-no-not-given" && question.answer.trim() && !normalizeYesNoAnswer(question.answer)) {
+          issues.push(issue("error", "YNNG_ANSWER_INVALID", `${questionPath}.answer`, `Question ${question.number} 的答案必须是 YES、NO 或 NOT GIVEN。`));
         }
         if (question.type === "fill-blank") {
           const blanks = (question.prompt.match(/\{\{blank\}\}|_{3,}|\.{3,}/gu) ?? []).length;
@@ -962,6 +1073,11 @@ function answerValues(answer: string): string[] {
 function normalizeBooleanAnswer(answer: string): "true" | "false" | "not-given" | undefined {
   const normalized = answer.trim().toLocaleLowerCase().replace(/[\s_]+/g, "-");
   return normalized === "true" || normalized === "false" || normalized === "not-given" ? normalized : undefined;
+}
+
+function normalizeYesNoAnswer(answer: string): "yes" | "no" | "not-given" | undefined {
+  const normalized = answer.trim().toLocaleLowerCase().replace(/[\s_]+/g, "-");
+  return normalized === "yes" || normalized === "no" || normalized === "not-given" ? normalized : undefined;
 }
 
 function optionForQuestion(questionId: string, option: StructuredOptionDraft) {
@@ -1019,9 +1135,44 @@ export async function buildStructuredReadingPack(
           const correctOptionId = options.find((option) => option.label.toLocaleUpperCase() === answerLabel)?.id;
           return { ...base, type: "single-choice" as const, options, ...(correctOptionId ? { correctOptionId } : {}) };
         }
+        if (question.type === "multiple-choice") {
+          const optionDrafts = question.options.length > 0 ? question.options : group.sharedOptions;
+          const options = optionDrafts.map((option) => optionForQuestion(question.id, option));
+          const correctOptionIds = answerValues(question.answer).map((answerLabel) => (
+            options.find((option) => option.label.toLocaleUpperCase() === answerLabel.toLocaleUpperCase())?.id
+          )).filter((optionId): optionId is string => Boolean(optionId));
+          return {
+            ...base,
+            type: "multiple-choice" as const,
+            options,
+            selectionCount: question.selectionCount,
+            additionalNumbers: question.additionalNumbers,
+            scoringMode: question.scoringMode,
+            correctOptionIds,
+            points: question.scoringMode === "per-correct-option" ? question.selectionCount : 1,
+          };
+        }
         if (question.type === "true-false-not-given") {
           const correctAnswer = normalizeBooleanAnswer(question.answer);
           return { ...base, type: "true-false-not-given" as const, ...(correctAnswer ? { correctAnswer } : {}) };
+        }
+        if (question.type === "yes-no-not-given") {
+          const correctAnswer = normalizeYesNoAnswer(question.answer);
+          return { ...base, type: "yes-no-not-given" as const, ...(correctAnswer ? { correctAnswer } : {}) };
+        }
+        if (question.type === "matching") {
+          const optionDrafts = question.options.length > 0 ? question.options : group.sharedOptions;
+          const options = optionDrafts.map((option) => optionForQuestion(question.id, option));
+          const answerLabel = question.answer.trim().toLocaleUpperCase();
+          const correctOptionId = options.find((option) => option.label.toLocaleUpperCase() === answerLabel)?.id;
+          return {
+            ...base,
+            type: "matching" as const,
+            matchingKind: question.matchingKind,
+            options,
+            allowOptionReuse: question.allowOptionReuse,
+            ...(correctOptionId ? { correctOptionId } : {}),
+          };
         }
         if (question.type === "fill-blank") {
           const sentence = question.prompt.replace(/_{3,}|\.{3,}/u, "{{blank}}");
@@ -1034,6 +1185,10 @@ export async function buildStructuredReadingPack(
   const usesStructuredQuestionContext = draft.passages.some((passage) =>
     passage.questionGroups.some((group) => group.contextBlocks.length > 0),
   );
+  const usesReadingV3 = draft.passages.some((passage) => passage.questionGroups.some((group) => (
+    group.contextBlocks.some((block) => block.type === "completion")
+    || group.questions.some((question) => ["multiple-choice", "yes-no-not-given", "matching"].includes(question.type))
+  )));
   const sourcePages = draft.source.pages.map((page) => page.pageNumber);
   const sourceRange = { start: Math.min(...sourcePages), end: Math.max(...sourcePages) };
   return parseIeltsPack({
@@ -1067,7 +1222,7 @@ export async function buildStructuredReadingPack(
       },
     },
     modules: [{
-      schemaVersion: usesStructuredQuestionContext ? 2 : 1,
+      schemaVersion: usesReadingV3 ? 3 : usesStructuredQuestionContext ? 2 : 1,
       id: draft.moduleId,
       testId: draft.testId,
       type: "reading",

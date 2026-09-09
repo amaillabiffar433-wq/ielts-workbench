@@ -186,6 +186,17 @@ pub struct SessionSnapshot {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct WorkspaceBackupSummary {
+    pub path: String,
+    pub created_at: String,
+    pub source_workspace_id: String,
+    pub file_count: u64,
+    pub total_bytes: u64,
+    pub database_sha256: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SettingRecord {
     pub key: String,
     pub value: Value,

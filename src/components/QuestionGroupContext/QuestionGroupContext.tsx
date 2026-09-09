@@ -129,6 +129,9 @@ export function QuestionGroupContext({
   const textByBlockId = useMemo(() => new Map(blocks.flatMap((block) => {
     if (block.type === "paragraph") return [[block.id, block.text] as const];
     if (block.type === "list") return block.items.map((item) => [item.id, item.text] as const);
+    if (block.type === "completion") {
+      return block.parts.flatMap((part) => part.kind === "text" ? [[part.id, part.text] as const] : []);
+    }
     return block.rows.flatMap((row) => row.cells.map((cell) => [cell.id, cell.text] as const));
   })), [blocks]);
 
@@ -213,6 +216,22 @@ export function QuestionGroupContext({
               <List className="question-context__list" key={block.id}>
                 {block.items.map((item) => <li key={item.id}>{renderText(item.id, item.text)}</li>)}
               </List>
+            );
+          }
+          if (block.type === "completion") {
+            return (
+              <section className={`question-context__completion question-context__completion--${block.style}`} key={block.id}>
+                {block.title && <h4>{block.title}</h4>}
+                <div className="question-context__completion-flow">
+                  {block.parts.map((part) => {
+                    if (part.kind === "text") return <span key={part.id}>{renderText(part.id, part.text)}</span>;
+                    const question = questionById.get(part.questionId);
+                    return question
+                      ? <span className="question-context__completion-answer" key={part.id}>{renderAnswerSlot(question, editableQuestionIds.has(question.id))}</span>
+                      : <span className="question-context__invalid-reference" key={part.id}>无效题目引用</span>;
+                  })}
+                </div>
+              </section>
             );
           }
           const headerRow = block.hasHeaderRow ? block.rows[0] : undefined;

@@ -206,7 +206,10 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
     let active = true;
     let unlisten: () => void = () => undefined;
     void listenForCloseRequested((event) => {
-      if (allowCloseRef.current || !structuredDraftRef.current) return;
+      // A close event can race with route unmount before Tauri finishes
+      // unregistering the listener. A stale PDF-import listener must never
+      // prevent a later Reading/Library window close.
+      if (!active || allowCloseRef.current || !structuredDraftRef.current) return;
       event.preventDefault();
       void flushStructuredDraft().then(async () => {
         allowCloseRef.current = true;

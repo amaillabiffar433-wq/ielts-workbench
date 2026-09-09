@@ -10,6 +10,20 @@ import { workbenchStore } from "../../stores/workbenchStore";
 import type { DocumentSourceAdapter, PdfDocumentHandle } from "./documentSource";
 import { PdfImportPage } from "./PdfImportPage";
 
+const closeRequestHarness = vi.hoisted(() => ({
+  closeCurrentWindow: vi.fn(async () => undefined),
+  listener: null as null | ((event: { preventDefault: () => void }) => void),
+  unlisten: vi.fn(),
+}));
+
+vi.mock("../../infrastructure/window/windowClose", () => ({
+  closeCurrentWindow: closeRequestHarness.closeCurrentWindow,
+  listenForCloseRequested: vi.fn(async (listener: (event: { preventDefault: () => void }) => void) => {
+    closeRequestHarness.listener = listener;
+    return closeRequestHarness.unlisten;
+  }),
+}));
+
 const originalState = workbenchStore.getState();
 
 const pageText: Record<number, string> = {
@@ -32,6 +46,9 @@ function fakeDocument(): PdfDocumentHandle {
 
 describe("PdfImportPage", () => {
   beforeEach(() => {
+    closeRequestHarness.closeCurrentWindow.mockClear();
+    closeRequestHarness.unlisten.mockClear();
+    closeRequestHarness.listener = null;
     workbenchStore.setState({
       repository: new InMemoryLearningRepository(),
       error: null,
@@ -142,6 +159,31 @@ describe("PdfImportPage", () => {
     await user.click(resume);
     expect(await screen.findByText("人工确认式结构化草稿")).toBeInTheDocument();
     expect(screen.getByText(/原 PDF 当前未连接/)).toBeInTheDocument();
+  });
+
+  it("does not let a stale close listener block another route after unmount", async () => {
+    const handle = fakeDocument();
+    const adapter: DocumentSourceAdapter = { open: vi.fn(async () => handle) };
+    const user = userEvent.setup();
+    const firstRender = render(<MemoryRouter><PdfImportPage adapter={adapter} /></MemoryRouter>);
+
+    await user.upload(
+      screen.getByLabelText("选择本地 PDF"),
+      new File(["%PDF original structured fixture"], "original-ui-sample.pdf", { type: "application/pdf" }),
+    );
+    await user.click(screen.getByRole("radio", { name: "多 Passage / 多题组（人工确认）" }));
+    await user.click(screen.getByRole("button", { name: /提取并整理/ }));
+    await screen.findByText("人工确认式结构化草稿");
+    await waitFor(() => expect(closeRequestHarness.listener).not.toBeNull());
+    const staleListener = closeRequestHarness.listener!;
+
+    firstRender.unmount();
+    expect(closeRequestHarness.unlisten).toHaveBeenCalled();
+    const preventDefault = vi.fn();
+    staleListener({ preventDefault });
+
+    expect(preventDefault).not.toHaveBeenCalled();
+    expect(closeRequestHarness.closeCurrentWindow).not.toHaveBeenCalled();
   });
 
   it("does not enable structured installation while source fragments and required structure are unresolved", async () => {

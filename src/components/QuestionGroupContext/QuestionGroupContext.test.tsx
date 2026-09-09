@@ -75,4 +75,32 @@ describe("QuestionGroupContext", () => {
     expect(within(rowHeader).getByRole("button", { name: /标记文字/u })).toHaveTextContent("Shared");
     expect(within(matchingCells[0]).queryByRole("button", { name: /标记文字/u })).not.toBeInTheDocument();
   });
+
+  it("renders summary and notes answer slots from stable questionId bindings", () => {
+    const completionBlocks: readonly QuestionContextBlock[] = [{
+      id: "completion-summary",
+      type: "completion",
+      style: "summary",
+      title: "Archive notes",
+      parts: [
+        { id: "completion-text-1", kind: "text", text: "The recorder uses a " },
+        { id: "completion-answer-1", kind: "answer", questionId: "q10" },
+        { id: "completion-text-2", kind: "text", text: "." },
+      ],
+    }];
+    render(
+      <QuestionGroupContext
+        blocks={completionBlocks}
+        editableQuestionIds={new Set(["q10"])}
+        instanceId="left-completion"
+        questions={[{ id: "q10", displayNumber: 10, prompt: "Complete the summary." }]}
+        readOnly
+        renderAnswerSlot={(question, editable) => <input aria-label={`Question ${question.displayNumber} completion`} disabled={!editable} />}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Archive notes" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Question 10 completion" })).toBeEnabled();
+    expect(boundQuestionIdsFromContext(completionBlocks)).toEqual(new Set(["q10"]));
+  });
 });

@@ -6,6 +6,8 @@ import reading from "../../../samples/original-demo-pack/modules/reading.json";
 import writing from "../../../samples/original-demo-pack/modules/writing.json";
 import multiPassageManifest from "../../../samples/original-multi-passage-pack/manifest.json";
 import multiPassageReading from "../../../samples/original-multi-passage-pack/modules/reading.json";
+import dailyReadingManifest from "../../../samples/original-daily-reading-pack/manifest.json";
+import dailyReading from "../../../samples/original-daily-reading-pack/modules/reading.json";
 import { IELTSPackSchema, QuestionSchema, parseIeltsPack } from "./schemas";
 
 const originalDemoInput = {
@@ -38,6 +40,26 @@ describe("IELTSPackSchema", () => {
     expect(readingModule.sections).toHaveLength(3);
     expect(questions).toHaveLength(21);
     expect(questions.find((question) => question.number === 18)?.id).toBe("northbridge-q18");
+  });
+
+  it("accepts the complete original Reading v3 sample with forty stable questions", () => {
+    const parsed = parseIeltsPack({ manifest: dailyReadingManifest, modules: [dailyReading] });
+    const readingModule = parsed.modules[0];
+    expect(readingModule.type).toBe("reading");
+    if (readingModule.type !== "reading") throw new Error("Reading module missing");
+    const questions = readingModule.sections.flatMap((section) =>
+      section.questionGroups.flatMap((group) => group.questions),
+    );
+    expect(readingModule.schemaVersion).toBe(3);
+    expect(readingModule.sections).toHaveLength(3);
+    expect(questions.map((question) => question.number)).toEqual(
+      Array.from({ length: 40 }, (_, index) => index + 1),
+    );
+    expect(new Set(questions.map((question) => question.id)).size).toBe(40);
+    expect(questions.find((question) => question.number === 18)?.type).toBe("multiple-choice");
+    expect(readingModule.sections.flatMap((section) => section.questionGroups)
+      .flatMap((group) => group.contextBlocks ?? [])
+      .map((block) => block.type)).toEqual(expect.arrayContaining(["table", "completion"]));
   });
 
   it("rejects unsupported schema versions", () => {
@@ -202,6 +224,42 @@ describe("QuestionSchema discriminated union", () => {
       type: "true-false-not-given",
       prompt: "Decide.",
       correctAnswer: "not-given",
+    },
+    {
+      id: "question-ynng",
+      number: 5,
+      type: "yes-no-not-given",
+      prompt: "Decide whether the writer agrees.",
+      correctAnswer: "no",
+    },
+    {
+      id: "question-multiple",
+      number: 6,
+      type: "multiple-choice",
+      prompt: "Choose two.",
+      points: 2,
+      options: [
+        { id: "question-multiple-a", label: "A", text: "First" },
+        { id: "question-multiple-b", label: "B", text: "Second" },
+        { id: "question-multiple-c", label: "C", text: "Third" },
+      ],
+      selectionCount: 2,
+      additionalNumbers: [7],
+      scoringMode: "per-correct-option",
+      correctOptionIds: ["question-multiple-a", "question-multiple-c"],
+    },
+    {
+      id: "question-matching",
+      number: 8,
+      type: "matching",
+      prompt: "Match the feature.",
+      matchingKind: "features",
+      allowOptionReuse: true,
+      options: [
+        { id: "question-matching-a", label: "A", text: "First" },
+        { id: "question-matching-b", label: "B", text: "Second" },
+      ],
+      correctOptionId: "question-matching-b",
     },
     {
       id: "question-short",
