@@ -1,11 +1,12 @@
 # IELTS Workbench 当前状态
 
-更新日期：2026-09-08
+更新日期：2026-09-09
 
 ## 当前仓库
 
 - 项目目录：`D:\Projects\雅思or算法软件项目`
 - 分支：`feat/pdf-import-mvp`
+- Reading 表格／列表上下文源码提交：`affa89d`（Reading module v2、草稿迁移、人工编辑器、共享渲染、表格内作答、标记与原创样本）
 - Reading PDF 人工结构化导入源码提交：`a6771d6`（可恢复草稿、稳定 ID、三阶段编辑器、校验/预览、原创 PDF 与回归测试）
 - Reading 稳定题组选择源码提交：`1b141d8`（按 `questionGroupId` 精确筛选、双 Pane 独立状态、安全恢复与回归测试）
 - 本轮题组选择起始 HEAD：`a19e22358c3e6ce9dcb45dadcb39d91e003a6f2f`
@@ -18,6 +19,25 @@
 - 远程状态：本轮不推送
 
 原项目仍保留在 `C:\Users\Exming\Documents\雅思or算法软件项目`，尚未删除，因此迁移核验期间没有释放 C 盘空间。
+
+## 2026-09-09 Reading 结构化表格／列表上下文 MVP
+
+- Reading 题组新增有类型的 `contextBlocks`：段落、单层有序/无序列表、规则矩形表格可按顺序混排。段落、列表项、表格行和单元格均持有稳定 ID；表格单元格只通过当前题组既有 `questionId` 绑定简答或句子填空，不另建答案或评分体系。
+- 版本规则为 manifest 仍保持 IELTSPack v1 固定布局，Reading 模块无结构化上下文时继续写 `schemaVersion: 1`，含结构化上下文时写 `schemaVersion: 2`。新版兼容 Reading v1；旧版不保证读取 v2。结构化草稿 v1 读取时确定性迁移为 v2，只补空 `contextBlocks`，不改旧 ID。
+- Structured Import 现在可直接新增/编辑/排序段落和列表，设置表格行列、表头/行标题、单元格文本和题目绑定；缩小或删除含绑定结构前必须确认。草稿把结构、ID、绑定和答案映射一起写入原 Repository settings/SQLite，正式安装仍经过既有前端与 Rust 双重校验。
+- Reading、导入预览和 Review 复用同一结构化上下文组件。表格内答案继续写 Session + `questionId`；内嵌题不在下方重复。单题 Q18 保留整张表、题组说明和列表，只有 Q18 可编辑，其他题目位置为只读占位；窄 Pane 的表格在自身容器横向滚动。
+- 表格/列表文字标记按稳定段落、列表项或单元格 ID 保存，offsets 不跨单元格；相同文字位于两个单元格时不会串标记。双 Pane 显示同一题组时，共用逻辑答案/标记，但 DOM ID 继续带 `left-pane` / `right-pane` 前缀。
+- 原创样本为 `local-data\import-samples\original-reading-table-list.pdf`（3 页、6,142 字节、SHA-256 `6347737B634FDA5E2C3D864C9F87C7C799FE9CEC39DE90FE9A335125C85A35A1`）；生成脚本与预期结构位于 `samples\original-table-list-pdf`，未覆盖旧样本，也没有 Cambridge 内容。
+
+### 本轮原生 Release 证据
+
+- 新 Release：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；12,801,536 字节；`2026-09-09 12:21:29.995 +08:00`；SHA-256 `918BB334B962CF91EF52A467EF2FBD0A7000863B2ECF41DFFEB503154F9AA9F4`。旧 EXE 已单文件备份到 `output\release-backup-20260909-121950`；本轮未生成或安装 MSI/NSIS。
+- 独立验收工作区：`D:\IELTS-Workbench-Table-List-Acceptance-20260909-122427`；workspaceId `018440a1-4a7f-4f6c-ac59-e0e925678565`；数据库为同目录 `ielts-workbench.sqlite3`。Vite 1420 未监听，Release origin 为 `http://tauri.localhost` 且 Tauri runtime 为真。
+- 原生 Windows 文件对话框选取原创 PDF 等哈希副本后，经真实向导新增段落、三项有序列表和 5×3 表格，绑定 Q17/Q18/Q19。正常退出并重开后，三个上下文块、15 个单元格 ID 和三处绑定均未变化；随后通过校验并正式安装 `pdf-reading-6347737b63-c577e79eba1d`。
+- Pane A 为 Passage 1，Pane B 为单题 Q18 时，完整表格/列表保留且仅 Q18 可编辑。双 Pane 同题组时，左侧先改成 `west records`、右侧同步，再由右侧改回 `west desk`、左侧同步；左右 Q18 DOM ID 唯一，独立滚动实测为 120/260。
+- 在单元格 `question-context-table-cell-619c918a-ada3-4406-ac89-20f09d0eea23` 对 `manual check` 建立黄色标记，另一同文单元格未显示标记。正常退出并直接重启 EXE 后，Passage/Q18 Pane 选择、Q18=`west desk` 和该标记均从 SQLite 恢复。
+- Review 实际提交 Q17=`field team`、Q18=`west desk`、Q19=`blue folder`：前两题正确，Q19 因题包未提供标准答案显示“待核对”，没有被默认判错；完整段落、列表和表格均保留。
+- 最终自动化：`npm test` 连续两次均为 30 文件、177/177；`npm run lint` 退出码 0；`npm run build` 转换 2009 modules、退出码 0；Cargo 29/29。
 
 ## 2026-09-08 Reading PDF 人工结构化导入
 
@@ -54,11 +74,11 @@
 
 | 范围 | 当前状态 | 证据或说明 |
 | --- | --- | --- |
-| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-08 `npm run lint` 退出码 0；`npm run build` 成功转换 2004 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
-| 默认 `npm test` | 最终源码连续两次通过 | 2026-09-08 两次均为 28/28 文件、163/163 测试；未改超时、重试或全局超时 |
-| Reading 多 Passage、稳定题组、双 Pane、答案与文字标记 | Release 原生验证通过 | 题目模式可按稳定 `questionGroupId` 选择完整题组；非连续题号按 ID 处理。原生验证 P2 / `northbridge-p3-group-01`、切换题组、双 Pane 同组答案同步及 SQLite 退出/重启恢复 |
-| Reading PDF 辅助导入 | 简单与结构化流程均原生通过 | 结构化 7 页 PDF 经原生对话框建立 3 Passage/6 题组/22 题草稿；SQLite 草稿恢复、阻断安装、正式安装、Reading 答案/标记与退出重启均通过 |
-| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-08 `cargo test --manifest-path src-tauri/Cargo.toml` 为 26/26；旧 Reading 缺号兼容与 Listening 缺号拒绝均有测试 |
+| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-09 `npm run lint` 退出码 0；`npm run build` 成功转换 2009 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
+| 默认 `npm test` | 最终源码连续两次通过 | 2026-09-09 两次均为 30/30 文件、177/177 测试；未改超时、重试或全局超时 |
+| Reading 多 Passage、稳定题组、双 Pane、答案与文字标记 | Release 原生验证通过 | 题组/单题保留结构化上下文；表格内答案共享，DOM/导航按 Pane 隔离；单元格标记按稳定 ID 隔离并完成 SQLite 退出/重启恢复 |
+| Reading PDF 辅助导入 | 简单、人工多 Passage 和表格/列表流程均原生通过 | 新 3 页原创 PDF 经原生对话框和向导人工整理为段落/列表/5×3 表格，草稿重启、正式安装、表格作答与 Review 均通过；不声称自动表格识别 |
+| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-09 `cargo test --manifest-path src-tauri/Cargo.toml` 为 29/29；Reading v2、交叉引用、重复绑定和 v1 拒绝新增字段均有测试 |
 | 原创 Listening/Writing 媒体 | 原生验证通过 | WAV 在真实 WebView 中播放；Exam 拖动/倍速/重播限制生效；900×560 Task 1 PNG 与 SQLite 草稿/版本均跨重启恢复 |
 | Tauri dev | 原生验证通过 | 在真实 Tauri 进程中确认 `window.__TAURI_INTERNALS__`，设置页显示 D 盘工作区和 SQLite；两轮正常退出/重启通过 |
 | Release/安装包 | 新 Reading EXE 独立运行通过 | Tauri 生产上下文 `--no-bundle` 生成新 EXE；Vite 关闭时从 `http://tauri.localhost` 启动并完成 Reading 退出/恢复；本轮未重建或安装 MSI/NSIS |
@@ -66,9 +86,9 @@
 
 ## 当前阻塞与下一步
 
-1. Reading 多 Passage、稳定题组与“PDF → 人工结构化 → 正式题包 → 原生练习”均已完成；没有剩余环境阻塞。
-2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；本轮验收数据位于 `D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`，不得删除。既有验收工作区和回退 EXE 也保持不变。
-3. 下一轮最合适的是扩充 IELTSPack/renderer 的复杂 Reading 表格与列表上下文表达；当前仍无 OCR、跨栏视觉重建、复杂自动拆分或 AI 推断。
+1. Reading 规则表格／单层列表上下文与表格内作答已经闭环，没有剩余环境或实现阻塞。
+2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；本轮验收数据位于 `D:\IELTS-Workbench-Table-List-Acceptance-20260909-122427`，不得删除。旧工作区、回退 EXE、C 盘项目和既有样本也保持不变。
+3. 当前不支持合并单元格、多层列表/嵌套表格、单元格图片/公式、任意 HTML、复杂跨栏还原、OCR、AI 推断或自动表格识别。下一轮可单独评估“多层表头/合并单元格”的最小 schema，而不是直接扩成电子表格。
 
 ## 2026-09-08 Reading 稳定题组 Release 验收摘要
 

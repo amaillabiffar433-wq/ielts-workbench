@@ -1,6 +1,6 @@
 # IELTS Workbench Windows 桌面验收记录
 
-更新日期：2026-09-08
+更新日期：2026-09-09
 
 状态定义：`未开始`、`已实现但未原生验证`、`浏览器验证通过`、`环境阻塞`、`验证失败`、`待人工验收`、`原生验证通过`。
 
@@ -13,6 +13,7 @@
 - SQLite：`D:\IELTS-Workbench-Acceptance-20260905\ielts-workbench.sqlite3`。
 - Reading 多 Passage Release 工作区：`D:\IELTS-Workbench-Reading-Acceptance-20260907`；SQLite 位于同目录，未修改上一轮工作区。
 - Reading 稳定题组 Release 工作区：`D:\IELTS-Workbench-QuestionGroup-Acceptance-20260908`；SQLite 位于同目录，既有工作区均未修改。
+- Reading 表格／列表 Release 工作区：`D:\IELTS-Workbench-Table-List-Acceptance-20260909-122427`；SQLite 位于同目录，workspaceId `018440a1-4a7f-4f6c-ac59-e0e925678565`，未修改旧验收数据库。
 - Reading PDF 结构化导入 Release 工作区：`D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`；SQLite 位于同目录，未复用或清空任何旧验收数据库。
 
 ## 验收矩阵
@@ -126,3 +127,16 @@ npm run tauri dev
 - 正常退出后进程结束；直接重启同一 EXE 后，左 Passage 3、右 `questions/single/18`、Q18=`false`、标记与 session-scoped view setting 全部恢复，随后再次正常退出。恢复的结构化草稿编辑器也单独验证关闭后进程结束且草稿保留。
 - 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；12,642,816 字节；`2026-09-08 13:04:47.712 +08:00`；SHA-256 `5D3AC42913E9F9D7BB2C8F8E68AD9CDC41AD79F1EE29D20D229308F3CF8876C3`。旧 EXE 已单文件备份；本轮 `--no-bundle`，没有生成、覆盖或安装 MSI/NSIS。
 - 最终自动化：`npm test` 连续两次均为 28 文件、163/163；`npm run lint` 和 `npm run build` 退出码 0（2004 modules）；Cargo 26/26。
+
+## 2026-09-09 Reading 表格／列表上下文 Release 证据
+
+- 新工作区：`D:\IELTS-Workbench-Table-List-Acceptance-20260909-122427`；数据库：同目录 `ielts-workbench.sqlite3`；workspaceId `018440a1-4a7f-4f6c-ac59-e0e925678565`。运行时为 `http://tauri.localhost` 的真实 Tauri Release，Vite 1420 未监听。
+- 原创 PDF：源码工作区的 `local-data\import-samples\original-reading-table-list.pdf`，3 页、6,142 字节、SHA-256 `6347737B634FDA5E2C3D864C9F87C7C799FE9CEC39DE90FE9A335125C85A35A1`。系统文件对话框实际选取其等哈希 ASCII 副本；不是 mock、浏览器文件输入或成品 JSON 注入。
+- 向导实际新增段落、三项有序列表和 5×3 矩形表格，启用首行表头和首列行标题，手动编辑 15 格，并把 Q17、Q18、Q19 绑定到三个稳定单元格。保存后正常退出，Release 重启恢复相同三个块 ID、15 个 cell ID、三处 questionId 绑定和答案映射。
+- 正式校验时有 0 个阻塞错误，仅 Q19 未提供标准答案警告；随后经现有 Repository/Rust 链路安装 pack `pdf-reading-6347737b63-c577e79eba1d`。安装副本 `modules\reading.json` 为 schema v2，manifest 仍为 v1 固定布局。
+- Pane A 为 Passage 1，Pane B 为单题 Q18：完整说明、列表、表头、行标题及全部行列仍在；仅 Q18 可编辑，Q17/Q19 是只读占位。双 Pane 同题组时 Q18 左改右同步、右改左同步；左右 Q18 DOM ID 分别带 Pane 前缀，独立滚动实际读回 120/260。
+- 黄色标记 quote=`manual check` 落在 `question-context-table-cell-619c918a-ada3-4406-ac89-20f09d0eea23`、offsets `0..12`。另一个同文单元格 `question-context-table-cell-966c30f8-c485-40ad-bcb5-8bfb4f420920` 没有标记，证明按 stable cell ID 隔离。
+- 正常退出后应用 PID 结束；再次直接启动同一 EXE，从“最近继续”恢复左 Passage、右 `questions/single/18`、Q18=`west desk`、完整结构和上述标记。SQLite `answers`、`annotations` 与 session-scoped view setting 均有读回证据。
+- Review 第二次提交显示完整段落、列表和表格；Q17/Q18 为正确，Q19 有答案但没有标准答案时显示“待核对”，汇总 2 正确、0 错误、0 未答、1 待核对，没有因表格绑定重复计数或默认判错。
+- 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；12,801,536 字节；`2026-09-09 12:21:29.995 +08:00`；SHA-256 `918BB334B962CF91EF52A467EF2FBD0A7000863B2ECF41DFFEB503154F9AA9F4`。旧 EXE 已单文件备份；本轮没有生成、覆盖或安装 MSI/NSIS。
+- 最终自动化：两次均为 30 文件、177/177；lint、2009-module Vite build、Cargo 29/29 通过。当前没有待人工验收项。

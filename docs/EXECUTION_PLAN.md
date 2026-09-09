@@ -1,6 +1,23 @@
 # IELTS Workbench 执行计划
 
-更新日期：2026-09-08（Reading PDF 人工结构化导入已完成）
+更新日期：2026-09-09（Reading 结构化表格／列表上下文 MVP 已完成）
+
+## 当前执行切片：Reading 结构化表格／列表上下文 MVP
+
+恢复基准为 `D:\Projects\雅思or算法软件项目`、分支 `feat/pdf-import-mvp`、起始 HEAD `ed983d8a95c4716b50dbe1d48b012fd83e0c6f2c`；恢复时工作树干净。现有 PDF 人工结构化导入、稳定题组选择、答案／标记、SQLite 与已验证 Release 均保留。本切片只扩展人工题组上下文和表格内作答，不做 OCR、AI、合并单元格、自动版面识别、新题型或整体 UI 重做。
+
+| 步骤 | 内容 | 状态 |
+| --- | --- | --- |
+| CT1 | 复核题包／草稿 schema、Rust 安装校验、Reading／Review、标记和 Repository 边界，确定版本规则 | 已完成：结构化上下文改变模块读取语义；采用 manifest v1 + Reading module v2，新版兼容 Reading v1，旧版不承诺读取 v2；草稿 v1 确定性迁移至 v2 |
+| CT2 | 实现有稳定 ID 的段落、单层列表、矩形表格与 questionId 单元格绑定；补齐 TS/Rust 双边限制和交叉引用校验 | 已完成：TS/Rust 同时校验尺寸、文本、全局 ID、矩形结构、组内引用、支持题型和单题唯一绑定 |
+| CT3 | 在 StructuredImportEditor 增加增删／重排／绑定／解绑与共用练习预览，草稿保存恢复不丢 ID | 已完成：无需手写 JSON；删除/缩小含绑定结构前确认，解绑不删除题目或答案；草稿 v1 自动迁移到 v2 |
+| CT4 | 在 Reading 与 Review 复用结构化上下文渲染；内嵌答案共享、筛选保留全表、Pane DOM/导航和标记稳定 | 已完成：单题保留全表且仅目标题可答；双 Pane 共用答案与标记，DOM/导航按 Pane 隔离；Review 复用同一只读组件 |
+| CT5 | 新增原创表格／列表 PDF，生成、渲染和目视核验；补齐模型、页面、Review、标记及旧数据回归测试 | 已完成：3 页原创文本层 PDF 已生成、提取并逐页渲染目视检查；覆盖规则表格、列表、Q18、同文单元格和原创答案 |
+| CT6 | 最终源码固定后连续两次 `npm test`，并运行 lint、Vite build、Cargo test | 已完成：两次均为 30 文件、177/177；lint、2009-module Vite build、Cargo 29/29 全部通过 |
+| CT7 | 单文件备份旧 EXE，no-bundle 构建；在新 D 盘工作区完成真实原生导入、草稿／题包／答案／标记／视图退出重启验收 | 已完成：旧 EXE 单文件备份；新 Release 在 Vite 关闭时独立启动，真实系统文件框、草稿重启、正式安装、表格作答、标记、Pane 和 Review 均通过 |
+| CT8 | 回写 CURRENT_STATE、WORK_LOG、DESKTOP_ACCEPTANCE、PDF_STRUCTURED_IMPORT，建立小型本地提交 | 已完成：实现与格式提交 `affa89d`；五份状态/验收文档已回写，未 push、未打 tag |
+
+发布边界：沿用当前应用版本，只生成并启动本地 Windows Release EXE；不生成或安装 MSI/NSIS，不复制整个 target，不推送、不打 tag，不删除旧 Release、旧验收工作区、题包或数据库。
 
 ## 当前执行切片：Reading PDF 人工确认式多 Passage / 多题组结构化导入
 

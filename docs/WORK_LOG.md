@@ -138,3 +138,25 @@
 - 原生向导明确忽略未处理片段后，故意清空 Question 1 题干得到 `QUESTION_PROMPT_REQUIRED`；原生 pack 列表没有半成品。恢复题干、完成 22 题人工复核和答案映射后，结构校验通过并安装 `pdf-reading-43955a0691-763086d6e4e0`。
 - Reading 实际查看 Passage 3、Questions 14–18 和单题 Q18；双 Pane 同显 Q18 时一侧写入 `false`，另一侧同步。随后在 Passage 3 新建黄色标记 `mechanical clock`。SQLite Session `e0fa9a32-c695-42a8-bcce-f16072ebd6af` 读到稳定 questionId 的答案与 `blockId + offsets 33..49 + quote/prefix/suffix` 标记。
 - 完整正常退出后 PID 和 WebView 调试监听结束；再次直接启动同一 EXE，从“最近继续”恢复左 Passage 3、右 Q18、Q18=`false`、黄色标记和 Pane 设置，随后第二次正常退出。另一次在恢复的结构化草稿编辑器内直接关闭也正常结束进程，没有删除草稿。
+
+## 2026-09-09 — Reading 结构化表格／列表上下文 MVP
+
+- 从干净的 `feat/pdf-import-mvp` / `ed983d8a95c4716b50dbe1d48b012fd83e0c6f2c` 恢复。复核前端 Zod、Rust serde/安装校验、结构化草稿、Reading/Review、答案和标记后，确定采用 manifest v1 + Reading module v2：新版继续读取 v1，含新结构才写 v2，旧版不保证读取 v2；老草稿 v1 迁移时只补空上下文数组，既有 ID 不变。
+- 新增题组级段落、单层列表和规则矩形表格。稳定 ID 覆盖上下文块、列表项、表格行和单元格；表格可绑定当前题组的简答/句子填空 `questionId`，同题最多一个主作答位。前端与 Rust 同时限制 32 块、50 列表项、30×12 表格、每文本 4,000 字符和每组 512 节点，并拒绝跨组/悬空/重复引用、重复 ID、非矩形和 v1 携带新字段。
+- StructuredImportEditor 增加段落/列表/表格编辑器、增删/重排、表头和行标题开关、单元格文本、组内题目绑定与接近练习的预览。缩小或删除含绑定结构前确认；解绑不删除题目或答案。Reading 和 Review 复用 `QuestionGroupContext`，表格内答案仍写原 Session + questionId，内嵌题不重复显示或计数。
+- 单题/题段筛选保留完整表格和列表，仅目标题输入可编辑；其他绑定显示只读题号占位。双 Pane 复用同一答案/标记，实例和题目 DOM ID 带 Pane 前缀；窄 Pane 的表格使用内部横向滚动。标记以单个上下文节点 ID + offsets 保存，不把答案输入拼入正文，也不允许跨单元格生成错误锚点。
+- 新增完全原创 3 页文本层 PDF 及生成脚本/预期结构。PDF 为 6,142 字节，SHA-256 `6347737B634FDA5E2C3D864C9F87C7C799FE9CEC39DE90FE9A335125C85A35A1`，含 5×3 表格、三处作答位、Q18、三项有序列表、两格相同 `manual check` 和原创答案。已用 Poppler 渲染三页并逐页目视检查，无裁切或第三方/Cambridge 内容。
+- 开发门槛先通过定向 60/60、`cargo check`、Cargo 29/29、首轮完整 177/177、lint 和 build。旧 minimal Rust profile 没有 rustfmt，`cargo fmt --check` 仅因此不可用；未安装额外全局组件，Rust 已由编译、测试和 diff 检查覆盖。
+
+## 2026-09-09 — 表格／列表 Release 与真实原生验收
+
+- 构建前将旧 EXE 单文件备份到 `D:\Projects\雅思or算法软件项目\output\release-backup-20260909-121950\ielts-workbench.exe`，12,642,816 字节，SHA-256 `5D3AC42913E9F9D7BB2C8F8E68AD9CDC41AD79F1EE29D20D229308F3CF8876C3`；未复制 target。`npm run tauri -- build --no-bundle` 成功生成新 EXE，未重建或安装 MSI/NSIS。
+- 新 EXE 为 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`，12,801,536 字节，时间 `2026-09-09 12:21:29.995 +08:00`，SHA-256 `918BB334B962CF91EF52A467EF2FBD0A7000863B2ECF41DFFEB503154F9AA9F4`；与旧哈希不同。Vite 1420 未监听时直接启动，origin `http://tauri.localhost`，Tauri runtime 为真。
+- 原 bootstrap 用原始字节备份到 `output\bootstrap-before-table-list-20260909-122427.json` 并核对 SHA-256 `15D8482EEA0F5A37ACBD818832ED4692319AAD387C3CD9A6CD9E04DE09CBD949`；通过真实 Rust 命令初始化 `D:\IELTS-Workbench-Table-List-Acceptance-20260909-122427`，workspaceId `018440a1-4a7f-4f6c-ac59-e0e925678565`，数据库位于同目录。
+- 原生 Windows 文件对话框选中等哈希 ASCII 路径副本 `D:\IELTS-Workbench-Releases\table-list-acceptance-20260909\original-reading-table-list.pdf`。向导先生成通用建议，再人工删除误识别项、新增段落/三项有序列表/5×3 表格、启用表头和行标题、绑定 Q17/Q18/Q19、填入 Q17/Q18 答案并保留 Q19 无标准答案警告。
+- 草稿落库后正常关窗，进程结束；直接重启 Release 并继续编辑，三个上下文块、15 个单元格 ID、三处 questionId 绑定和答案映射全部保持。将被删除问题遗留的 7 个来源引用在界面明确忽略后，校验为 0 阻塞、1 个未提供答案警告，并经原 Repository/Rust 安装链路安装 `pdf-reading-6347737b63-c577e79eba1d`；安装模块明确为 Reading schema v2。
+- Pane A 为 Passage 1、Pane B 为单题 Q18 时，说明、列表、5×3 表格全部保留，仅 Q18 有输入框，Q17/Q19 为只读占位。双 Pane 同组时 Q18 从左改为 `west records` 后右侧同步，再从右改回 `west desk` 后左侧同步；左右题目 DOM ID 分别有 `left-pane`/`right-pane` 前缀。两 Pane 独立滚动设置并读回 120/260。
+- 在单元格 `question-context-table-cell-619c918a-ada3-4406-ac89-20f09d0eea23` 标记 `manual check` 为黄色；另一相同文本单元格 `question-context-table-cell-966c30f8-c485-40ad-bcb5-8bfb4f420920` 未显示标记。正常退出、直接重启并从“最近继续”进入后，左 Passage/右单题 Q18、Q18=`west desk`、完整上下文与标记均恢复。
+- SQLite 证据：Session `084990c6-1b98-4827-b237-97afab3c80d8` 保存 Q17/Q18 和上述 annotation；第二次提交 Session `1eff08e1-b2e5-43ea-8cb8-59637ab612b1` 保存 Q17=`field team`、Q18=`west desk`、Q19=`blue folder`。Review 保留结构化上下文，前两题正确，Q19 显示“待核对”，统计为 2 正确、0 错误、0 未答、1 待核对。
+- 最终固定源码回归：两次 `npm test` 均为 30 文件、177/177；`npm run lint` 退出码 0；`npm run build` 转换 2009 modules、退出码 0；`cargo test --manifest-path src-tauri/Cargo.toml` 为 29/29。未启用重试、未扩大超时、未删除断言。
+- 实现、schema、测试与原创样本已保存为本地提交 `affa89d`；验收数据库、生成 PDF、Release、缓存和工具链未提交。未 push、未打 tag。

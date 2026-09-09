@@ -1,17 +1,25 @@
 # Reading PDF 人工结构化导入
 
-更新日期：2026-09-08
+更新日期：2026-09-09
 
 ## 能力边界
 
-该流程把用户合法持有的文本层 PDF 整理为 `IELTSPack v1` Reading 模块。它支持任意数量 Passage、每篇多个题组、显式题组成员、答案映射和可恢复草稿；不做 OCR、跨栏/表格视觉重建、AI 推断或复杂 PDF 自动拆分。简单单 Passage 入口继续保留。
+该流程把用户合法持有的文本层 PDF 人工整理为 IELTSPack Reading 模块。它支持任意数量 Passage、每篇多个题组、显式题组成员、答案映射、可恢复草稿，以及题组内按顺序混排的段落、单层列表和规则矩形表格；表格单元格可绑定当前题组已有简答/句子填空题的作答位置。它不做 OCR、自动表格识别、跨栏视觉重建、AI 推断或复杂 PDF 自动拆分。简单单 Passage 入口继续保留。
 
 ## 稳定身份与编辑
 
-- 草稿、pack、test、module、Passage、正文块、questionGroup、共享选项、question 与题目选项在创建时一次生成 ID。
+- 草稿、pack、test、module、Passage、正文块、questionGroup、共享选项、question、题目选项、上下文块、列表项、表格行与单元格在创建时一次生成 ID。
 - 改名、重排、移动不会重新生成 ID；题号是展示/答案录入字段，不作为底层身份。
 - 题组成员由稳定 questionGroupId 直接归属，允许非连续题号；最终 Reading Pane 的题组选择可直接使用相同 group ID。
 - 来源片段保留页码、文本和处置状态。每个片段必须分配到稳定目标，或由用户明确忽略，才能安装。
+- 表格内题目引用保存原 questionId；移动行列、改题号或重命名不改变绑定。每道题在同一题组上下文中最多一个主作答位，不建立表格专用答案或评分记录。
+
+## 表格／列表人工整理
+
+1. 在“来源与结构”选择当前题组，在“题组结构化上下文”中新增段落、列表或表格；来源 PDF 只提供文本核对，不自动猜测布局。
+2. 列表可选有序/无序、增删和重排单层条目。表格可设置 1–30 行、1–12 列、首行表头和首列行标题，编辑普通文本/换行，并用下拉框绑定当前题组合法题目。
+3. 缩小或删除含题目绑定的表格结构前必须确认；解除绑定仅移除显示位置，不删除题目或已有答案。未绑定题目仍按原方式显示。
+4. 导入预览、Reading 和 Review 共用同一语义化渲染组件。窄 Pane 中表格在自身容器横向滚动；PDF 文本作为普通文本渲染，不接受任意 HTML。
 
 ## 草稿、恢复与安装
 
@@ -19,10 +27,17 @@
 - 保存 source SHA-256、大小、页数、文本快照、阶段、当前编辑对象、来源选择和全部稳定 ID。恢复后不要求原文件仍在原路径；重选文件必须同时匹配 SHA-256、大小和页数。
 - 450 ms 自动保存并在 Tauri 关窗前刷新；保存失败明确提示且不会显示虚假成功。取消文件选择、返回或正常退出均保留草稿，只有“明确丢弃此草稿”会删除草稿。
 - 安装前执行结构校验和现有 IELTSPack 校验；安装按钮有单次锁。源 SHA 去重提示与 packId 冲突分开判断，同源可建立不同 packId，不覆盖既有题包。
+- 老草稿 schema v1 读取时升级为草稿 v2，只为旧题组补空 `contextBlocks`，不重建 Passage、题组、题目或来源 ID。无结构化上下文的旧题包继续按原方式显示。
+
+## 题包版本和校验
+
+- Manifest 保持 IELTSPack v1 的固定目录/文件布局。Reading 无结构化上下文时仍写模块 schema v1；包含真实上下文时写 Reading module schema v2。新版读取 v1 和 v2；旧版不保证读取 v2。
+- 前端 Zod 与 Rust 安装校验都要求矩形表格、全局稳定 ID 唯一、绑定 questionId 属于当前题组、类型为简答/句子填空、且同题不重复绑定。Reading v1 携带 `contextBlocks` 会被拒绝，避免字段被静默丢弃。
+- 每题组最多 32 个上下文块、50 个列表项、30×12 表格、每个文本节点 4,000 个 Unicode 字符、总计 512 个上下文持久节点。
 
 ## 校验语义
 
-阻塞错误包括：草稿/schema 无效、缺少 Passage 正文/题组说明/题目、重复稳定 ID、重复或无效题号、来源目标失效、仍有未分配片段、不支持题型、选择项/答案无效、填空标记不合法。警告包括：空答案（按未评分处理）、缺少来源页以及题目仍标记为待人工复核。
+阻塞错误包括：草稿/schema 无效、缺少 Passage 正文/题组说明/题目、重复稳定 ID、重复或无效题号、来源目标失效、仍有未分配片段、不支持题型、选择项/答案无效、填空标记不合法，以及非矩形/超限表格、未知节点、跨题组或悬空 questionId、同题重复绑定。警告包括：空答案（按未评分处理）、缺少来源页以及题目仍标记为待人工复核。
 
 Answer Key 以完整 Reading 模块中的唯一题号定位，再写入稳定 questionId。重复答案行、找不到题号或重复题号歧义会让整批操作失败，不做部分写入。
 
@@ -34,9 +49,17 @@ Answer Key 以完整 Reading 模块中的唯一题号定位，再写入稳定 qu
 - 结构：7 页、3 Passage、6 题组、Question 1–22；Q18 位于 Passage 3；页面 4 同时出现 Passage 2 题目与 Passage 3 开始；三篇均跨页。
 - 内容完全原创，包含共享选项、字数限制和跨 Passage 重复句，未包含 Cambridge 或第三方试题。
 
+本轮独立表格／列表样本没有覆盖上述多 Passage 样本：
+
+- 生成脚本：`samples\original-table-list-pdf\scripts\generate_original_table_list_pdf.py`
+- 预期结构：`samples\original-table-list-pdf\expected-structure.json`
+- 生成 PDF（Git 忽略）：`local-data\import-samples\original-reading-table-list.pdf`
+- 结构：3 页原创文本层；5×3 表格、表头、行标题、Q17–19（含 Q18）、三项有序列表、字数限制和两个不同单元格中的相同 `manual check`。
+- 文件：6,142 字节；SHA-256 `6347737B634FDA5E2C3D864C9F87C7C799FE9CEC39DE90FE9A335125C85A35A1`；三页均已渲染并目视检查。
+
 ## 当前证据与限制
 
-- 模型/页面自动化覆盖稳定 ID、任意 Passage、同页/跨页分配、移动/删除、答案歧义、校验、草稿恢复、来源核验、失败保留和旧简单流程。
-- 浏览器层和真实 Tauri Release 都已从生成 PDF 走完选择、提取、3 Passage/6 题组/22 题确认、答案映射、阻断预览、正式安装和打开 Reading。原生验收使用独立 D 盘工作区；草稿 payload、正式题包、Q18 答案、稳定 block 标记和 Pane 视图均写入 SQLite 并完成退出/重启读回。
-- 新 Release EXE 为 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`，SHA-256 `5D3AC42913E9F9D7BB2C8F8E68AD9CDC41AD79F1EE29D20D229308F3CF8876C3`；验收工作区为 `D:\IELTS-Workbench-PDF-Structured-Acceptance-20260908-130850`。
-- 当前 IELTSPack v1 没有独立 Reading 表格对象；必要表格/列表上下文只能保存在题组说明与共享选项。不能无损表达的版式必须人工调整或等待 schema 扩展。
+- 自动化覆盖旧题包/旧草稿、序列化/校验/恢复、稳定 ID/绑定、非法和跨组引用、表格内答案、单题筛选、双 Pane 同题、同文单元格标记、Review 和既有 Writing 关窗回归。最终两次均为 30 文件、177/177；Rust 29/29，lint/build 通过。
+- 真实 Tauri Release 从新增 PDF 走完原生系统文件选择、人工建立段落/列表/5×3 表格、Q17/Q18/Q19 绑定、草稿退出重启、正式安装、单题 Q18、双 Pane 同组、表格单元格标记、再次退出重启和 Review。验收工作区为 `D:\IELTS-Workbench-Table-List-Acceptance-20260909-122427`。
+- 新 Release EXE 为 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`，12,801,536 字节，SHA-256 `918BB334B962CF91EF52A467EF2FBD0A7000863B2ECF41DFFEB503154F9AA9F4`。
+- 当前不支持合并单元格、嵌套表格、多层列表、单元格图片/公式、任意 HTML、复杂跨栏还原、OCR、AI 推断或自动表格识别。一次文字标记只能位于一个稳定段落、列表项或单元格内；跨单元格选择会提示且不保存。
