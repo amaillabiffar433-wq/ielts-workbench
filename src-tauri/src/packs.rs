@@ -35,6 +35,12 @@ const MAX_PACK_FILES: usize = 50_000;
 const MAX_PACK_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 const MAX_PACK_PATH_CHARS: usize = 512;
 const MAX_SAFE_JSON_INTEGER: u64 = 9_007_199_254_740_991;
+const MAX_QUESTION_CONTEXT_BLOCKS: usize = 32;
+const MAX_QUESTION_CONTEXT_LIST_ITEMS: usize = 50;
+const MAX_QUESTION_CONTEXT_TABLE_ROWS: usize = 30;
+const MAX_QUESTION_CONTEXT_TABLE_COLUMNS: usize = 12;
+const MAX_QUESTION_CONTEXT_TEXT_LENGTH: usize = 4_000;
+const MAX_QUESTION_CONTEXT_NODES: usize = 512;
 
 const EMBEDDED_DEMO_FILES: &[(&str, &[u8])] = &[
     (
@@ -247,11 +253,11 @@ impl PackModuleV1 {
         }
     }
 
-    fn schema_version(&self) -> u32 {
+    fn has_supported_schema_version(&self) -> bool {
         match self {
-            Self::Reading(module) => module.schema_version,
-            Self::Listening(module) => module.schema_version,
-            Self::Writing(module) => module.schema_version,
+            Self::Reading(module) => matches!(module.schema_version, 1 | 2),
+            Self::Listening(module) => module.schema_version == 1,
+            Self::Writing(module) => module.schema_version == 1,
         }
     }
 
@@ -308,6 +314,11 @@ impl PackModuleV1 {
                     .content_blocks
                     .iter()
                     .any(|block| block.id == block_id)
+                    || section.question_groups.iter().any(|group| {
+                        group.context_blocks.as_ref().is_some_and(|blocks| {
+                            blocks.iter().any(|block| block.contains_text_block_id(block_id))
+                        })
+                    })
             }),
             Self::Listening(module) => module.sections.iter().any(|section| {
                 section
@@ -412,7 +423,93 @@ struct QuestionGroupV1 {
     id: String,
     title: Option<String>,
     instructions: String,
+    context_blocks: Option<Vec<QuestionContextBlockV2>>,
     questions: Vec<QuestionV1>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type")]
+enum QuestionContextBlockV2 {
+    #[serde(rename = "paragraph")]
+    Paragraph(QuestionContextParagraphV2),
+    #[serde(rename = "list")]
+    List(QuestionContextListV2),
+    #[serde(rename = "table")]
+    Table(QuestionContextTableV2),
+}
+
+impl QuestionContextBlockV2 {
+    fn id(&self) -> &str {
+        match self {
+            Self::Paragraph(block) => &block.id,
+            Self::List(block) => &block.id,
+            Self::Table(block) => &block.id,
+        }
+    }
+
+    fn contains_text_block_id(&self, block_id: &str) -> bool {
+        match self {
+            Self::Paragraph(block) => block.id == block_id,
+            Self::List(block) => block.items.iter().any(|item| item.id == block_id),
+            Self::Table(block) => block
+                .rows
+                .iter()
+                .any(|row| row.cells.iter().any(|cell| cell.id == block_id)),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct QuestionContextParagraphV2 {
+    id: String,
+    text: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct QuestionContextListV2 {
+    id: String,
+    style: QuestionContextListStyleV2,
+    items: Vec<QuestionContextListItemV2>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum QuestionContextListStyleV2 {
+    Ordered,
+    Unordered,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct QuestionContextListItemV2 {
+    id: String,
+    text: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct QuestionContextTableV2 {
+    id: String,
+    has_header_row: bool,
+    has_row_headers: bool,
+    rows: Vec<QuestionContextTableRowV2>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct QuestionContextTableRowV2 {
+    id: String,
+    cells: Vec<QuestionContextTableCellV2>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct QuestionContextTableCellV2 {
+    id: String,
+    text: String,
+    question_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -436,6 +533,10 @@ impl QuestionV1 {
             Self::ShortAnswer(question) => &question.id,
             Self::FillBlank(question) => &question.id,
         }
+    }
+
+    fn supports_table_binding(&self) -> bool {
+        matches!(self, Self::ShortAnswer(_) | Self::FillBlank(_))
     }
 }
 
@@ -1121,7 +1222,7 @@ fn load_installed_target_module(
         ));
     }
     if module.kind() != module_kind
-        || module.schema_version() != 1
+        || !module.has_supported_schema_version()
         || module.test_id() != test.id.as_str()
         || !test.module_ids.iter().any(|module_id| module_id == module.id())
     {
@@ -1745,10 +1846,10 @@ fn validate_module_schema(
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
-    if module.schema_version() != 1 {
+    if !module.has_supported_schema_version() {
         errors.push(issue(
             "UNSUPPORTED_MODULE_SCHEMA_VERSION",
-            "Every module must use schemaVersion 1.",
+            "Reading modules support schemaVersion 1 or 2; Listening and Writing modules require schemaVersion 1.",
             Some(&format!("{file_path}#schemaVersion")),
         ));
     }
@@ -1781,6 +1882,7 @@ fn validate_module_schema(
                 validate_reading_section(
                     section,
                     &format!("{file_path}#sections[{section_index}]"),
+                    reading.schema_version == 2,
                     stable_ids,
                     errors,
                 );
@@ -1833,6 +1935,7 @@ fn validate_module_schema(
 fn validate_reading_section(
     section: &ReadingSectionV1,
     path: &str,
+    allow_structured_context: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
@@ -1852,7 +1955,14 @@ fn validate_reading_section(
             errors,
         );
     }
-    validate_question_groups(&section.question_groups, path, true, stable_ids, errors);
+    validate_question_groups(
+        &section.question_groups,
+        path,
+        true,
+        allow_structured_context,
+        stable_ids,
+        errors,
+    );
 }
 
 fn validate_listening_section(
@@ -1891,7 +2001,14 @@ fn validate_listening_section(
             errors,
         );
     }
-    validate_question_groups(&section.question_groups, path, false, stable_ids, errors);
+    validate_question_groups(
+        &section.question_groups,
+        path,
+        false,
+        false,
+        stable_ids,
+        errors,
+    );
 }
 
 fn validate_writing_section(
@@ -1985,6 +2102,7 @@ fn validate_question_groups(
     groups: &[QuestionGroupV1],
     section_path: &str,
     allow_missing_numbers: bool,
+    allow_structured_context: bool,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
@@ -2028,6 +2146,147 @@ fn validate_question_groups(
                 errors,
             );
         }
+        if let Some(context_blocks) = &group.context_blocks {
+            if !allow_structured_context {
+                errors.push(issue(
+                    "STRUCTURED_CONTEXT_REQUIRES_READING_V2",
+                    "Structured question context is supported only by Reading module schemaVersion 2.",
+                    Some(&format!("{group_path}.contextBlocks")),
+                ));
+            } else {
+                validate_question_context(
+                    context_blocks,
+                    &group.questions,
+                    &group_path,
+                    stable_ids,
+                    errors,
+                );
+            }
+        }
+    }
+}
+
+fn validate_question_context(
+    blocks: &[QuestionContextBlockV2],
+    questions: &[QuestionV1],
+    group_path: &str,
+    stable_ids: &mut StableIdRegistry,
+    errors: &mut Vec<ValidationIssue>,
+) {
+    if blocks.len() > MAX_QUESTION_CONTEXT_BLOCKS {
+        errors.push(issue(
+            "QUESTION_CONTEXT_BLOCK_LIMIT",
+            "A question group may contain at most 32 structured context blocks.",
+            Some(&format!("{group_path}.contextBlocks")),
+        ));
+    }
+    let question_by_id: HashMap<&str, &QuestionV1> =
+        questions.iter().map(|question| (question.id(), question)).collect();
+    let mut bound_question_ids = HashSet::new();
+    let mut node_count = blocks.len();
+
+    for (block_index, block) in blocks.iter().enumerate() {
+        let block_path = format!("{group_path}.contextBlocks[{block_index}]");
+        stable_ids.record(block.id(), &format!("{block_path}.id"), errors);
+        match block {
+            QuestionContextBlockV2::Paragraph(paragraph) => {
+                validate_question_context_text(&paragraph.text, &format!("{block_path}.text"), errors);
+            }
+            QuestionContextBlockV2::List(list) => {
+                let _ = &list.style;
+                node_count += list.items.len();
+                if list.items.is_empty() || list.items.len() > MAX_QUESTION_CONTEXT_LIST_ITEMS {
+                    errors.push(issue(
+                        "QUESTION_CONTEXT_LIST_SIZE",
+                        "A structured list requires 1 to 50 items.",
+                        Some(&format!("{block_path}.items")),
+                    ));
+                }
+                for (item_index, item) in list.items.iter().enumerate() {
+                    let item_path = format!("{block_path}.items[{item_index}]");
+                    stable_ids.record(&item.id, &format!("{item_path}.id"), errors);
+                    validate_question_context_text(&item.text, &format!("{item_path}.text"), errors);
+                }
+            }
+            QuestionContextBlockV2::Table(table) => {
+                let _ = (table.has_header_row, table.has_row_headers);
+                node_count += table.rows.len();
+                if table.rows.is_empty() || table.rows.len() > MAX_QUESTION_CONTEXT_TABLE_ROWS {
+                    errors.push(issue(
+                        "QUESTION_CONTEXT_TABLE_ROW_LIMIT",
+                        "A structured table requires 1 to 30 rows.",
+                        Some(&format!("{block_path}.rows")),
+                    ));
+                }
+                let column_count = table.rows.first().map_or(0, |row| row.cells.len());
+                if column_count == 0 || column_count > MAX_QUESTION_CONTEXT_TABLE_COLUMNS {
+                    errors.push(issue(
+                        "QUESTION_CONTEXT_TABLE_COLUMN_LIMIT",
+                        "A structured table requires 1 to 12 columns.",
+                        Some(&format!("{block_path}.rows[0].cells")),
+                    ));
+                }
+                for (row_index, row) in table.rows.iter().enumerate() {
+                    let row_path = format!("{block_path}.rows[{row_index}]");
+                    stable_ids.record(&row.id, &format!("{row_path}.id"), errors);
+                    node_count += row.cells.len();
+                    if row.cells.len() != column_count {
+                        errors.push(issue(
+                            "QUESTION_CONTEXT_TABLE_NOT_RECTANGULAR",
+                            "Every row in a structured table must have the same number of cells.",
+                            Some(&format!("{row_path}.cells")),
+                        ));
+                    }
+                    for (cell_index, cell) in row.cells.iter().enumerate() {
+                        let cell_path = format!("{row_path}.cells[{cell_index}]");
+                        stable_ids.record(&cell.id, &format!("{cell_path}.id"), errors);
+                        validate_question_context_text(&cell.text, &format!("{cell_path}.text"), errors);
+                        let Some(question_id) = &cell.question_id else {
+                            continue;
+                        };
+                        let Some(question) = question_by_id.get(question_id.as_str()) else {
+                            errors.push(issue(
+                                "QUESTION_CONTEXT_REFERENCE_INVALID",
+                                "A table answer binding must reference a question in the same question group.",
+                                Some(&format!("{cell_path}.questionId")),
+                            ));
+                            continue;
+                        };
+                        if !question.supports_table_binding() {
+                            errors.push(issue(
+                                "QUESTION_CONTEXT_TYPE_UNSUPPORTED",
+                                "Only short-answer and fill-blank questions can be bound inside a table cell.",
+                                Some(&format!("{cell_path}.questionId")),
+                            ));
+                        }
+                        if !bound_question_ids.insert(question_id.as_str()) {
+                            errors.push(issue(
+                                "QUESTION_CONTEXT_BINDING_DUPLICATE",
+                                "A question may have only one primary answer position in structured context.",
+                                Some(&format!("{cell_path}.questionId")),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if node_count > MAX_QUESTION_CONTEXT_NODES {
+        errors.push(issue(
+            "QUESTION_CONTEXT_NODE_LIMIT",
+            "Structured question context may contain at most 512 persistent nodes.",
+            Some(&format!("{group_path}.contextBlocks")),
+        ));
+    }
+}
+
+fn validate_question_context_text(text: &str, path: &str, errors: &mut Vec<ValidationIssue>) {
+    if text.chars().count() > MAX_QUESTION_CONTEXT_TEXT_LENGTH {
+        errors.push(issue(
+            "QUESTION_CONTEXT_TEXT_LIMIT",
+            "Structured context text may contain at most 4000 characters per node.",
+            Some(path),
+        ));
     }
 }
 
@@ -2936,6 +3195,50 @@ mod tests {
         .unwrap();
     }
 
+    fn structured_context(question_id: &str) -> Value {
+        serde_json::json!([
+            {
+                "id": "demo-context-paragraph-01",
+                "type": "paragraph",
+                "text": "Use the complete original timetable."
+            },
+            {
+                "id": "demo-context-list-01",
+                "type": "list",
+                "style": "ordered",
+                "items": [
+                    { "id": "demo-context-list-item-01", "text": "Read the row label." }
+                ]
+            },
+            {
+                "id": "demo-context-table-01",
+                "type": "table",
+                "hasHeaderRow": true,
+                "hasRowHeaders": true,
+                "rows": [
+                    {
+                        "id": "demo-context-row-head",
+                        "cells": [
+                            { "id": "demo-context-cell-head-01", "text": "Route" },
+                            { "id": "demo-context-cell-head-02", "text": "Power" }
+                        ]
+                    },
+                    {
+                        "id": "demo-context-row-body",
+                        "cells": [
+                            { "id": "demo-context-cell-label", "text": "Cabinets" },
+                            {
+                                "id": "demo-context-cell-answer",
+                                "text": "Complete this cell",
+                                "questionId": question_id
+                            }
+                        ]
+                    }
+                ]
+            }
+        ])
+    }
+
     #[test]
     fn validates_and_hashes_an_original_pack() {
         let temp = tempfile::tempdir().unwrap();
@@ -2968,6 +3271,112 @@ mod tests {
 
         let report = validate_pack_folder(pack.to_str().unwrap());
         assert!(report.valid, "{:?}", report.errors);
+    }
+
+    #[test]
+    fn accepts_reading_v2_context_and_owns_stable_nested_annotation_ids() {
+        let temp = tempfile::tempdir().unwrap();
+        let workspace_path = temp.path().join("workspace");
+        let workspace = Workspace::initialize(workspace_path.to_str().unwrap()).unwrap();
+        storage::initialize_database(&workspace.database_path()).unwrap();
+        let connection = storage::open_database(&workspace.database_path()).unwrap();
+        let pack = temp.path().join("pack");
+        write_valid_pack(&pack);
+        let mut reading = read_fixture_json(&pack, "modules/reading.json");
+        reading["schemaVersion"] = Value::from(2);
+        reading["sections"][0]["questionGroups"][1]["contextBlocks"] =
+            structured_context("demo-reading-q05");
+        write_fixture_json(&pack, "modules/reading.json", &reading);
+
+        let report = validate_pack_folder(pack.to_str().unwrap());
+        assert!(report.valid, "{:?}", report.errors);
+        install_pack(&workspace, &connection, pack.to_str().unwrap()).unwrap();
+        ensure_installed_content_block_id(
+            &workspace,
+            &connection,
+            "original-demo-pack",
+            "demo-test-01",
+            "reading",
+            "demo-context-cell-answer",
+        )
+        .unwrap();
+        ensure_installed_content_block_id(
+            &workspace,
+            &connection,
+            "original-demo-pack",
+            "demo-test-01",
+            "reading",
+            "demo-context-list-item-01",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn rejects_structured_context_in_reading_v1() {
+        let temp = tempfile::tempdir().unwrap();
+        let pack = temp.path().join("pack");
+        write_valid_pack(&pack);
+        let mut reading = read_fixture_json(&pack, "modules/reading.json");
+        reading["sections"][0]["questionGroups"][1]["contextBlocks"] =
+            structured_context("demo-reading-q05");
+        write_fixture_json(&pack, "modules/reading.json", &reading);
+
+        let report = validate_pack_folder(pack.to_str().unwrap());
+        assert!(!report.valid);
+        assert!(report
+            .errors
+            .iter()
+            .any(|error| error.code == "STRUCTURED_CONTEXT_REQUIRES_READING_V2"));
+    }
+
+    #[test]
+    fn rejects_cross_group_and_duplicate_table_bindings_in_reading_v2() {
+        let temp = tempfile::tempdir().unwrap();
+        let cross_group_pack = temp.path().join("cross-group-pack");
+        write_valid_pack(&cross_group_pack);
+        let mut reading = read_fixture_json(&cross_group_pack, "modules/reading.json");
+        reading["schemaVersion"] = Value::from(2);
+        reading["sections"][0]["questionGroups"][1]["contextBlocks"] =
+            structured_context("demo-reading-q01");
+        write_fixture_json(&cross_group_pack, "modules/reading.json", &reading);
+
+        let cross_group_report = validate_pack_folder(cross_group_pack.to_str().unwrap());
+        assert!(!cross_group_report.valid);
+        assert!(cross_group_report
+            .errors
+            .iter()
+            .any(|error| error.code == "QUESTION_CONTEXT_REFERENCE_INVALID"));
+
+        let duplicate_pack = temp.path().join("duplicate-pack");
+        write_valid_pack(&duplicate_pack);
+        let mut reading = read_fixture_json(&duplicate_pack, "modules/reading.json");
+        reading["schemaVersion"] = Value::from(2);
+        let context = structured_context("demo-reading-q05");
+        reading["sections"][0]["questionGroups"][1]["contextBlocks"] = context;
+        reading["sections"][0]["questionGroups"][1]["contextBlocks"]
+            .as_array_mut()
+            .unwrap()[2]["rows"]
+            .as_array_mut()
+            .unwrap()
+            .push(serde_json::json!({
+                "id": "demo-context-row-duplicate",
+                "cells": [
+                    { "id": "demo-context-cell-duplicate-label", "text": "Duplicate" },
+                    {
+                        "id": "demo-context-cell-duplicate-answer",
+                        "text": "Second position",
+                        "questionId": "demo-reading-q05"
+                    }
+                ]
+            }));
+        write_fixture_json(&duplicate_pack, "modules/reading.json", &reading);
+
+        let duplicate_report = validate_pack_folder(duplicate_pack.to_str().unwrap());
+        assert!(!duplicate_report.valid);
+        assert!(duplicate_report
+            .errors
+            .iter()
+            .any(|error| error.code == "QUESTION_CONTEXT_BINDING_DUPLICATE"));
     }
 
     #[test]

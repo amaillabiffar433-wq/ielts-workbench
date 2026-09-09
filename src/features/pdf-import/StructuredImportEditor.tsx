@@ -3,6 +3,9 @@ import { AlertTriangle, ArrowDown, ArrowUp, CheckCircle2, FileCheck2, Plus, Rota
 
 import type { SaveState } from "../../components/common/SaveStatus";
 import { SaveStatus } from "../../components/common/SaveStatus";
+import { QuestionGroupContext } from "../../components/QuestionGroupContext/QuestionGroupContext";
+import { boundQuestionIdsFromContext } from "../../components/QuestionGroupContext/questionGroupContextModel";
+import { StructuredContextEditor } from "./StructuredContextEditor";
 import {
   applyStructuredAnswerKey,
   assignSourceSegments,
@@ -73,6 +76,31 @@ function updateQuestion(
       })),
     })),
   });
+}
+
+function StructuredGroupPreview({ group }: { readonly group: StructuredGroupDraft }) {
+  const boundQuestionIds = boundQuestionIdsFromContext(group.contextBlocks);
+  return (
+    <div>
+      <strong>{group.title || group.id}</strong>
+      <span>{group.instructions}</span>
+      <QuestionGroupContext
+        blocks={group.contextBlocks}
+        editableQuestionIds={new Set(group.questions.map((question) => question.id))}
+        instanceId={`install-preview-${group.id}`}
+        questions={group.questions.map((question) => ({
+          id: question.id,
+          displayNumber: question.number,
+          prompt: question.prompt,
+        }))}
+        readOnly
+        renderAnswerSlot={(question) => (
+          <label className="structured-context-preview__answer">Question {question.displayNumber}<input aria-label={`Question ${question.displayNumber} 安装预览答案`} disabled placeholder="练习时在此作答" /></label>
+        )}
+      />
+      <ol>{group.questions.filter((question) => !boundQuestionIds.has(question.id)).map((question) => <li key={question.id}>Question {question.number}: {question.prompt}</li>)}</ol>
+    </div>
+  );
 }
 
 export interface StructuredImportEditorProps {
@@ -187,6 +215,27 @@ export function StructuredImportEditor({
     if (result.errors.length === 0 && result.invalidLines.length === 0) onChange(result.draft);
   };
 
+  const removeQuestion = (group: StructuredGroupDraft, question: StructuredQuestionDraft) => {
+    const isBound = group.contextBlocks.some((block) => block.type === "table"
+      && block.rows.some((row) => row.cells.some((cell) => cell.questionId === question.id)));
+    if (isBound && !window.confirm(`Question ${question.number} 已绑定到表格。删除题目会同时解除该作答位置，但不会删除已安装题包或历史 Session。确定继续吗？`)) return;
+    onChange(updateGroup(draft, group.id, (item) => ({
+      ...item,
+      contextBlocks: item.contextBlocks.map((block) => block.type === "table"
+        ? {
+            ...block,
+            rows: block.rows.map((row) => ({
+              ...row,
+              cells: row.cells.map((cell) => cell.questionId === question.id
+                ? { ...cell, questionId: undefined }
+                : cell),
+            })),
+          }
+        : block),
+      questions: item.questions.filter((candidate) => candidate.id !== question.id),
+    })));
+  };
+
   return (
     <section className="pdf-review-panel pdf-structured-editor">
       <header className="pdf-structured-editor__header">
@@ -288,7 +337,7 @@ export function StructuredImportEditor({
                     </header>
                     <label>题组名称<input onFocus={() => setActiveGroupId(group.id)} onChange={(event) => onChange(updateGroup(draft, group.id, (item) => ({ ...item, title: event.target.value })))} value={group.title} /></label>
                     <label>题组说明 / 必要上下文<textarea onFocus={() => setActiveGroupId(group.id)} onChange={(event) => onChange(updateGroup(draft, group.id, (item) => ({ ...item, instructions: event.target.value })))} rows={3} value={group.instructions} /></label>
-                    <p className="pdf-source-reference">题组来源页：{group.sourcePages.join(", ") || "人工输入 / 尚未分配"}。当前 IELTSPack v1 没有独立表格对象；表格或列表上下文须保留在题组说明/共享选项中，不能标成自动结构化表格。</p>
+                    <p className="pdf-source-reference">题组来源页：{group.sourcePages.join(", ") || "人工输入 / 尚未分配"}。表格和列表仍需根据来源人工整理；程序不会从 PDF 自动猜测行列或题目绑定。</p>
                     <div className="pdf-group-fields">
                       <label>题组题型<select onChange={(event) => onChange(updateGroup(draft, group.id, (item) => {
                         const questionType = event.target.value as StructuredGroupDraft["questionType"];
@@ -299,16 +348,25 @@ export function StructuredImportEditor({
                       <label>共享选项（每行如 A Heading）<textarea onChange={(event) => onChange(updateGroup(draft, group.id, (item) => ({ ...item, sharedOptions: replaceDraftOptions(item.sharedOptions, event.target.value) })))} rows={3} value={group.sharedOptions.map((option) => `${option.label} ${option.text}`).join("\n")} /></label>
                     </div>
 
+                    <StructuredContextEditor
+                      group={group}
+                      onChange={(nextGroup) => onChange(updateGroup(draft, group.id, () => nextGroup))}
+                    />
+
                     {group.questions.map((question, questionIndex) => (
                       <article className={`pdf-structured-question${activeQuestionId === question.id ? " is-active" : ""}`} key={question.id} onClick={(event) => { event.stopPropagation(); activate(passage.id, group.id, question.id); }}>
-                        <header><strong>Question {question.number}</strong><code>{question.id}</code><div className="pdf-actions"><button aria-label={`上移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === 0} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex - 1) }))); }} type="button"><ArrowUp size={14} /></button><button aria-label={`下移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === group.questions.length - 1} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex + 1) }))); }} type="button"><ArrowDown size={14} /></button><button aria-label={`删除 Question ${question.number}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: item.questions.filter((candidate) => candidate.id !== question.id) }))); }} type="button"><Trash2 size={14} /></button></div></header>
+                        <header><strong>Question {question.number}</strong><code>{question.id}</code><div className="pdf-actions"><button aria-label={`上移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === 0} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex - 1) }))); }} type="button"><ArrowUp size={14} /></button><button aria-label={`下移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === group.questions.length - 1} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex + 1) }))); }} type="button"><ArrowDown size={14} /></button><button aria-label={`删除 Question ${question.number}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); removeQuestion(group, question); }} type="button"><Trash2 size={14} /></button></div></header>
                         <div className="pdf-question-editor__head">
                           <label>题号<input min={1} onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, number: Number(event.target.value) })))} type="number" value={question.number} /></label>
                           <label>题型<select onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, type: event.target.value as StructuredQuestionDraft["type"], needsReview: true })))} value={question.type}>
                             {supportedQuestionTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                             {(question.type === "matching-headings" || question.type === "unsupported") && <option value={question.type}>{question.type}（需改为支持题型）</option>}
                           </select></label>
-                          <label>移动到题组<select aria-label={`Question ${question.number} 所属题组`} onChange={(event) => onChange(moveQuestionBetweenGroups(draft, question.id, event.target.value))} value={group.id}>{groups.map((entry) => <option key={entry.group.id} value={entry.group.id}>{entry.passage.title} / {entry.group.title}</option>)}</select></label>
+                          <label>移动到题组<select aria-label={`Question ${question.number} 所属题组`} onChange={(event) => {
+                            const isBound = group.contextBlocks.some((block) => block.type === "table" && block.rows.some((row) => row.cells.some((cell) => cell.questionId === question.id)));
+                            if (isBound && !window.confirm(`移动 Question ${question.number} 会解除它在当前题组表格中的作答位置。题目和已有答案不会删除。确定继续吗？`)) return;
+                            onChange(moveQuestionBetweenGroups(draft, question.id, event.target.value));
+                          }} value={group.id}>{groups.map((entry) => <option key={entry.group.id} value={entry.group.id}>{entry.passage.title} / {entry.group.title}</option>)}</select></label>
                         </div>
                         <label>题干<textarea onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, prompt: event.target.value })))} rows={2} value={question.prompt} /></label>
                         <label>题目自有选项（留空时使用题组共享选项）<textarea onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, options: replaceDraftOptions(item.options, event.target.value) })))} rows={3} value={question.options.map((option) => `${option.label} ${option.text}`).join("\n")} /></label>
@@ -355,7 +413,7 @@ export function StructuredImportEditor({
           <header><FileCheck2 size={22} /><div><h3>{validation.valid ? "结构校验通过" : `${validation.errors.length} 个阻塞错误`}</h3><p>{validation.warnings.length} 个警告；警告不会阻止安装，但会在题包中保留待复核状态。</p></div></header>
           {validation.errors.length > 0 && <section className="pdf-validation-list is-error"><h4>阻塞错误</h4>{validation.errors.map((item, index) => <p key={`${item.code}-${index}`}><strong>{item.code}</strong> · {item.message}</p>)}</section>}
           {validation.warnings.length > 0 && <section className="pdf-validation-list"><h4>警告</h4>{validation.warnings.map((item, index) => <p key={`${item.code}-${index}`}><strong>{item.code}</strong> · {item.message}</p>)}</section>}
-          <section className="pdf-structure-preview"><h3>安装预览</h3>{draft.passages.map((passage, passageIndex) => <article key={passage.id}><h4>Passage {passageIndex + 1}: {passage.title}</h4><p>{passage.contentBlocks.map((block) => block.text).join(" ").slice(0, 220)}{passage.contentBlocks.some((block) => block.text.length > 220) ? "…" : ""}</p>{passage.questionGroups.map((group) => <div key={group.id}><strong>{group.title || group.id}</strong><span>{group.instructions}</span><ol>{group.questions.map((question) => <li key={question.id}>Question {question.number}: {question.prompt}</li>)}</ol></div>)}</article>)}</section>
+          <section className="pdf-structure-preview"><h3>安装预览</h3>{draft.passages.map((passage, passageIndex) => <article key={passage.id}><h4>Passage {passageIndex + 1}: {passage.title}</h4><p>{passage.contentBlocks.map((block) => block.text).join(" ").slice(0, 220)}{passage.contentBlocks.some((block) => block.text.length > 220) ? "…" : ""}</p>{passage.questionGroups.map((group) => <StructuredGroupPreview group={group} key={group.id} />)}</article>)}</section>
           <button className="button button--primary" disabled={!validation.valid || busy} onClick={onInstall} type="button"><CheckCircle2 size={16} />{busy ? "正在安装…" : "确认结构并安装题包"}</button>
         </div>
       )}

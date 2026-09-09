@@ -1,0 +1,25 @@
+{
+  "title": "The Harbour Ledger",
+  "passages": 1,
+  "questionGroups": [
+    {
+      "title": "Questions 17-19 / Table Completion",
+      "questionType": "short-answer",
+      "maxWords": 2,
+      "contextOrder": ["paragraph", "ordered-list", "table"],
+      "table": {
+        "rows": 5,
+        "columns": 3,
+        "hasHeaderRow": true,
+        "hasRowHeaders": true,
+        "boundQuestionNumbers": [17, 18, 19],
+        "repeatedCellText": "manual check"
+      }
+    }
+  ],
+  "answers": {
+    "17": "field team",
+    "18": "west desk",
+    "19": "blue folder"
+  }
+}

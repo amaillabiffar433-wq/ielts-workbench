@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertCircle, CheckCircle2, CircleDashed, FileClock, Headphones, Highlighter, Lock, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { IELTSPack, Question, WritingModule } from "../../domain";
+import type { IELTSPack, Question, ReadingModule, WritingModule } from "../../domain";
+import { QuestionGroupContext } from "../../components/QuestionGroupContext/QuestionGroupContext";
+import { boundQuestionIdsFromContext } from "../../components/QuestionGroupContext/questionGroupContextModel";
 import { PageHeader } from "../../components/common/PageHeader";
 import { useWorkbenchStore } from "../../stores/workbenchStore";
 import { buildPracticeRoute, parsePracticeRouteIdentity } from "../practice/practiceRoute";
@@ -11,6 +13,12 @@ type ReviewPackAttempt = {
   readonly packId: string;
   readonly pack: IELTSPack | null;
   readonly error: string | null;
+};
+
+type ReviewResult = {
+  readonly question: Question;
+  readonly userAnswer: string;
+  readonly status: "unanswered" | "unscored" | "correct" | "incorrect";
 };
 
 function normalize(value: string): string {
@@ -34,6 +42,26 @@ function displayCorrectAnswer(question: Question): string {
   }
   if (question.type === "true-false-not-given") return question.correctAnswer?.replace("not-given", "Not Given") ?? "尚未录入，请人工核对";
   return question.acceptableAnswers.join(" / ") || "尚未录入，请人工核对";
+}
+
+function ReviewAnswer({ result, inline = false }: { readonly result: ReviewResult; readonly inline?: boolean }) {
+  const { question, userAnswer, status } = result;
+  return (
+    <article
+      className={`review-answer review-answer--${status}${inline ? " review-answer--inline" : ""}`}
+      id={inline ? undefined : `review-question-${question.number}`}
+    >
+      <div className="review-answer__number">{question.number}</div>
+      <div>
+        <div className="review-answer__status">
+          {status === "correct" ? <CheckCircle2 aria-hidden="true" size={15} /> : status === "incorrect" ? <AlertCircle aria-hidden="true" size={15} /> : <CircleDashed aria-hidden="true" size={15} />}
+          {status === "correct" ? "正确" : status === "incorrect" ? "错误" : status === "unscored" ? "待核对" : "未答"}
+        </div>
+        <p className="review-answer__prompt">{question.prompt}</p>
+        <dl><div><dt>你的答案</dt><dd>{userAnswer || "（未作答）"}</dd></div><div><dt>正确答案</dt><dd>{displayCorrectAnswer(question)}</dd></div></dl>
+      </div>
+    </article>
+  );
 }
 
 export function ReviewPage() {
@@ -90,6 +118,23 @@ export function ReviewPage() {
         : "incorrect" as const;
     return { question, userAnswer, status };
   }), [answers, questions, session]);
+
+  const readingGroups = useMemo(() => {
+    if (!reviewPack || !session?.testId || session.moduleType !== "reading") return [];
+    const module = reviewPack.modules.find(
+      (candidate): candidate is ReadingModule => candidate.type === "reading" && candidate.testId === session.testId,
+    );
+    if (!module) return [];
+    const resultByQuestionId = new Map(results.map((result) => [result.question.id, result]));
+    return module.sections.flatMap((section) => section.questionGroups.map((group) => ({
+      section,
+      group,
+      results: group.questions.flatMap((question) => {
+        const result = resultByQuestionId.get(question.id);
+        return result ? [result] : [];
+      }),
+    })));
+  }, [results, reviewPack, session]);
 
   useEffect(() => {
     if (activeExamLock || !session?.testId || !reviewPack || session.moduleType !== "writing") {
@@ -197,22 +242,47 @@ export function ReviewPage() {
         </section>
       ) : results.length === 0 ? (
         <div className="empty-state">此 Session 暂无可复盘题目。</div>
+      ) : session.moduleType === "reading" ? (
+        <section className="review-answers" aria-label="逐题复盘">
+          <header><h2>逐题答案</h2><span>{results.length} 题</span></header>
+          {readingGroups.map(({ section, group, results: groupResults }) => {
+            const contextBlocks = group.contextBlocks ?? [];
+            const boundQuestionIds = boundQuestionIdsFromContext(contextBlocks);
+            const resultById = new Map(groupResults.map((result) => [result.question.id, result]));
+            return (
+              <section className="review-question-group" key={`${section.id}:${group.id}`}>
+                <header><span>{section.title}</span>{group.title && <h3>{group.title}</h3>}<p>{group.instructions}</p></header>
+                <QuestionGroupContext
+                  annotations={annotations}
+                  blocks={contextBlocks}
+                  editableQuestionIds={new Set()}
+                  instanceId={`review-${group.id}`}
+                  questions={groupResults.map((result) => ({
+                    id: result.question.id,
+                    displayNumber: result.question.number,
+                    prompt: result.question.prompt,
+                  }))}
+                  readOnly
+                  renderAnswerSlot={(question) => {
+                    const result = resultById.get(question.id);
+                    return result ? <ReviewAnswer inline result={result} /> : null;
+                  }}
+                />
+                {groupResults
+                  .filter((result) => !boundQuestionIds.has(result.question.id))
+                  .map((result) => <ReviewAnswer key={result.question.id} result={result} />)}
+              </section>
+            );
+          })}
+        </section>
       ) : (
         <section className="review-answers" aria-label="逐题复盘">
           <header><h2>{session.moduleType === "listening" ? "听力错题与答案" : "逐题答案"}</h2><span>{results.length} 题</span></header>
-          {results.map(({ question, userAnswer, status }) => (
-            <article className={`review-answer review-answer--${status}`} id={`review-question-${question.number}`} key={question.id}>
-              <div className="review-answer__number">{question.number}</div>
-              <div>
-                <div className="review-answer__status">
-                  {status === "correct" ? <CheckCircle2 aria-hidden="true" size={15} /> : status === "incorrect" ? <AlertCircle aria-hidden="true" size={15} /> : <CircleDashed aria-hidden="true" size={15} />}
-                  {status === "correct" ? "正确" : status === "incorrect" ? "错误" : status === "unscored" ? "待核对" : "未答"}
-                  {session.moduleType === "listening" && status === "incorrect" && <Headphones aria-hidden="true" size={14} />}
-                </div>
-                <p className="review-answer__prompt">{question.prompt}</p>
-                <dl><div><dt>你的答案</dt><dd>{userAnswer || "（未作答）"}</dd></div><div><dt>正确答案</dt><dd>{displayCorrectAnswer(question)}</dd></div></dl>
-              </div>
-            </article>
+          {results.map((result) => (
+            <div key={result.question.id}>
+              {result.status === "incorrect" && <Headphones aria-hidden="true" className="review-answer__listening-icon" size={14} />}
+              <ReviewAnswer result={result} />
+            </div>
           ))}
         </section>
       )}

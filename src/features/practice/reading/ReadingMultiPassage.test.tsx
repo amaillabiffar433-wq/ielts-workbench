@@ -3,7 +3,7 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { questionContainerId } from "../../../components/QuestionRenderer/questionDomIds";
-import { createTextAnchor } from "../../../domain";
+import { createTextAnchor, parseIeltsPack } from "../../../domain";
 import { originalMultiPassagePack } from "../../../infrastructure/demo/originalMultiPassagePack";
 import type {
   AnswerRecord,
@@ -39,6 +39,54 @@ const session: SessionSnapshot = {
 
 const module = originalMultiPassagePack.modules.find((candidate) => candidate.type === "reading");
 if (!module || module.type !== "reading") throw new Error("Multi-passage Reading fixture missing");
+
+function createStructuredContextPack() {
+  const input = structuredClone(originalMultiPassagePack) as unknown as {
+    manifest: unknown;
+    modules: Array<{
+      type: string;
+      schemaVersion: number;
+      sections: Array<{
+        id: string;
+        questionGroups: Array<{
+          id: string;
+          questions: Array<Record<string, unknown>>;
+          contextBlocks?: unknown[];
+        }>;
+      }>;
+    }>;
+  };
+  const readingModule = input.modules.find((candidate) => candidate.type === "reading");
+  const group = readingModule?.sections.find((section) => section.id === "northbridge-passage-03")
+    ?.questionGroups.find((candidate) => candidate.id === "northbridge-p3-group-01");
+  if (!readingModule || !group) throw new Error("Structured fixture target missing");
+  readingModule.schemaVersion = 2;
+  group.questions = group.questions.map((question) => {
+    if (question.id !== "northbridge-q17" && question.id !== "northbridge-q18") return question;
+    return {
+      id: question.id,
+      number: question.number,
+      type: "short-answer",
+      prompt: question.id === "northbridge-q18" ? "Which desk records the evening count?" : "Which team checks the first count?",
+      points: 1,
+      acceptableAnswers: question.id === "northbridge-q18" ? ["west desk"] : ["field team"],
+      maxWords: 2,
+      caseSensitive: false,
+    };
+  });
+  group.contextBlocks = [{
+    id: "northbridge-context-table",
+    type: "table",
+    hasHeaderRow: true,
+    hasRowHeaders: true,
+    rows: [
+      { id: "northbridge-context-row-head", cells: [{ id: "northbridge-context-cell-h1", text: "Observation" }, { id: "northbridge-context-cell-h2", text: "Responsible desk" }] },
+      { id: "northbridge-context-row-1", cells: [{ id: "northbridge-context-cell-r1", text: "First count" }, { id: "northbridge-context-cell-a1", text: "Team", questionId: "northbridge-q17" }] },
+      { id: "northbridge-context-row-2", cells: [{ id: "northbridge-context-cell-r2", text: "Evening count" }, { id: "northbridge-context-cell-a2", text: "Desk", questionId: "northbridge-q18" }] },
+    ],
+  }];
+  return parseIeltsPack(input);
+}
 
 function renderReading() {
   return render(
@@ -134,6 +182,32 @@ describe("ReadingPage multi-passage selection", () => {
     expect(await screen.findByText("The offline guide records the names of all volunteers.")).toBeInTheDocument();
     expect(screen.getByText("Decide whether each statement agrees with Passage 3. Choose True, False, or Not Given.")).toBeInTheDocument();
     expect(document.querySelectorAll('[data-question-id^="northbridge-q"]')).toHaveLength(1);
+  });
+
+  it("retains the complete structured table for a single question and shares its inline answer across panes", async () => {
+    const pack = createStructuredContextPack();
+    workbenchStore.setState({
+      activePack: pack,
+      loadPack: vi.fn(async () => pack),
+    });
+    renderReading();
+    await screen.findByTestId("reading-split-workspace");
+    const rightPane = screen.getByRole("region", { name: "右窗格" });
+    expect(within(rightPane).getByRole("table")).toHaveTextContent("First count");
+    expect(within(rightPane).getByRole("table")).toHaveTextContent("Evening count");
+    expect(within(rightPane).getByLabelText("第 18 题答案")).toBeEnabled();
+    expect(within(rightPane).queryByLabelText("第 17 题答案")).not.toBeInTheDocument();
+    expect(within(rightPane).getByText("Question 17 · 当前筛选中只读")).toBeInTheDocument();
+    expect(rightPane.querySelectorAll('[data-question-id="northbridge-q18"]')).toHaveLength(1);
+
+    fireEvent.change(screen.getByLabelText("左窗格内容"), { target: { value: "questions" } });
+    fireEvent.change(screen.getByLabelText("左窗格题目范围类型"), { target: { value: "single" } });
+    fireEvent.change(screen.getByLabelText("左窗格单题题号"), { target: { value: "18" } });
+    const answers = await screen.findAllByLabelText("第 18 题答案");
+    expect(answers).toHaveLength(2);
+    fireEvent.change(answers[0], { target: { value: "west desk" } });
+    await waitFor(() => answers.forEach((answer) => expect(answer).toHaveValue("west desk")));
+    expect(document.querySelectorAll('[id$="northbridge-q18-section"]')).toHaveLength(2);
   });
 
   it("selects exactly one complete group by its stable questionGroupId", async () => {

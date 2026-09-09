@@ -5,6 +5,10 @@ import {
   applyStructuredAnswerKey,
   assignSourceSegments,
   buildStructuredReadingPack,
+  boundStructuredQuestionIds,
+  createStructuredContextList,
+  createStructuredContextParagraph,
+  createStructuredContextTable,
   createStructuredGroup,
   createStructuredImportDraft,
   createStructuredPassage,
@@ -17,6 +21,7 @@ import {
   moveGroupBetweenPassages,
   moveQuestionBetweenGroups,
   replaceDraftOptions,
+  resizeStructuredContextTable,
   saveStructuredImportDraft,
   suggestStructuredImportDraft,
   touchStructuredDraft,
@@ -24,6 +29,7 @@ import {
   verifyStructuredDraftSource,
   type StableIdFactory,
   type StructuredImportDraft,
+  StructuredImportDraftSchema,
 } from "./structuredImportModel";
 
 function idSequence(): StableIdFactory {
@@ -162,6 +168,26 @@ describe("structured PDF draft identity and editing", () => {
     expect(edited.slice(0, 2).map((option) => option.id)).toEqual(existing.map((option) => option.id));
     expect(edited[2].id).not.toBe(existing[1].id);
   });
+
+  it("creates stable paragraph/list/table IDs and preserves retained cells while resizing", () => {
+    const ids = idSequence();
+    const paragraph = createStructuredContextParagraph(ids);
+    const list = createStructuredContextList("unordered", ids);
+    const table = createStructuredContextTable(2, 3, ids);
+    const retainedCellId = table.rows[0].cells[0].id;
+    table.rows[0].cells[0].questionId = "stable-q-1";
+    const expanded = resizeStructuredContextTable(table, 3, 4, ids);
+    expect(expanded.id).toBe(table.id);
+    expect(expanded.rows[0].cells[0]).toMatchObject({ id: retainedCellId, questionId: "stable-q-1" });
+    expect(new Set([
+      paragraph.id,
+      list.id,
+      list.items[0].id,
+      expanded.id,
+      ...expanded.rows.map((row) => row.id),
+      ...expanded.rows.flatMap((row) => row.cells.map((cell) => cell.id)),
+    ]).size).toBe(1 + 1 + 1 + 1 + 3 + 12);
+  });
 });
 
 describe("structured PDF answers and validation", () => {
@@ -215,6 +241,27 @@ describe("structured PDF answers and validation", () => {
     const report = validateStructuredImportDraft(draft);
     expect(report.errors.find((item) => item.code === "QUESTION_TYPE_UNSUPPORTED")?.message).toContain("不能把");
   });
+
+  it("blocks cross-group, unsupported, and duplicate structured table bindings", () => {
+    const draft = validDraft();
+    const group = draft.passages[0].questionGroups[0];
+    const table = createStructuredContextTable(1, 3, idSequence());
+    table.rows[0].cells[0].questionId = "stable-q-18";
+    table.rows[0].cells[1].questionId = "stable-q-1";
+    table.rows[0].cells[2].questionId = "stable-q-1";
+    group.contextBlocks = [table];
+    const report = validateStructuredImportDraft(draft);
+    expect(report.errors.map((item) => item.code)).toEqual(expect.arrayContaining([
+      "CONTEXT_QUESTION_REFERENCE_INVALID",
+      "CONTEXT_QUESTION_BINDING_DUPLICATE",
+    ]));
+
+    const choiceGroup = draft.passages[1].questionGroups[0];
+    const choiceTable = createStructuredContextTable(1, 1, idSequence());
+    choiceTable.rows[0].cells[0].questionId = "stable-q-18";
+    choiceGroup.contextBlocks = [choiceTable];
+    expect(validateStructuredImportDraft(draft).errors.some((item) => item.code === "CONTEXT_QUESTION_TYPE_UNSUPPORTED")).toBe(true);
+  });
 });
 
 describe("structured PDF persistence and pack conversion", () => {
@@ -229,6 +276,36 @@ describe("structured PDF persistence and pack conversion", () => {
 
     await discardStructuredImportDraft(repository, draft.id);
     expect(await loadStructuredImportDrafts(repository)).toEqual([]);
+  });
+
+  it("migrates legacy v1 drafts deterministically without changing existing IDs", () => {
+    const current = structuredClone(validDraft()) as unknown as Record<string, unknown>;
+    current.schemaVersion = 1;
+    const passages = current.passages as Array<Record<string, unknown>>;
+    for (const passage of passages) {
+      for (const group of passage.questionGroups as Array<Record<string, unknown>>) delete group.contextBlocks;
+    }
+    const migrated = StructuredImportDraftSchema.parse(current);
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.passages[0].id).toBe(validDraft().passages[0].id);
+    expect(migrated.passages.every((passage) => passage.questionGroups.every((group) => group.contextBlocks.length === 0))).toBe(true);
+  });
+
+  it("round-trips structured context IDs, order, text and question bindings through SQLite settings", async () => {
+    const repository = new InMemoryLearningRepository();
+    const draft = validDraft();
+    const group = draft.passages[0].questionGroups[0];
+    const list = createStructuredContextList("ordered", idSequence());
+    list.items[0].text = "Read the row labels first.";
+    const table = createStructuredContextTable(2, 2, idSequence());
+    table.rows[1].cells[1].text = "Recorded value";
+    table.rows[1].cells[1].questionId = "stable-q-1";
+    group.contextBlocks = [list, table];
+    await saveStructuredImportDraft(repository, draft);
+    const restored = (await loadStructuredImportDrafts(repository))[0];
+    const restoredGroup = restored.passages[0].questionGroups[0];
+    expect(restoredGroup.contextBlocks).toEqual(group.contextBlocks);
+    expect(boundStructuredQuestionIds(restoredGroup)).toEqual(new Set(["stable-q-1"]));
   });
 
   it("allows source recovery only when SHA-256, byte length, and page count all match", () => {
@@ -254,6 +331,22 @@ describe("structured PDF persistence and pack conversion", () => {
     expect(module.sections[0].questionGroups[0].questions.map((item) => item.number)).toEqual([1, 3]);
     expect(module.sections[0].questionGroups[0].id).toBe(draft.passages[0].questionGroups[0].id);
     expect(module.sections[1].questionGroups[0].questions[0].id).toBe("stable-q-18");
+    expect(module.schemaVersion).toBe(1);
+  });
+
+  it("builds declared Reading module v2 when structured context is present", async () => {
+    const draft = validDraft();
+    const group = draft.passages[0].questionGroups[0];
+    const ids = idSequence();
+    const table = createStructuredContextTable(2, 2, ids);
+    table.rows[1].cells[1].text = "Question 1 answer";
+    table.rows[1].cells[1].questionId = "stable-q-1";
+    group.contextBlocks = [createStructuredContextParagraph(ids), table];
+    const pack = await buildStructuredReadingPack(draft);
+    const module = pack.modules[0];
+    if (module.type !== "reading") throw new Error("Expected Reading module");
+    expect(module.schemaVersion).toBe(2);
+    expect(module.sections[0].questionGroups[0].contextBlocks?.[1]).toMatchObject({ id: table.id, type: "table" });
   });
 
   it("keeps source dedupe separate from pack ID conflicts and never overwrites an installed pack", async () => {

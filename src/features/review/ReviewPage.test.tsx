@@ -2,7 +2,7 @@ import { act, cleanup, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { IELTSPack } from "../../domain";
+import { parseIeltsPack, type IELTSPack } from "../../domain";
 import { originalDemoPack } from "../../infrastructure/demo/originalDemoPack";
 import { workbenchStore } from "../../stores/workbenchStore";
 import { ReviewPage } from "./ReviewPage";
@@ -152,5 +152,81 @@ describe("ReviewPage Exam lock", () => {
 
     expect(await screen.findByText(originalQuestion.prompt)).toBeInTheDocument();
     expect(screen.queryByText(otherPrompt)).not.toBeInTheDocument();
+  });
+
+  it("keeps structured table/list context in Reading review without duplicating bound questions", () => {
+    const input = structuredClone(originalDemoPack) as unknown as {
+      manifest: unknown;
+      modules: Array<{
+        type: string;
+        schemaVersion: number;
+        sections: Array<{
+          questionGroups: Array<{
+            questions: Array<Record<string, unknown>>;
+            contextBlocks?: unknown[];
+          }>;
+        }>;
+      }>;
+    };
+    const reading = input.modules.find((module) => module.type === "reading");
+    const group = reading?.sections[0].questionGroups[0];
+    if (!reading || !group) throw new Error("Reading fixture missing");
+    reading.schemaVersion = 2;
+    const original = group.questions[0];
+    group.questions[0] = {
+      id: original.id,
+      number: original.number,
+      type: "short-answer",
+      prompt: "Which row contains the original review answer?",
+      points: 1,
+      acceptableAnswers: ["west desk"],
+      maxWords: 2,
+      caseSensitive: false,
+    };
+    group.contextBlocks = [{
+      id: "review-context-table",
+      type: "table",
+      hasHeaderRow: true,
+      hasRowHeaders: true,
+      rows: [
+        { id: "review-context-head", cells: [{ id: "review-context-h1", text: "Record" }, { id: "review-context-h2", text: "Desk" }] },
+        { id: "review-context-row", cells: [{ id: "review-context-r1", text: "Evening" }, { id: "review-context-a1", text: "Recorded by", questionId: original.id }] },
+      ],
+    }, {
+      id: "review-context-list",
+      type: "list",
+      style: "unordered",
+      items: [{ id: "review-context-list-item", text: "Check the complete table before comparing answers." }],
+    }];
+    const pack = parseIeltsPack(input);
+    workbenchStore.setState({
+      activePack: pack,
+      session: {
+        sessionId: "structured-review-session",
+        packId: pack.manifest.id,
+        testId: pack.manifest.tests[0].id,
+        moduleType: "reading",
+        mode: "study",
+        status: "submitted",
+        answers: [],
+        annotations: [],
+      },
+      answers: {
+        "structured-review-session:demo-reading-q01": {
+          id: "answer:structured-review-session:demo-reading-q01",
+          sessionId: "structured-review-session",
+          questionId: "demo-reading-q01",
+          value: "west desk",
+          updatedAt: "2026-09-09T00:00:00.000Z",
+        },
+      },
+    });
+
+    render(<MemoryRouter><ReviewPage /></MemoryRouter>);
+    expect(screen.getByRole("table")).toHaveTextContent("Evening");
+    expect(screen.getByRole("list")).toHaveTextContent("Check the complete table");
+    expect(screen.getAllByText("Which row contains the original review answer?")).toHaveLength(1);
+    expect(screen.getAllByText("west desk")).toHaveLength(2);
+    expect(screen.getAllByText("正确").length).toBeGreaterThan(0);
   });
 });

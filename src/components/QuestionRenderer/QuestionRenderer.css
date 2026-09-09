@@ -7,6 +7,17 @@
   scroll-margin-top: 92px;
 }
 
+.question--inline {
+  background: transparent;
+  border: 0;
+  margin-top: 0.5rem;
+  padding: 0;
+}
+
+.question--inline .question__number {
+  min-width: 1.8rem;
+}
+
 .question:first-child {
   padding-top: 4px;
 }

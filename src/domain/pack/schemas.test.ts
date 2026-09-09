@@ -106,6 +106,81 @@ describe("IELTSPackSchema", () => {
     expect(parsedQuestions[3].number).toBe(4);
     expect(parsedQuestions[3].id).toBe(questions[3].id);
   });
+
+  it("accepts declared Reading module v2 table/list context while retaining manifest v1", () => {
+    const input = structuredClone({ manifest: multiPassageManifest, modules: [multiPassageReading] });
+    type MutableQuestion = { id: string; type: string };
+    type MutableGroup = { id: string; questions: MutableQuestion[]; contextBlocks?: unknown[] };
+    const readingModule = input.modules[0] as unknown as {
+      schemaVersion: number;
+      sections: Array<{ questionGroups: MutableGroup[] }>;
+    };
+    readingModule.schemaVersion = 2;
+    const candidateGroups = readingModule.sections.flatMap((section) => section.questionGroups);
+    const group = candidateGroups.find((candidate) =>
+      candidate.questions.some((question) => question.type === "short-answer" || question.type === "fill-blank"),
+    );
+    if (!group) throw new Error("Fixture needs a text question group");
+    const question = group.questions.find((candidate) => candidate.type === "short-answer" || candidate.type === "fill-blank");
+    if (!question) throw new Error("Fixture needs a text question");
+    group.contextBlocks = [
+      { id: "context-paragraph-1", type: "paragraph", text: "Use the original timetable." },
+      { id: "context-list-1", type: "list", style: "ordered", items: [{ id: "context-list-item-1", text: "Read each row." }] },
+      {
+        id: "context-table-1",
+        type: "table",
+        hasHeaderRow: true,
+        hasRowHeaders: true,
+        rows: [
+          { id: "context-row-1", cells: [{ id: "context-cell-1", text: "Route" }, { id: "context-cell-2", text: "Detail" }] },
+          { id: "context-row-2", cells: [{ id: "context-cell-3", text: "East" }, { id: "context-cell-4", text: "Answer", questionId: question.id }] },
+        ],
+      },
+    ];
+
+    const parsed = parseIeltsPack(input);
+    expect(parsed.manifest.schemaVersion).toBe(1);
+    expect(parsed.modules[0].schemaVersion).toBe(2);
+    if (parsed.modules[0].type !== "reading") throw new Error("Reading module missing");
+    const parsedGroup = parsed.modules[0].sections
+      .flatMap((section) => section.questionGroups)
+      .find((candidate) => candidate.id === group.id);
+    expect(parsedGroup?.contextBlocks).toHaveLength(3);
+  });
+
+  it("rejects structured context in Reading v1 and invalid or duplicate table bindings in v2", () => {
+    const input = structuredClone({ manifest: multiPassageManifest, modules: [multiPassageReading] });
+    const firstGroup = input.modules[0].sections[0].questionGroups[0] as typeof input.modules[0]["sections"][number]["questionGroups"][number] & { contextBlocks?: unknown[] };
+    const otherQuestionId = input.modules[0].sections[1].questionGroups[0].questions[0].id;
+    firstGroup.contextBlocks = [{
+      id: "context-table-invalid",
+      type: "table",
+      hasHeaderRow: false,
+      hasRowHeaders: false,
+      rows: [{
+        id: "context-row-invalid",
+        cells: [
+          { id: "context-cell-invalid-1", text: "First", questionId: otherQuestionId },
+          { id: "context-cell-invalid-2", text: "Second", questionId: otherQuestionId },
+        ],
+      }],
+    }];
+    expect(IELTSPackSchema.safeParse(input).success).toBe(false);
+    input.modules[0].schemaVersion = 2;
+    expect(IELTSPackSchema.safeParse(input).success).toBe(false);
+  });
+
+  it("rejects duplicate persistent context IDs across the pack", () => {
+    const input = structuredClone({ manifest: multiPassageManifest, modules: [multiPassageReading] });
+    input.modules[0].schemaVersion = 2;
+    const group = input.modules[0].sections[0].questionGroups[0] as typeof input.modules[0]["sections"][number]["questionGroups"][number] & { contextBlocks?: unknown[] };
+    group.contextBlocks = [{
+      id: input.modules[0].sections[0].contentBlocks[0].id,
+      type: "paragraph",
+      text: "This ID collides with an existing passage block.",
+    }];
+    expect(IELTSPackSchema.safeParse(input).success).toBe(false);
+  });
 });
 
 describe("QuestionSchema discriminated union", () => {

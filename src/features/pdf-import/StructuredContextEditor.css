@@ -1,0 +1,110 @@
+.structured-context-editor {
+  border: 1px solid var(--color-border, #d7dddf);
+  border-radius: 10px;
+  display: grid;
+  gap: 0.8rem;
+  margin: 0.8rem 0;
+  padding: 0.8rem;
+}
+
+.structured-context-editor > header,
+.structured-context-block > header,
+.structured-context-editor__add,
+.structured-context-block > header > div,
+.structured-context-table-editor__controls {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  justify-content: space-between;
+}
+
+.structured-context-editor h4,
+.structured-context-editor p {
+  margin: 0;
+}
+
+.structured-context-editor__empty {
+  color: var(--color-text-muted, #596367);
+}
+
+.structured-context-block {
+  background: var(--color-surface-soft, #f6f8f8);
+  border-radius: 8px;
+  display: grid;
+  gap: 0.65rem;
+  padding: 0.7rem;
+}
+
+.structured-context-block code {
+  color: var(--color-text-muted, #596367);
+  font-size: 0.7rem;
+}
+
+.structured-context-list-editor,
+.structured-context-table-editor {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.structured-context-list-item {
+  align-items: start;
+  display: grid;
+  gap: 0.35rem;
+  grid-template-columns: auto minmax(12rem, 1fr) auto auto auto;
+}
+
+.structured-context-table-editor__controls {
+  justify-content: flex-start;
+}
+
+.structured-context-table-editor__controls label {
+  align-items: center;
+  display: flex;
+  gap: 0.35rem;
+}
+
+.structured-context-table-editor__resize-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.structured-context-table-editor__controls input[type="number"] {
+  width: 4.6rem;
+}
+
+.structured-context-table-editor__scroll {
+  overflow-x: auto;
+}
+
+.structured-context-table-editor table {
+  border-collapse: collapse;
+  min-width: 38rem;
+  width: 100%;
+}
+
+.structured-context-table-editor td {
+  border: 1px solid var(--color-border, #cbd3d6);
+  min-width: 12rem;
+  padding: 0.45rem;
+  vertical-align: top;
+}
+
+.structured-context-table-editor td label,
+.structured-context-table-editor td code,
+.structured-context-preview__answer {
+  display: block;
+  margin-top: 0.35rem;
+}
+
+.structured-context-preview {
+  border-top: 1px solid var(--color-border, #d7dddf);
+  padding-top: 0.7rem;
+}
+
+.structured-context-preview__answer input {
+  display: block;
+  margin-top: 0.25rem;
+  width: 100%;
+}

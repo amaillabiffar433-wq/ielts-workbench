@@ -1,6 +1,8 @@
 import { useLayoutEffect, useMemo, useRef, type UIEvent } from "react";
 
 import { QuestionRenderer } from "../../../components/QuestionRenderer/QuestionRenderer";
+import { QuestionGroupContext } from "../../../components/QuestionGroupContext/QuestionGroupContext";
+import { boundQuestionIdsFromContext } from "../../../components/QuestionGroupContext/questionGroupContextModel";
 import { TextDocument, type CreateAnnotationInput } from "../../../components/TextDocument/TextDocument";
 import type { ReadingModule } from "../../../domain";
 import { answerKey, useWorkbenchStore } from "../../../stores/workbenchStore";
@@ -52,7 +54,10 @@ function QuestionGroups({
 }) {
   const session = useWorkbenchStore((state) => state.session);
   const answers = useWorkbenchStore((state) => state.answers);
+  const annotations = useWorkbenchStore((state) => state.annotations);
   const answerQuestion = useWorkbenchStore((state) => state.answerQuestion);
+  const addAnnotation = useWorkbenchStore((state) => state.addAnnotation);
+  const removeAnnotation = useWorkbenchStore((state) => state.removeAnnotation);
   const selection = selectionResult.error ? null : selectionResult.entries;
   const groups = useMemo(
     () => groupSelectedReadingQuestions(selection ?? []),
@@ -69,34 +74,66 @@ function QuestionGroups({
         <div className="reading-selection-error" role="alert">{selectionResult.error}</div>
       ) : groups.length === 0 ? (
         <div className="empty-state reading-questions__empty">当前范围没有可显示的题目。</div>
-      ) : groups.map((selectedGroup) => (
-        <section
-          className="reading-question-group"
-          data-question-group-id={selectedGroup.group.id}
-          key={`${selectedGroup.section.id}:${selectedGroup.group.id}`}
-        >
-          <header className="reading-question-group__header">
-            <span>{passageLabel(selectedGroup.section, selectedGroup.sectionIndex)}</span>
-            {selectedGroup.group.title && <h3>{selectedGroup.group.title}</h3>}
-            <p>{selectedGroup.group.instructions}</p>
-          </header>
-          {selectedGroup.entries.map((entry) => {
-            const value = session ? answers[answerKey(session.sessionId, entry.question.id)]?.value : "";
-            return (
-              <QuestionRenderer
-                answer={typeof value === "string" ? value : value?.join(", ")}
-                displayNumber={entry.displayNumber}
-                instanceId={paneInstanceId(side)}
-                key={entry.question.id}
-                onAnswer={(questionId, answer) => {
-                  if (session) void answerQuestion(session.sessionId, questionId, answer);
-                }}
-                question={entry.question}
-              />
-            );
-          })}
-        </section>
-      ))}
+      ) : groups.map((selectedGroup) => {
+        const contextBlocks = selectedGroup.group.contextBlocks ?? [];
+        const boundQuestionIds = boundQuestionIdsFromContext(contextBlocks);
+        const editableQuestionIds = new Set(selectedGroup.entries.map((entry) => entry.question.id));
+        const completeGroupEntries = entries.filter((entry) => entry.group.id === selectedGroup.group.id);
+        const renderQuestion = (entry: ReadingQuestionEntry, inline = false) => {
+          const value = session ? answers[answerKey(session.sessionId, entry.question.id)]?.value : "";
+          return (
+            <QuestionRenderer
+              answer={typeof value === "string" ? value : value?.join(", ")}
+              displayNumber={entry.displayNumber}
+              inline={inline}
+              instanceId={paneInstanceId(side)}
+              key={entry.question.id}
+              onAnswer={(questionId, answer) => {
+                if (session) void answerQuestion(session.sessionId, questionId, answer);
+              }}
+              question={entry.question}
+            />
+          );
+        };
+        return (
+          <section
+            className="reading-question-group"
+            data-question-group-id={selectedGroup.group.id}
+            key={`${selectedGroup.section.id}:${selectedGroup.group.id}`}
+          >
+            <header className="reading-question-group__header">
+              <span>{passageLabel(selectedGroup.section, selectedGroup.sectionIndex)}</span>
+              {selectedGroup.group.title && <h3>{selectedGroup.group.title}</h3>}
+              <p>{selectedGroup.group.instructions}</p>
+            </header>
+            <QuestionGroupContext
+              annotations={annotations}
+              blocks={contextBlocks}
+              editableQuestionIds={editableQuestionIds}
+              instanceId={`${paneInstanceId(side)}-${selectedGroup.group.id}`}
+              onCreateAnnotation={(input) => {
+                if (session) void addAnnotation({ sessionId: session.sessionId, ...input });
+              }}
+              onDeleteAnnotation={(id) => void removeAnnotation(id)}
+              questions={completeGroupEntries.map((entry) => ({
+                id: entry.question.id,
+                displayNumber: entry.displayNumber,
+                prompt: entry.question.prompt,
+              }))}
+              renderAnswerSlot={(question, editable) => {
+                const entry = completeGroupEntries.find((candidate) => candidate.question.id === question.id);
+                if (!entry) return null;
+                return editable
+                  ? renderQuestion(entry, true)
+                  : <span className="question-context__answer-placeholder">Question {question.displayNumber} · 当前筛选中只读</span>;
+              }}
+            />
+            {selectedGroup.entries
+              .filter((entry) => !boundQuestionIds.has(entry.question.id))
+              .map((entry) => renderQuestion(entry))}
+          </section>
+        );
+      })}
     </div>
   );
 }

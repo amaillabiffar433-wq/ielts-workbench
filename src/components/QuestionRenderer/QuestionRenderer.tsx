@@ -10,6 +10,7 @@ export type QuestionRendererProps = {
   showCorrectAnswer?: boolean;
   instanceId?: string;
   displayNumber?: number;
+  inline?: boolean;
 };
 
 function CorrectAnswer({ question }: { question: Question }) {
@@ -42,6 +43,7 @@ export function QuestionRenderer({
   showCorrectAnswer = false,
   instanceId = "question-view",
   displayNumber = question.number,
+  inline = false,
 }: QuestionRendererProps) {
   const domPrefix = `${instanceId}-${question.id}`;
   const legendId = `${domPrefix}-legend`;
@@ -50,7 +52,7 @@ export function QuestionRenderer({
   return (
     <section
       aria-labelledby={legendId}
-      className="question"
+      className={`question${inline ? " question--inline" : ""}`}
       data-question-id={question.id}
       id={containerId}
       tabIndex={-1}

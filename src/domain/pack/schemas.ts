@@ -190,14 +190,144 @@ export const ContentBlockSchema = z
   })
   .strict();
 
+export const MAX_QUESTION_CONTEXT_BLOCKS = 32;
+export const MAX_QUESTION_CONTEXT_LIST_ITEMS = 50;
+export const MAX_QUESTION_CONTEXT_TABLE_ROWS = 30;
+export const MAX_QUESTION_CONTEXT_TABLE_COLUMNS = 12;
+export const MAX_QUESTION_CONTEXT_TEXT_LENGTH = 4_000;
+export const MAX_QUESTION_CONTEXT_NODES = 512;
+
+const QuestionContextTextSchema = z.string().max(MAX_QUESTION_CONTEXT_TEXT_LENGTH);
+
+export const QuestionContextParagraphSchema = z
+  .object({
+    id: StableIdSchema,
+    type: z.literal("paragraph"),
+    text: QuestionContextTextSchema,
+  })
+  .strict();
+
+export const QuestionContextListItemSchema = z
+  .object({
+    id: StableIdSchema,
+    text: QuestionContextTextSchema,
+  })
+  .strict();
+
+export const QuestionContextListSchema = z
+  .object({
+    id: StableIdSchema,
+    type: z.literal("list"),
+    style: z.enum(["ordered", "unordered"]),
+    items: z.array(QuestionContextListItemSchema).min(1).max(MAX_QUESTION_CONTEXT_LIST_ITEMS),
+  })
+  .strict();
+
+export const QuestionContextTableCellSchema = z
+  .object({
+    id: StableIdSchema,
+    text: QuestionContextTextSchema,
+    questionId: StableIdSchema.optional(),
+  })
+  .strict();
+
+export const QuestionContextTableRowSchema = z
+  .object({
+    id: StableIdSchema,
+    cells: z
+      .array(QuestionContextTableCellSchema)
+      .min(1)
+      .max(MAX_QUESTION_CONTEXT_TABLE_COLUMNS),
+  })
+  .strict();
+
+export const QuestionContextTableSchema = z
+  .object({
+    id: StableIdSchema,
+    type: z.literal("table"),
+    hasHeaderRow: z.boolean(),
+    hasRowHeaders: z.boolean(),
+    rows: z
+      .array(QuestionContextTableRowSchema)
+      .min(1)
+      .max(MAX_QUESTION_CONTEXT_TABLE_ROWS),
+  })
+  .strict()
+  .superRefine((table, context) => {
+    const columnCount = table.rows[0]?.cells.length ?? 0;
+    table.rows.forEach((row, rowIndex) => {
+      if (row.cells.length !== columnCount) {
+        context.addIssue({
+          code: "custom",
+          path: ["rows", rowIndex, "cells"],
+          message: "Question context tables must remain rectangular",
+        });
+      }
+    });
+  });
+
+export const QuestionContextBlockSchema = z.discriminatedUnion("type", [
+  QuestionContextParagraphSchema,
+  QuestionContextListSchema,
+  QuestionContextTableSchema,
+]);
+
 export const QuestionGroupSchema = z
   .object({
     id: StableIdSchema,
     title: z.string().trim().min(1).optional(),
     instructions: z.string().trim().min(1),
+    contextBlocks: z.array(QuestionContextBlockSchema).max(MAX_QUESTION_CONTEXT_BLOCKS).optional(),
     questions: z.array(QuestionSchema).min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((group, context) => {
+    const questions = new Map(group.questions.map((question) => [question.id, question]));
+    const boundQuestionIds = new Set<string>();
+    let nodeCount = group.contextBlocks?.length ?? 0;
+    (group.contextBlocks ?? []).forEach((block, blockIndex) => {
+      if (block.type === "list") nodeCount += block.items.length;
+      if (block.type !== "table") return;
+      nodeCount += block.rows.length + block.rows.reduce((sum, row) => sum + row.cells.length, 0);
+      block.rows.forEach((row, rowIndex) => {
+        row.cells.forEach((cell, cellIndex) => {
+          if (!cell.questionId) return;
+          const path = ["contextBlocks", blockIndex, "rows", rowIndex, "cells", cellIndex, "questionId"];
+          const question = questions.get(cell.questionId);
+          if (!question) {
+            context.addIssue({
+              code: "custom",
+              path,
+              message: "A table answer binding must reference a question in the same question group",
+            });
+            return;
+          }
+          if (question.type !== "short-answer" && question.type !== "fill-blank") {
+            context.addIssue({
+              code: "custom",
+              path,
+              message: "Only short-answer and fill-blank questions can be bound inside a table cell",
+            });
+          }
+          if (boundQuestionIds.has(cell.questionId)) {
+            context.addIssue({
+              code: "custom",
+              path,
+              message: "A question may have only one primary answer position in structured context",
+            });
+          }
+          boundQuestionIds.add(cell.questionId);
+        });
+      });
+    });
+    if (nodeCount > MAX_QUESTION_CONTEXT_NODES) {
+      context.addIssue({
+        code: "custom",
+        path: ["contextBlocks"],
+        message: `Structured question context may contain at most ${MAX_QUESTION_CONTEXT_NODES} persistent nodes`,
+      });
+    }
+  });
 
 export const ReadingSectionSchema = z
   .object({
@@ -208,8 +338,7 @@ export const ReadingSectionSchema = z
   })
   .strict();
 
-const moduleBaseShape = {
-  schemaVersion: z.literal(1),
+const moduleIdentityShape = {
   id: StableIdSchema,
   testId: StableIdSchema,
   title: z.string().trim().min(1),
@@ -217,11 +346,27 @@ const moduleBaseShape = {
 
 export const ReadingModuleSchema = z
   .object({
-    ...moduleBaseShape,
+    schemaVersion: z.union([z.literal(1), z.literal(2)]),
+    ...moduleIdentityShape,
     type: z.literal("reading"),
     sections: z.array(ReadingSectionSchema).min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((module, context) => {
+    if (module.schemaVersion === 1) {
+      module.sections.forEach((section, sectionIndex) => {
+        section.questionGroups.forEach((group, groupIndex) => {
+          if (group.contextBlocks !== undefined) {
+            context.addIssue({
+              code: "custom",
+              path: ["sections", sectionIndex, "questionGroups", groupIndex, "contextBlocks"],
+              message: "Structured question context requires Reading module schemaVersion 2",
+            });
+          }
+        });
+      });
+    }
+  });
 
 export const ListeningSectionSchema = z
   .object({
@@ -245,12 +390,26 @@ export const ListeningSectionSchema = z
 
 export const ListeningModuleSchema = z
   .object({
-    ...moduleBaseShape,
+    schemaVersion: z.literal(1),
+    ...moduleIdentityShape,
     type: z.literal("listening"),
     audioAssetId: StableIdSchema,
     sections: z.array(ListeningSectionSchema).min(1),
   })
-  .strict();
+  .strict()
+  .superRefine((module, context) => {
+    module.sections.forEach((section, sectionIndex) => {
+      section.questionGroups.forEach((group, groupIndex) => {
+        if (group.contextBlocks !== undefined) {
+          context.addIssue({
+            code: "custom",
+            path: ["sections", sectionIndex, "questionGroups", groupIndex, "contextBlocks"],
+            message: "Structured question context is supported only by Reading module schemaVersion 2",
+          });
+        }
+      });
+    });
+  });
 
 export const WritingTaskSchema = z
   .object({
@@ -274,13 +433,14 @@ export const WritingSectionSchema = z
 
 export const WritingModuleSchema = z
   .object({
-    ...moduleBaseShape,
+    schemaVersion: z.literal(1),
+    ...moduleIdentityShape,
     type: z.literal("writing"),
     sections: z.array(WritingSectionSchema).min(1),
   })
   .strict();
 
-export const PackModuleSchema = z.discriminatedUnion("type", [
+export const PackModuleSchema = z.union([
   ReadingModuleSchema,
   ListeningModuleSchema,
   WritingModuleSchema,
@@ -591,6 +751,28 @@ const IELTSPackStrictSchema = z
               ],
             ),
           );
+          if (module.type === "reading" && module.schemaVersion === 2) {
+            (group.contextBlocks ?? []).forEach((block, blockIndex) => {
+              const blockPath = [
+                "modules", moduleIndex, "sections", sectionIndex,
+                "questionGroups", groupIndex, "contextBlocks", blockIndex,
+              ];
+              recordId(block.id, [...blockPath, "id"]);
+              if (block.type === "list") {
+                block.items.forEach((item, itemIndex) =>
+                  recordId(item.id, [...blockPath, "items", itemIndex, "id"]),
+                );
+              }
+              if (block.type === "table") {
+                block.rows.forEach((row, rowIndex) => {
+                  recordId(row.id, [...blockPath, "rows", rowIndex, "id"]);
+                  row.cells.forEach((cell, cellIndex) =>
+                    recordId(cell.id, [...blockPath, "rows", rowIndex, "cells", cellIndex, "id"]),
+                  );
+                });
+              }
+            });
+          }
         });
       });
     });
@@ -613,6 +795,8 @@ export type ReadingModule = DeepReadonly<z.infer<typeof ReadingModuleSchema>>;
 export type ListeningModule = DeepReadonly<z.infer<typeof ListeningModuleSchema>>;
 export type WritingModule = DeepReadonly<z.infer<typeof WritingModuleSchema>>;
 export type ContentBlock = DeepReadonly<z.infer<typeof ContentBlockSchema>>;
+export type QuestionContextBlock = DeepReadonly<z.infer<typeof QuestionContextBlockSchema>>;
+export type QuestionContextTable = DeepReadonly<z.infer<typeof QuestionContextTableSchema>>;
 export type MediaAsset = DeepReadonly<z.infer<typeof MediaAssetSchema>>;
 export type IELTSPack = DeepReadonly<MutableIELTSPack>;
 

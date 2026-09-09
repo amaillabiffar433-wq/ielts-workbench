@@ -1,6 +1,16 @@
 import { z } from "zod";
 
-import { StableIdSchema, parseIeltsPack, type IELTSPack } from "../../domain";
+import {
+  MAX_QUESTION_CONTEXT_BLOCKS,
+  MAX_QUESTION_CONTEXT_LIST_ITEMS,
+  MAX_QUESTION_CONTEXT_NODES,
+  MAX_QUESTION_CONTEXT_TABLE_COLUMNS,
+  MAX_QUESTION_CONTEXT_TABLE_ROWS,
+  MAX_QUESTION_CONTEXT_TEXT_LENGTH,
+  StableIdSchema,
+  parseIeltsPack,
+  type IELTSPack,
+} from "../../domain";
 import type { LearningRepository } from "../../infrastructure/repositories/LearningRepository";
 import {
   PDF_IMPORT_PARSER_VERSION,
@@ -10,8 +20,8 @@ import {
   type ExtractedPdfPage,
 } from "./pdfImportModel";
 
-export const STRUCTURED_IMPORT_DRAFT_VERSION = 1 as const;
-export const STRUCTURED_IMPORT_PARSER_VERSION = `${PDF_IMPORT_PARSER_VERSION}-structured-1`;
+export const STRUCTURED_IMPORT_DRAFT_VERSION = 2 as const;
+export const STRUCTURED_IMPORT_PARSER_VERSION = `${PDF_IMPORT_PARSER_VERSION}-structured-2`;
 export const STRUCTURED_IMPORT_DRAFT_INDEX_SETTING = "pdfImport.structuredDraftIndex.v1";
 export const MAX_STRUCTURED_IMPORT_DRAFT_SETTING_BYTES = 240 * 1024;
 
@@ -72,6 +82,54 @@ const DraftQuestionSchema = z.object({
   needsReview: z.boolean(),
 }).strict();
 
+const DraftContextParagraphSchema = z.object({
+  id: StableIdSchema,
+  type: z.literal("paragraph"),
+  text: z.string().max(MAX_QUESTION_CONTEXT_TEXT_LENGTH),
+}).strict();
+
+const DraftContextListSchema = z.object({
+  id: StableIdSchema,
+  type: z.literal("list"),
+  style: z.enum(["ordered", "unordered"]),
+  items: z.array(z.object({
+    id: StableIdSchema,
+    text: z.string().max(MAX_QUESTION_CONTEXT_TEXT_LENGTH),
+  }).strict()).min(1).max(MAX_QUESTION_CONTEXT_LIST_ITEMS),
+}).strict();
+
+const DraftContextTableSchema = z.object({
+  id: StableIdSchema,
+  type: z.literal("table"),
+  hasHeaderRow: z.boolean(),
+  hasRowHeaders: z.boolean(),
+  rows: z.array(z.object({
+    id: StableIdSchema,
+    cells: z.array(z.object({
+      id: StableIdSchema,
+      text: z.string().max(MAX_QUESTION_CONTEXT_TEXT_LENGTH),
+      questionId: StableIdSchema.optional(),
+    }).strict()).min(1).max(MAX_QUESTION_CONTEXT_TABLE_COLUMNS),
+  }).strict()).min(1).max(MAX_QUESTION_CONTEXT_TABLE_ROWS),
+}).strict().superRefine((table, context) => {
+  const columns = table.rows[0]?.cells.length ?? 0;
+  table.rows.forEach((row, rowIndex) => {
+    if (row.cells.length !== columns) {
+      context.addIssue({
+        code: "custom",
+        path: ["rows", rowIndex, "cells"],
+        message: "表格必须保持每行列数一致。",
+      });
+    }
+  });
+});
+
+const DraftContextBlockSchema = z.discriminatedUnion("type", [
+  DraftContextParagraphSchema,
+  DraftContextListSchema,
+  DraftContextTableSchema,
+]);
+
 const DraftGroupSchema = z.object({
   id: StableIdSchema,
   title: z.string(),
@@ -80,6 +138,7 @@ const DraftGroupSchema = z.object({
   sourcePages: z.array(z.number().int().positive()),
   maxWords: z.number().int().positive().max(20).nullable(),
   sharedOptions: z.array(DraftOptionSchema),
+  contextBlocks: z.array(DraftContextBlockSchema).max(MAX_QUESTION_CONTEXT_BLOCKS),
   questions: z.array(DraftQuestionSchema),
 }).strict();
 
@@ -96,7 +155,7 @@ const DraftPassageSchema = z.object({
   questionGroups: z.array(DraftGroupSchema),
 }).strict();
 
-export const StructuredImportDraftSchema = z.object({
+const StructuredImportDraftV2Schema = z.object({
   schemaVersion: z.literal(STRUCTURED_IMPORT_DRAFT_VERSION),
   id: StableIdSchema,
   packId: StableIdSchema,
@@ -127,12 +186,42 @@ export const StructuredImportDraftSchema = z.object({
   installedPackId: StableIdSchema.nullable(),
 }).strict();
 
+function migrateLegacyStructuredDraft(input: unknown): unknown {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
+  const record = input as Record<string, unknown>;
+  if (record.schemaVersion !== 1 || !Array.isArray(record.passages)) return input;
+  return {
+    ...record,
+    schemaVersion: STRUCTURED_IMPORT_DRAFT_VERSION,
+    passages: record.passages.map((passage) => {
+      if (typeof passage !== "object" || passage === null || Array.isArray(passage)) return passage;
+      const passageRecord = passage as Record<string, unknown>;
+      if (!Array.isArray(passageRecord.questionGroups)) return passage;
+      return {
+        ...passageRecord,
+        questionGroups: passageRecord.questionGroups.map((group) => (
+          typeof group === "object" && group !== null && !Array.isArray(group)
+            ? { ...(group as Record<string, unknown>), contextBlocks: [] }
+            : group
+        )),
+      };
+    }),
+  };
+}
+
+export const StructuredImportDraftSchema = z.preprocess(
+  migrateLegacyStructuredDraft,
+  StructuredImportDraftV2Schema,
+);
+
 export type StructuredImportDraft = z.infer<typeof StructuredImportDraftSchema>;
 export type StructuredSourceSegment = StructuredImportDraft["sourceSegments"][number];
 export type StructuredPassageDraft = StructuredImportDraft["passages"][number];
 export type StructuredGroupDraft = StructuredPassageDraft["questionGroups"][number];
 export type StructuredQuestionDraft = StructuredGroupDraft["questions"][number];
 export type StructuredOptionDraft = StructuredQuestionDraft["options"][number];
+export type StructuredContextBlockDraft = StructuredGroupDraft["contextBlocks"][number];
+export type StructuredContextTableDraft = Extract<StructuredContextBlockDraft, { type: "table" }>;
 
 export interface StableIdFactory {
   (prefix: string): string;
@@ -238,8 +327,78 @@ export function createStructuredGroup(
     sourcePages: uniqueNumbers(partial.sourcePages ?? []),
     maxWords: partial.maxWords ?? null,
     sharedOptions: partial.sharedOptions?.map((option) => ({ ...option })) ?? [],
+    contextBlocks: partial.contextBlocks?.map((block) => structuredClone(block)) ?? [],
     questions: partial.questions?.map((question) => createStructuredQuestion(question, idFactory)) ?? [],
   };
+}
+
+export function createStructuredContextParagraph(
+  idFactory: StableIdFactory = defaultIdFactory,
+): Extract<StructuredContextBlockDraft, { type: "paragraph" }> {
+  return { id: idFactory("question-context"), type: "paragraph", text: "" };
+}
+
+export function createStructuredContextList(
+  style: "ordered" | "unordered" = "ordered",
+  idFactory: StableIdFactory = defaultIdFactory,
+): Extract<StructuredContextBlockDraft, { type: "list" }> {
+  return {
+    id: idFactory("question-context"),
+    type: "list",
+    style,
+    items: [{ id: idFactory("question-context-list-item"), text: "" }],
+  };
+}
+
+export function createStructuredContextTable(
+  rowCount = 2,
+  columnCount = 2,
+  idFactory: StableIdFactory = defaultIdFactory,
+): StructuredContextTableDraft {
+  const safeRows = Math.min(MAX_QUESTION_CONTEXT_TABLE_ROWS, Math.max(1, Math.trunc(rowCount)));
+  const safeColumns = Math.min(MAX_QUESTION_CONTEXT_TABLE_COLUMNS, Math.max(1, Math.trunc(columnCount)));
+  return {
+    id: idFactory("question-context"),
+    type: "table",
+    hasHeaderRow: true,
+    hasRowHeaders: false,
+    rows: Array.from({ length: safeRows }, () => ({
+      id: idFactory("question-context-table-row"),
+      cells: Array.from({ length: safeColumns }, () => ({
+        id: idFactory("question-context-table-cell"),
+        text: "",
+      })),
+    })),
+  };
+}
+
+export function resizeStructuredContextTable(
+  table: StructuredContextTableDraft,
+  rowCount: number,
+  columnCount: number,
+  idFactory: StableIdFactory = defaultIdFactory,
+): StructuredContextTableDraft {
+  const safeRows = Math.min(MAX_QUESTION_CONTEXT_TABLE_ROWS, Math.max(1, Math.trunc(rowCount)));
+  const safeColumns = Math.min(MAX_QUESTION_CONTEXT_TABLE_COLUMNS, Math.max(1, Math.trunc(columnCount)));
+  const rows = Array.from({ length: safeRows }, (_, rowIndex) => {
+    const existingRow = table.rows[rowIndex];
+    return {
+      id: existingRow?.id ?? idFactory("question-context-table-row"),
+      cells: Array.from({ length: safeColumns }, (_, columnIndex) => {
+        const existingCell = existingRow?.cells[columnIndex];
+        return existingCell
+          ? { ...existingCell }
+          : { id: idFactory("question-context-table-cell"), text: "" };
+      }),
+    };
+  });
+  return { ...table, rows };
+}
+
+export function boundStructuredQuestionIds(group: StructuredGroupDraft): Set<string> {
+  return new Set(group.contextBlocks.flatMap((block) => block.type === "table"
+    ? block.rows.flatMap((row) => row.cells.flatMap((cell) => cell.questionId ? [cell.questionId] : []))
+    : []));
 }
 
 export function createStructuredPassage(
@@ -470,6 +629,17 @@ export function moveQuestionBetweenGroups(
     ...passage,
     questionGroups: passage.questionGroups.map((group) => ({
       ...group,
+      contextBlocks: group.contextBlocks.map((block) => block.type === "table"
+        ? {
+            ...block,
+            rows: block.rows.map((row) => ({
+              ...row,
+              cells: row.cells.map((cell) => cell.questionId === questionId
+                ? { ...cell, questionId: undefined }
+                : cell),
+            })),
+          }
+        : block),
       questions: group.questions.filter((question) => {
         if (question.id === questionId) selected = question;
         return question.id !== questionId;
@@ -691,6 +861,45 @@ export function validateStructuredImportDraft(draftInput: StructuredImportDraft)
       if (!group.instructions.trim()) issues.push(issue("error", "GROUP_INSTRUCTIONS_REQUIRED", `${groupPath}.instructions`, "题组说明不能为空。"));
       if (group.questions.length === 0) issues.push(issue("error", "QUESTION_REQUIRED", `${groupPath}.questions`, `${group.title || "题组"} 至少需要一道题。`));
       group.sharedOptions.forEach((option, optionIndex) => allIds.push({ id: option.id, path: `${groupPath}.sharedOptions.${optionIndex}.id` }));
+      const questionById = new Map(group.questions.map((question) => [question.id, question]));
+      const boundQuestionIds = new Set<string>();
+      let contextNodeCount = group.contextBlocks.length;
+      group.contextBlocks.forEach((block, blockIndex) => {
+        const blockPath = `${groupPath}.contextBlocks.${blockIndex}`;
+        allIds.push({ id: block.id, path: `${blockPath}.id` });
+        if (block.type === "list") {
+          contextNodeCount += block.items.length;
+          block.items.forEach((item, itemIndex) => allIds.push({
+            id: item.id,
+            path: `${blockPath}.items.${itemIndex}.id`,
+          }));
+        }
+        if (block.type !== "table") return;
+        contextNodeCount += block.rows.length + block.rows.reduce((sum, row) => sum + row.cells.length, 0);
+        block.rows.forEach((row, rowIndex) => {
+          allIds.push({ id: row.id, path: `${blockPath}.rows.${rowIndex}.id` });
+          row.cells.forEach((cell, cellIndex) => {
+            const cellPath = `${blockPath}.rows.${rowIndex}.cells.${cellIndex}`;
+            allIds.push({ id: cell.id, path: `${cellPath}.id` });
+            if (!cell.questionId) return;
+            const question = questionById.get(cell.questionId);
+            if (!question) {
+              issues.push(issue("error", "CONTEXT_QUESTION_REFERENCE_INVALID", `${cellPath}.questionId`, "表格作答位置必须引用当前题组内存在的 questionId。"));
+              return;
+            }
+            if (question.type !== "short-answer" && question.type !== "fill-blank") {
+              issues.push(issue("error", "CONTEXT_QUESTION_TYPE_UNSUPPORTED", `${cellPath}.questionId`, `Question ${question.number} 的题型不能绑定到表格输入框。`));
+            }
+            if (boundQuestionIds.has(cell.questionId)) {
+              issues.push(issue("error", "CONTEXT_QUESTION_BINDING_DUPLICATE", `${cellPath}.questionId`, `Question ${question.number} 已有一个主要表格作答位置。`));
+            }
+            boundQuestionIds.add(cell.questionId);
+          });
+        });
+      });
+      if (contextNodeCount > MAX_QUESTION_CONTEXT_NODES) {
+        issues.push(issue("error", "CONTEXT_NODE_LIMIT", `${groupPath}.contextBlocks`, `题组上下文最多允许 ${MAX_QUESTION_CONTEXT_NODES} 个持久节点。`));
+      }
       group.questions.forEach((question, questionIndex) => {
         const questionPath = `${groupPath}.questions.${questionIndex}`;
         allIds.push({ id: question.id, path: `${questionPath}.id` });
@@ -793,6 +1002,7 @@ export async function buildStructuredReadingPack(
       id: group.id,
       title: group.title.trim() || undefined,
       instructions: groupInstructions(group),
+      contextBlocks: group.contextBlocks.map((block) => structuredClone(block)),
       questions: group.questions.map((question) => {
         const source = question.sourcePages.length > 0 ? {
           rawText: question.rawText.trim() || question.prompt.trim(),
@@ -821,6 +1031,9 @@ export async function buildStructuredReadingPack(
       }),
     })),
   }));
+  const usesStructuredQuestionContext = draft.passages.some((passage) =>
+    passage.questionGroups.some((group) => group.contextBlocks.length > 0),
+  );
   const sourcePages = draft.source.pages.map((page) => page.pageNumber);
   const sourceRange = { start: Math.min(...sourcePages), end: Math.max(...sourcePages) };
   return parseIeltsPack({
@@ -854,12 +1067,22 @@ export async function buildStructuredReadingPack(
       },
     },
     modules: [{
-      schemaVersion: 1,
+      schemaVersion: usesStructuredQuestionContext ? 2 : 1,
       id: draft.moduleId,
       testId: draft.testId,
       type: "reading",
       title: draft.bookTitle.trim(),
-      sections,
+      sections: usesStructuredQuestionContext
+        ? sections
+        : sections.map((section) => ({
+            ...section,
+            questionGroups: section.questionGroups.map((group) => ({
+              id: group.id,
+              ...(group.title ? { title: group.title } : {}),
+              instructions: group.instructions,
+              questions: group.questions,
+            })),
+          })),
     }],
   });
 }

@@ -173,6 +173,7 @@ type QuestionGroup = {
   id: string;
   title?: string;
   instructions: string;
+  contextBlocks?: QuestionContextBlock[];
   questions: Question[];
 };
 
@@ -209,17 +210,44 @@ type Question =
     });
 ```
 
+`contextBlocks` 只允许出现在 `reading.json` 的模块 `schemaVersion: 2` 中。它按原始顺序混排段落、单层列表和规则矩形表格：
+
+```ts
+type QuestionContextBlock =
+  | { id: string; type: "paragraph"; text: string }
+  | {
+      id: string;
+      type: "list";
+      style: "ordered" | "unordered";
+      items: Array<{ id: string; text: string }>;
+    }
+  | {
+      id: string;
+      type: "table";
+      hasHeaderRow: boolean;
+      hasRowHeaders: boolean;
+      rows: Array<{
+        id: string;
+        cells: Array<{ id: string; text: string; questionId?: string }>;
+      }>;
+    };
+```
+
+表格必须保持矩形；`questionId` 只能指向当前题组中的 `short-answer` 或 `fill-blank`，且同一道题在该题组上下文中最多绑定一个主要作答位置。表格绑定只是现有答案控件的显示位置，答案、提交和评分仍使用原 Session + `questionId`，不会创建表格专用答案。
+
+持久化边界为每题组最多 32 个上下文块、每个列表最多 50 项、表格最多 30 行 × 12 列、每个文本节点最多 4,000 个 Unicode 字符、每题组最多 512 个上下文持久节点。段落 ID、列表项 ID、表格行 ID 和单元格 ID 都参与全题包稳定 ID 唯一性校验；标记锚定段落、列表项或单元格 ID，不锚定数组下标或行列坐标。
+
 新建题包仍应为每道题写入正整数 `number`。为兼容早期 Reading v1 题包，Reading 题目缺少该字段时，导入后会按完整 Reading 模块（Section → QuestionGroup → Question）的稳定原始顺序补齐展示题号；Listening 题目仍必须显式提供 `number`。筛选 Passage、题段或单题只改变视图，不得重新编号，也不得改变 `questionId`、`sectionId` 或 `blockId`。
 
 `points` 省略时为 1。Fill-blank 的 `sentence` 必须恰好包含一个 `{{blank}}`。`correctOptionId` 必须引用本题唯一 option，`acceptableAnswers` 至少包含一个非空字符串。正确答案属于只读题包；未提交练习，尤其进行中的 Exam，不得通过 UI 暴露。
 
 ### 3.5 Module
 
-所有模块都包含 `schemaVersion: 1`、稳定 `id`、与唯一 Test 一致的 `testId`、`type` 和非空 `title`。
+所有模块都包含稳定 `id`、与唯一 Test 一致的 `testId`、`type` 和非空 `title`。Listening 与 Writing 当前只接受模块 `schemaVersion: 1`；Reading 接受 1 或 2。Reading v1 不允许出现 `contextBlocks`，Reading v2 才声明并校验上述结构化上下文。
 
 ```ts
-type ReadingModuleV1 = {
-  schemaVersion: 1;
+type ReadingModule = {
+  schemaVersion: 1 | 2;
   id: string;
   testId: string;
   type: "reading";
@@ -280,11 +308,13 @@ Listening 的 `audioAssetId` 必须解析到 audio asset；Writing 的可选 `im
 ```ts
 type IELTSPack = {
   manifest: PackManifestV1;
-  modules: Array<ReadingModuleV1 | ListeningModuleV1 | WritingModuleV1>;
+  modules: Array<ReadingModule | ListeningModuleV1 | WritingModuleV1>;
 };
 ```
 
 该对象通过 Zod 严格校验后深度冻结。未知字段、错误 discriminant、悬空引用、重复 ID 或未声明模块都必须拒绝。
+
+兼容规则是“新应用读取旧数据”：新版继续读取没有 `contextBlocks` 的 Reading v1 包；结构化导入草稿 v1 在读取时确定性升级为草稿 v2，并给每个旧题组补空 `contextBlocks`，既有 Passage、题组、题目和来源 ID 不变。含真实结构化上下文的新题包保留 manifest v1 的固定文件布局，但 `reading.json` 明确写入模块 `schemaVersion: 2`；旧版应用不保证能读取这种新模块。已安装题包仍视为只读，不做原地结构改写。
 
 ## 4. 校验与安装
 
