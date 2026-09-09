@@ -1,6 +1,6 @@
 # Reading 多 Passage 功能与验收记录
 
-更新日期：2026-09-07
+更新日期：2026-09-09
 
 ## 已完成能力
 
@@ -33,9 +33,17 @@
 - Vite 1420 关闭时从 `http://tauri.localhost` 独立启动。实际完成 P2/Q18、四种题目切换、独立滚动、目标 Pane 导航、同题答案同步、同 Passage 双 Pane、重复文本标记隔离及整套配对。
 - SQLite 写入 Q18=`true`、2 条标记和最终视图状态；正常退出并直接重启后恢复左 Passage 2、右 Q18、答案与 Passage 2 标记。
 
+## 2026-09-09 日常 Reading 合并交付
+
+- 在既有多 Passage/题组选择和结构化上下文上增加 Reading v3：YNNG、显式多选、统一 matching 四类、summary/notes completion；答案、标记、题号和 Pane DOM 仍分别遵守稳定领域 ID 与视图实例边界。
+- PDF 人工整理器支持批量题目/选项/答案、题号范围分配、题组统一设置和可解释候选；所有批量变化先预览，歧义、遗漏和不支持配置阻止确认。原创 11 页文本层 PDF 已在原生 Release 中人工整理并安装为 3 Passage/11 题组/40 题。
+- 完整练习现有 Session 级待检查、Study/Exam 计时、提交确认/幂等、可评分汇总、历史查看、继续和新 Session 重做；旧提交不被覆盖。工作区可切换，SQLite online backup 与逐文件 SHA-256 清单支持只恢复到新的独立工作区。
+- 最终自动化：前端 34 文件、204/204；lint 通过；Cargo 33/33；Tauri `--no-bundle` 生产构建通过。最终交付 EXE 为 `D:\IELTS-Workbench-Releases\daily-use-20260909-191124\ielts-workbench.exe`，SHA-256 `8BEEAACB85C301EC671157269FFE9D70B954ED895C9E90DA3E4BE909119F17A8`。
+- 原生证据分别保存在 `D:\IELTS-Workbench-Daily-Acceptance-20260909-1703`、`D:\IELTS-Workbench-PDF-Daily-Acceptance-20260909-1745` 和相应备份/恢复目录；正式日常工作区为 `D:\IELTS-Workbench`。
+
 ## 已知限制
 
-- PDF 辅助导入仍只从用户选择页生成一个 Reading Passage；没有 OCR、自动多 Passage 识别或复杂版面拆分。
+- PDF 导入可以人工确认多 Passage/多题组，但规则只产生可解释候选，仍需人工核对页码、边界、题型、共享选项、结构化上下文和答案；没有 OCR、可靠的自动复杂版面/合并表格还原或 AI 推断。
 - IELTSPack v1 的 Reading 正文块当前是 heading/paragraph/instruction/quote 文本块；本轮样本没有新增 Reading 图片块或新题型。
 - Pane 滚动位置按内容选择尽量恢复，但不承诺跨题包内容版本变更后的像素级位置一致；失效选择会回退并提示。
 - 本轮未重建或安装 MSI/NSIS；交付对象是独立 Release EXE。

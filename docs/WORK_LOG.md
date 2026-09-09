@@ -160,3 +160,25 @@
 - SQLite 证据：Session `084990c6-1b98-4827-b237-97afab3c80d8` 保存 Q17/Q18 和上述 annotation；第二次提交 Session `1eff08e1-b2e5-43ea-8cb8-59637ab612b1` 保存 Q17=`field team`、Q18=`west desk`、Q19=`blue folder`。Review 保留结构化上下文，前两题正确，Q19 显示“待核对”，统计为 2 正确、0 错误、0 未答、1 待核对。
 - 最终固定源码回归：两次 `npm test` 均为 30 文件、177/177；`npm run lint` 退出码 0；`npm run build` 转换 2009 modules、退出码 0；`cargo test --manifest-path src-tauri/Cargo.toml` 为 29/29。未启用重试、未扩大超时、未删除断言。
 - 实现、schema、测试与原创样本已保存为本地提交 `affa89d`；验收数据库、生成 PDF、Release、缓存和工具链未提交。未 push、未打 tag。
+
+## 2026-09-09 — Reading 日常可用版合并开发（A–D）
+
+- 从干净基准 `feat/pdf-import-mvp` / `dc0aa415050def619b819c68446cdcf7ea7074c9` 开始，在既有人工结构化导入、Reading 双 Pane、Session/SQLite 和题包安装链路上连续补齐 A–D，没有重新初始化、迁移、升级整套依赖或重做 UI。
+- 导入整理器新增批量题目/选项预览、Answer Key 全量无歧义预览与一次确认、按题号范围显示稳定 questionId 后分配、题组统一题型/说明/字数限制/共享选项，以及基于显式 Passage/Questions/题号/A–H 行的可解释候选。重复、缺失、歧义和未解析条目阻止整批写入；已确认对象和人工修改不会被候选重新生成覆盖。
+- Reading module schema v3 新增 YNNG、显式多选计分契约、统一 matching（headings/information/features/sentence-endings + 选项复用规则）和 summary/notes completion 的稳定 questionId 空位。前端 Zod、Rust serde/安装校验、草稿、编辑器、练习控件和 Review/评分共用同一契约；v1/v2 继续读取，旧 ID 不重建。
+- 练习页增加已答/未答/待检查状态、Session 级待检查标记、Study/Exam 明确计时、提交前未答/待检查确认和提交幂等。Library 展示最近 Session 历史；未完成练习可继续，已提交练习可进入 Review，重新练习创建新 Session，不覆盖旧答案、标记或提交记录。Review 区分正确、错误、未答和不可评分，分别显示正确题/可评分题与得分/可评分分值，不伪造 Band。
+- Settings 增加当前工作区切换入口和完整本地备份/恢复。Rust 使用 SQLite online backup 生成一致性数据库快照，连同 `packs/`、`imports/`、`themes/` 写入新备份目录，最后生成逐文件长度/SHA-256 清单；恢复先校验全部文件和路径/reparse 安全，再新建独立工作区、新 workspaceId 并执行 SQLite integrity check，绝不覆盖当前数据库。
+- 新增原创 `samples/original-daily-reading-pack`：3 Passage、40 题、连续题号 1–40，覆盖本轮全部题型与 table/summary/notes completion；Rust 和前端均从真实目录校验。配套 11 页原创文本层 PDF 位于 Git 忽略的 `local-data\import-samples\original-daily-reading-complete.pdf`，18,310 字节、SHA-256 `4C229ABE42DC96CC8D927DB90E54CDE4687DAB97C55308B3B8E8ABE6CC7DE308`，已完成文本提取和逐页渲染目视检查。
+- 仅在项目 `local-data` 和既有明确授权的 IELTS 工作区/交付目录范围内检查材料；未找到用户真实 Reading 试卷，未做全盘或网盘扩权扫描。因此当前私有真实材料验收明确为“缺少文件”，继续使用原创样本验证，但不把它冒充真题。
+- 开发期间定向测试已覆盖批量错位防护、稳定 ID、题型渲染、completion 绑定、计时、历史/重做隔离、备份篡改与恢复；最新定向结果为 QuestionRenderer/上下文/评分/批量导入 15/15，题组统一设置 6/6，Rust 备份 3/3。最终全量门槛和 Release 原生验收在后续同节追加。
+
+## 2026-09-09 — 日常 Reading 最终回归、Release 与原生闭环
+
+- 源码固定后 `npm test` 为 34 文件、204/204；`npm run lint` 退出码 0；`cargo test --manifest-path src-tauri/Cargo.toml` 为 33/33；`npm run tauri -- build --no-bundle` 退出码 0，beforeBuild 的 Vite production build 转换 2013 个模块。没有跳过测试、放宽断言或生成/安装 MSI/NSIS。
+- 最终源码提交 `4c41ec2` 包含 A–D 功能、测试、原创样本及契约/安全说明；Python `__pycache__` 和 `.pyc` 已由 `.gitignore` 排除，生成 PDF、Release、数据库、备份、恢复目录、缓存和工具链均未提交。
+- 原创完整题包在 `D:\IELTS-Workbench-Daily-Acceptance-20260909-1703` 完成 6/40 作答、Q18 待检查、Passage 2 标记、双 Pane 同题双向同步、独立滚动和目标 Pane 导航。正常重启恢复后提交结果为 6/40 正确、6/40 分、34 未答、1 标记；历史保留旧 Session，重新练习创建独立 0/40 新 Session。
+- 一致性备份输出为 `D:\IELTS-Workbench-Daily-Backups-20260909-1703\ielts-workbench-backup-20260909-093553-9c7dc79f`，11 个文件、363,292 字节；数据库清单哈希 `1aa9b2ea826bf2a840915994ea4910c44796b8ac99f222c83d0d3173eeb2442c`。恢复目录 `D:\IELTS-Workbench-Daily-Restores-20260909-1703\IELTS-Workbench-Restored-20260909-093553-b71cbeb9` 使用新 workspaceId，旧 Review 和当前练习均能打开。
+- 原创 11 页 PDF 在 `D:\IELTS-Workbench-PDF-Daily-Acceptance-20260909-1745` 通过真实 Windows 文件对话框导入。选择正文 1–9 页、答案 10–11 页后，规则建议得到 3 Passage/11 题组/40 题；4 个页眉/页脚答案行、105 个结构错误、缺 matching 选项和错误 YNNG 类型均先阻止安装。人工明确修正/忽略并完成 40 题复核后，校验 0 错误、0 警告，经真实 Rust Repository 安装并在 Reading 显示全部结构。
+- 从 PDF 导入页切到 Reading 后首次正常关窗暴露陈旧 close listener 竞态；只强制结束了已确认草稿落库的那一个卡住进程。修复为仅活动导入页可拦截关闭，并增加组件卸载回归测试。重建后的最终 EXE 恢复同一草稿，再从导入页切到 Library/Reading 后正常关窗，2.6 秒内进程和调试监听均结束。
+- 最终 EXE 复制到新目录 `D:\IELTS-Workbench-Releases\daily-use-20260909-191124\ielts-workbench.exe`，13,193,728 字节，修改时间 `2026-09-09 19:10:57 +08:00`，SHA-256 `8BEEAACB85C301EC671157269FFE9D70B954ED895C9E90DA3E4BE909119F17A8`；与修复前交付哈希不同，复制后哈希一致。Vite 1420 未监听时直接启动，origin 为 `http://tauri.localhost`。
+- 新建正式工作区 `D:\IELTS-Workbench`，workspaceId `a18137ae-5b67-4d6a-a77b-dbcb73f61a51`，SQLite 位于同目录；通过最终 EXE 安装原创完整 Reading 题包。范围内没有用户真实 Reading PDF，故真实材料兼容性仍明确保留为待用户私有验收。

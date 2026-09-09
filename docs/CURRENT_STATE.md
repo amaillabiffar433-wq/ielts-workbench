@@ -6,6 +6,7 @@
 
 - 项目目录：`D:\Projects\雅思or算法软件项目`
 - 分支：`feat/pdf-import-mvp`
+- Reading 日常可用版功能提交：`4c41ec2`（批量结构化整理、Reading v3 常用题型、完整练习／复盘、工作区切换及一致性备份恢复）
 - Reading 表格／列表上下文源码提交：`affa89d`（Reading module v2、草稿迁移、人工编辑器、共享渲染、表格内作答、标记与原创样本）
 - Reading PDF 人工结构化导入源码提交：`a6771d6`（可恢复草稿、稳定 ID、三阶段编辑器、校验/预览、原创 PDF 与回归测试）
 - Reading 稳定题组选择源码提交：`1b141d8`（按 `questionGroupId` 精确筛选、双 Pane 独立状态、安全恢复与回归测试）
@@ -19,6 +20,22 @@
 - 远程状态：本轮不推送
 
 原项目仍保留在 `C:\Users\Exming\Documents\雅思or算法软件项目`，尚未删除，因此迁移核验期间没有释放 C 盘空间。
+
+## 2026-09-09 Reading 日常可用版（合并交付）
+
+- 导入：现有 PDF 人工结构化向导已增加批量题目/选项、Answer Key 预览确认、题号范围分配、题组统一设置，以及带 source segment/page/reason 的有限规则候选。所有批量变化先预览；重复、缺失、歧义或未解析条目会阻止整批写入，不覆盖既有草稿和人工修正。
+- 题型：Reading module schema v3 贯通 YNNG、显式多选计分契约、统一 matching 四类配置，以及 summary/notes completion 的稳定 questionId 作答位。v1/v2 继续兼容；展示、双 Pane、答案、标记和 Review 均继续使用稳定领域 ID。
+- 练习：题号导航可见已答/未答/待检查；待检查按 Session 保存。Study 仅累计练习页打开时间，Exam 使用持久化开始时间且重启不重置。提交前显示未答/待检查数量，重复提交幂等；Library 可查看最近 Session，继续未完成练习或打开已提交 Review，重新练习创建新 Session。
+- 复盘：按完整 Session 展示用户答案、标准答案或“未提供标准答案”、正确/错误/未答/待核对、Passage/题组/结构化上下文、实际用时以及正确题/可评分题和得分/可评分分值；不输出未经官方规则支持的 Band。
+- 工作区与备份：Settings 显示真实工作区和 SQLite，可切换到用户选择的新目录。完整备份通过 Rust/SQLite 一致性快照导出数据库、题包/资源、导入草稿与主题，并写逐文件 SHA-256 清单；恢复先校验再新建独立工作区和 workspaceId，不覆盖当前数据。
+- 原创完整样本：`samples\original-daily-reading-pack` 是可经正常安装链路使用的 3 Passage / 40 题 Reading v3 题包；配套 11 页文本层 PDF 为被忽略的 `local-data\import-samples\original-daily-reading-complete.pdf`，18,310 字节，SHA-256 `4C229ABE42DC96CC8D927DB90E54CDE4687DAB97C55308B3B8E8ABE6CC7DE308`。二者均为原创工程验收材料，不是 Cambridge 或用户真实试卷。
+- 材料边界：只检查了项目 `local-data` 和既有明确授权工作区/交付目录，未找到用户真实 Reading 试卷；真实材料验收仍缺少文件，不能由原创样本替代。
+- 自动化与构建：最终 `npm test` 为 34/34 文件、204/204；`npm run lint` 退出码 0；`cargo test --manifest-path src-tauri/Cargo.toml` 为 33/33；`npm run tauri -- build --no-bundle` 退出码 0，其 beforeBuild 的 Vite production build 转换 2013 个模块。未生成或安装 MSI/NSIS。
+- 原生闭环：交付目录 EXE 在 Vite 1420 未监听时从 `http://tauri.localhost` 独立启动。原创 3 Passage/40 题题包完成作答、双 Pane 同步/隔离、退出恢复、提交、Review、历史与新 Session；原创 11 页 PDF 经系统文件对话框、页码范围、规则建议、人工纠错、40 个答案确认、校验和安装走完真实链路。
+- 备份恢复：`D:\IELTS-Workbench-Daily-Acceptance-20260909-1703` 的 SQLite/题包/草稿/主题已备份到 `D:\IELTS-Workbench-Daily-Backups-20260909-1703\ielts-workbench-backup-20260909-093553-9c7dc79f`，再恢复到新的 `D:\IELTS-Workbench-Daily-Restores-20260909-1703\IELTS-Workbench-Restored-20260909-093553-b71cbeb9`；清单逐文件校验和 SQLite integrity check 均通过，旧提交和新练习并存。
+- 关窗修复：原生 PDF 验收发现从导入页切换路由后旧 close listener 仍可能拦截正常关闭；现已限制只有活动导入页可阻止关窗，增加卸载竞态回归测试。修复后的最终 EXE 已验证正常关闭，2.6 秒内进程及调试监听均结束。
+- 正式工作区：`D:\IELTS-Workbench`，workspaceId `a18137ae-5b67-4d6a-a77b-dbcb73f61a51`，SQLite 为同目录 `ielts-workbench.sqlite3`；已通过最终 EXE 安装原创完整 Reading 题包，当前 bootstrap 指向该目录。
+- 日常交付：`D:\IELTS-Workbench-Releases\daily-use-20260909-191124\ielts-workbench.exe`，13,193,728 字节，修改时间 `2026-09-09 19:10:57 +08:00`，SHA-256 `8BEEAACB85C301EC671157269FFE9D70B954ED895C9E90DA3E4BE909119F17A8`；前端已嵌入 EXE，无需保留 Vite 或额外程序目录，学习数据仍需保留所选工作区。
 
 ## 2026-09-09 Reading 结构化表格／列表上下文 MVP
 
@@ -74,21 +91,21 @@
 
 | 范围 | 当前状态 | 证据或说明 |
 | --- | --- | --- |
-| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-09 `npm run lint` 退出码 0；`npm run build` 成功转换 2009 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
-| 默认 `npm test` | 最终源码连续两次通过 | 2026-09-09 两次均为 30/30 文件、177/177 测试；未改超时、重试或全局超时 |
+| React/TypeScript/Vite 前端 | D 盘最终验证通过 | 2026-09-09 `npm run lint` 退出码 0；最终 Release 的 beforeBuild 成功转换 2013 个模块并输出 PDF worker；仅有既知的大 chunk 提示 |
+| 默认 `npm test` | 最终源码通过 | 2026-09-09 为 34/34 文件、204/204 测试；未改超时、重试或全局超时 |
 | Reading 多 Passage、稳定题组、双 Pane、答案与文字标记 | Release 原生验证通过 | 题组/单题保留结构化上下文；表格内答案共享，DOM/导航按 Pane 隔离；单元格标记按稳定 ID 隔离并完成 SQLite 退出/重启恢复 |
-| Reading PDF 辅助导入 | 简单、人工多 Passage 和表格/列表流程均原生通过 | 新 3 页原创 PDF 经原生对话框和向导人工整理为段落/列表/5×3 表格，草稿重启、正式安装、表格作答与 Review 均通过；不声称自动表格识别 |
-| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-09 `cargo test --manifest-path src-tauri/Cargo.toml` 为 29/29；Reading v2、交叉引用、重复绑定和 v1 拒绝新增字段均有测试 |
+| Reading PDF 辅助导入 | 简单、人工多 Passage、批量整理和表格/列表流程均原生通过 | 11 页原创 PDF 经原生对话框整理为 3 Passage/11 题组/40 题；错误类型、缺选项、未分配片段会阻止安装，人工确认后校验和安装通过；不声称 OCR 或自动复杂版面识别 |
+| Rust 工作区、SQLite、题包和媒体源码 | 原生编译与测试通过 | 2026-09-09 `cargo test --manifest-path src-tauri/Cargo.toml` 为 33/33；Reading v3、备份篡改/恢复和既有兼容边界均有测试 |
 | 原创 Listening/Writing 媒体 | 原生验证通过 | WAV 在真实 WebView 中播放；Exam 拖动/倍速/重播限制生效；900×560 Task 1 PNG 与 SQLite 草稿/版本均跨重启恢复 |
 | Tauri dev | 原生验证通过 | 在真实 Tauri 进程中确认 `window.__TAURI_INTERNALS__`，设置页显示 D 盘工作区和 SQLite；两轮正常退出/重启通过 |
-| Release/安装包 | 新 Reading EXE 独立运行通过 | Tauri 生产上下文 `--no-bundle` 生成新 EXE；Vite 关闭时从 `http://tauri.localhost` 启动并完成 Reading 退出/恢复；本轮未重建或安装 MSI/NSIS |
+| Release/安装包 | 日常交付 EXE 独立运行通过 | `--no-bundle` 生成 13,193,728 字节 EXE；从独立交付目录在 Vite 关闭时完成 Reading、PDF、恢复和正常关窗验证；本轮未重建或安装 MSI/NSIS |
 | DeepSeek、Vocabulary、OCR 等 | 未开始 | 明确不在本轮范围 |
 
 ## 当前阻塞与下一步
 
-1. Reading 规则表格／单层列表上下文与表格内作答已经闭环，没有剩余环境或实现阻塞。
-2. 用户可直接双击 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；本轮验收数据位于 `D:\IELTS-Workbench-Table-List-Acceptance-20260909-122427`，不得删除。旧工作区、回退 EXE、C 盘项目和既有样本也保持不变。
-3. 当前不支持合并单元格、多层列表/嵌套表格、单元格图片/公式、任意 HTML、复杂跨栏还原、OCR、AI 推断或自动表格识别。下一轮可单独评估“多层表头/合并单元格”的最小 schema，而不是直接扩成电子表格。
+1. 日常 Reading 的导入、练习、提交、复盘、历史、新 Session、工作区切换和一致性备份恢复已形成原创材料原生闭环，没有剩余环境阻塞。
+2. 用户可直接双击 `D:\IELTS-Workbench-Releases\daily-use-20260909-191124\ielts-workbench.exe`；正式数据位于 `D:\IELTS-Workbench`，不得删除。旧工作区、回退 EXE、C 盘项目和既有验收资料也保持不变。
+3. 用户自己的真实 Reading PDF 尚未提供，仍需私有验收。当前只处理有文本层 PDF，结构/答案必须人工确认；不支持 OCR、复杂跨栏自动还原、合并单元格、多层列表/嵌套表格、单元格图片/公式、任意 HTML 或 AI 推断。
 
 ## 2026-09-08 Reading 稳定题组 Release 验收摘要
 

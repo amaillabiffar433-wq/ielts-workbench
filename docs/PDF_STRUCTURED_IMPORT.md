@@ -73,7 +73,8 @@ Answer Key 以完整 Reading 模块中的唯一题号定位，再写入稳定 qu
 
 ## 当前证据与限制
 
-- 自动化覆盖旧题包/旧草稿、序列化/校验/恢复、稳定 ID/绑定、非法和跨组引用、表格内答案、单题筛选、双 Pane 同题、同文单元格标记、Review 和既有 Writing 关窗回归。最终两次均为 30 文件、177/177；Rust 29/29，lint/build 通过。
-- 真实 Tauri Release 从新增 PDF 走完原生系统文件选择、人工建立段落/列表/5×3 表格、Q17/Q18/Q19 绑定、草稿退出重启、正式安装、单题 Q18、双 Pane 同组、表格单元格标记、再次退出重启和 Review。验收工作区为 `D:\IELTS-Workbench-Table-List-Acceptance-20260909-122427`。
-- 新 Release EXE 为 `D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`，12,801,536 字节，SHA-256 `918BB334B962CF91EF52A467EF2FBD0A7000863B2ECF41DFFEB503154F9AA9F4`。
+- 自动化覆盖旧题包/旧草稿、批量映射防错、稳定 ID/绑定、Reading v3 题型和评分、计时、历史/新 Session、备份篡改/恢复、表格内答案、双 Pane、Review 及 Writing 关窗回归。最终为 34 文件、204/204；Rust 33/33，lint 和 2013-module production build 通过。
+- 真实 Tauri Release 在 `D:\IELTS-Workbench-PDF-Daily-Acceptance-20260909-1745` 从原创 11 页 PDF 走完系统文件选择、source 1–9/answer 10–11 页范围、可解释建议、3 Passage/11 题组/40 题人工修正、40 个答案确认、校验和正式安装。初始 105 个校验错误及 4 个非答案行均明确阻止安装，没有静默猜测或部分写入。
+- 另在 `D:\IELTS-Workbench-Daily-Acceptance-20260909-1703` 验证完整题包练习、提交、Review、历史、新 Session 和一致性备份；恢复到新工作区后旧提交与当前练习均可读。路由切换后的陈旧关窗监听竞态已修复并在最终 EXE 原生复验正常退出。
+- 日常交付 EXE 为 `D:\IELTS-Workbench-Releases\daily-use-20260909-191124\ielts-workbench.exe`，13,193,728 字节，SHA-256 `8BEEAACB85C301EC671157269FFE9D70B954ED895C9E90DA3E4BE909119F17A8`。
 - 当前不支持合并单元格、嵌套表格、多层列表、单元格图片/公式、任意 HTML、复杂跨栏还原、OCR、AI 推断或自动表格识别。一次文字标记只能位于一个稳定段落、列表项或单元格内；跨单元格选择会提示且不保存。

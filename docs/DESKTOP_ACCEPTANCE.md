@@ -140,3 +140,15 @@ npm run tauri dev
 - Review 第二次提交显示完整段落、列表和表格；Q17/Q18 为正确，Q19 有答案但没有标准答案时显示“待核对”，汇总 2 正确、0 错误、0 未答、1 待核对，没有因表格绑定重复计数或默认判错。
 - 新 EXE：`D:\Projects\雅思or算法软件项目\src-tauri\target\release\ielts-workbench.exe`；12,801,536 字节；`2026-09-09 12:21:29.995 +08:00`；SHA-256 `918BB334B962CF91EF52A467EF2FBD0A7000863B2ECF41DFFEB503154F9AA9F4`。旧 EXE 已单文件备份；本轮没有生成、覆盖或安装 MSI/NSIS。
 - 最终自动化：两次均为 30 文件、177/177；lint、2009-module Vite build、Cargo 29/29 通过。当前没有待人工验收项。
+
+## 2026-09-09 Reading 日常可用版原生验收
+
+- 最终交付 EXE：`D:\IELTS-Workbench-Releases\daily-use-20260909-191124\ielts-workbench.exe`；13,193,728 字节；修改时间 `2026-09-09 19:10:57 +08:00`；SHA-256 `8BEEAACB85C301EC671157269FFE9D70B954ED895C9E90DA3E4BE909119F17A8`。从该独立目录启动时 Vite 1420 未监听，origin 为 `http://tauri.localhost`，Tauri runtime 为真；本轮没有生成或安装 MSI/NSIS。
+- 完整题包工作区：`D:\IELTS-Workbench-Daily-Acceptance-20260909-1703`，SQLite 同目录，workspaceId `0c4d85fc-dc50-4eb8-b248-d99d113ab04b`。原创 3 Passage/40 题题包经真实 Rust 校验/安装；Pane A=P2、Pane B=`rivermark-p2-g2`（Q18–19），实际写入 6 个答案、Q18 待检查和 P2 稳定 block 标记。
+- 双 Pane 同显 Q18 时左右答案双向同步，DOM ID 分别为 `left-pane-rivermark-q18-section` / `right-pane-rivermark-q18-section`；独立滚动读回 131/287，题号导航只聚焦右 Pane。双 Pane 同显 P2 时标记在两侧显示，P3 的相同文本没有串标。
+- 正常关窗后进程结束；独立重启并“继续”后恢复 6/40、Q18 待检查、标记、左右 Pane 选择/滚动及计时。提交 Review 显示 40 题、6 正确、0 错误、34 未答、0 待核对、6/40 分、1 标记，不输出 Band；历史中旧提交保留，“重新练习”创建新的 0/40 Session。
+- 备份目录 `D:\IELTS-Workbench-Daily-Backups-20260909-1703\ielts-workbench-backup-20260909-093553-9c7dc79f` 含 11 个清单文件、363,292 字节。恢复目标 `D:\IELTS-Workbench-Daily-Restores-20260909-1703\IELTS-Workbench-Restored-20260909-093553-b71cbeb9` 使用新 workspaceId；清单哈希、SQLite integrity、2 个题包、旧 Review 和当前练习均核对通过。
+- PDF 工作区：`D:\IELTS-Workbench-PDF-Daily-Acceptance-20260909-1745`，workspaceId `312f4e02-31f1-455d-923e-bb92265d6dfa`。真实文件对话框选择原创 11 页文本层 PDF（18,310 字节，SHA-256 `4C229ABE42DC96CC8D927DB90E54CDE4687DAB97C55308B3B8E8ABE6CC7DE308`），正文 1–9 页、答案 10–11 页；规则建议形成 3 Passage/11 题组/40 题。未识别答案行、105 个初始结构错误、缺共享选项、YNNG 类型和未分配片段均显式阻止安装；人工修正后 0 错误、0 警告并从 UI 正式安装，Reading 显示 3 Passage/11 组/40 题。
+- PDF 草稿完整退出/重启后恢复稳定 ID、结构和答案；原路径断开时明确提示但文本快照仍可编辑。验收中发现从导入页切路由后陈旧 close listener 可拦截窗口，已修复并增加自动化测试。最终 EXE 复验：恢复草稿，切到 Library/Reading 后正常关闭，2.6 秒内 PID 与调试端口均结束。
+- 正式日常工作区：`D:\IELTS-Workbench`，workspaceId `a18137ae-5b67-4d6a-a77b-dbcb73f61a51`，SQLite 为 `D:\IELTS-Workbench\ielts-workbench.sqlite3`；最终 EXE 已安装原创完整 Reading 题包，Library 可见 2 个题包。用户真实 Reading PDF 未在授权范围内找到，因此仍需用户私有材料验收，不能把上述原创工程样本称为真实试卷证据。
+- 最终自动化：`npm test` 34 文件、204/204；`npm run lint` 退出码 0；`cargo test --manifest-path src-tauri/Cargo.toml` 33/33；`npm run tauri -- build --no-bundle` 退出码 0，包含 2013-module Vite production build。没有跳过、重试或放宽测试。
