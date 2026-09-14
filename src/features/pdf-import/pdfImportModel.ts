@@ -12,9 +12,11 @@ export interface PageRange {
 export interface ExtractedPdfPage {
   readonly pageNumber: number;
   readonly text: string;
+  readonly layout?: { readonly kind: "single-column" | "two-column" | "complex" | "scan"; readonly confidence: number; readonly message: string };
 }
 
 export interface PdfTextFragment {
+  readonly width?: number;
   readonly text: string;
   readonly x: number;
   readonly y: number;

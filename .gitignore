@@ -34,3 +34,5 @@ Thumbs.db
 # User workspaces and imported copyrighted study materials never belong in source control.
 IELTS-Workbench-Data/
 workspace-data/
+# Generated from locked npm packages; licenses are copied into the Release.
+/public/ocr/runtime/

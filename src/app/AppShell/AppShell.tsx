@@ -1,44 +1,15 @@
 import { useState } from "react";
-import {
-  BookOpenText,
-  Bot,
-  ChevronLeft,
-  ChevronRight,
-  FileInput,
-  Headphones,
-  Highlighter,
-  Library,
-  PanelLeftClose,
-  PenLine,
-  Settings,
-  X,
-  type LucideIcon,
-} from "lucide-react";
-import { Navigate, NavLink, Outlet, useLocation } from "react-router-dom";
+import { X } from "lucide-react";
+import { Navigate, Outlet, useLocation } from "react-router-dom";
 import {
   buildPracticeRoute,
   parsePracticeRouteIdentity,
   type PracticeModuleType,
 } from "../../features/practice/practiceRoute";
 import { useWorkbenchStore } from "../../stores/workbenchStore";
+import { TopNavigation } from "./TopNavigation";
+import "../../styles/wallpaper.css";
 import "./AppShell.css";
-
-type PrimaryNavigationItem = {
-  readonly to: string;
-  readonly label: string;
-  readonly icon: LucideIcon;
-  readonly moduleType?: PracticeModuleType;
-};
-
-const primaryNavigation: readonly PrimaryNavigationItem[] = [
-  { to: "/library", label: "题库", icon: Library },
-  { to: "/practice/reading", label: "阅读", icon: BookOpenText, moduleType: "reading" },
-  { to: "/practice/listening", label: "听力", icon: Headphones, moduleType: "listening" },
-  { to: "/practice/writing", label: "写作", icon: PenLine, moduleType: "writing" },
-  { to: "/review", label: "复盘", icon: Highlighter },
-  { to: "/import", label: "导入中心", icon: FileInput },
-  { to: "/settings", label: "设置", icon: Settings },
-];
 
 function AiDrawer({ onClose }: { onClose: () => void }) {
   return (
@@ -83,7 +54,6 @@ function AiDrawer({ onClose }: { onClose: () => void }) {
 }
 
 export function AppShell() {
-  const [collapsed, setCollapsed] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
   const location = useLocation();
   const session = useWorkbenchStore((state) => state.session);
@@ -111,63 +81,12 @@ export function AppShell() {
   }
 
   return (
-    <div className={`app-shell${collapsed ? " app-shell--collapsed" : ""}`}>
-      <aside className="sidebar" aria-label="主导航">
-        <div className="sidebar__brand">
-          <div aria-hidden="true" className="brand-mark">W</div>
-          <div className="brand-copy">
-            <strong>IELTS Workbench</strong>
-            <span>Local learning workspace</span>
-          </div>
-        </div>
-        <nav className="sidebar__nav">
-          {primaryNavigation
-            .filter(({ to }) => !activeExamLock || to === activeExamPath)
-            .map(({ to, label, icon: Icon, moduleType }) => (
-            <NavLink
-              aria-label={collapsed ? label : undefined}
-              className={({ isActive }) => `nav-link${isActive ? " active" : ""}`}
-              key={to}
-              title={collapsed ? label : undefined}
-              to={activeExamLock
-                ? activeExamRoute
-                : moduleType
-                  ? buildPracticeRoute(moduleType, { identity: navigationIdentity })
-                  : to}
-            >
-              <Icon aria-hidden="true" size={19} strokeWidth={1.8} />
-              <span>{label}</span>
-            </NavLink>
-            ))}
-        </nav>
-        <footer className="sidebar__footer">
-          <span className="sidebar__footer-copy">本地优先 · 默认离线</span>
-          <button
-            aria-label={collapsed ? "展开侧边栏" : "折叠侧边栏"}
-            className="icon-button"
-            onClick={() => setCollapsed((value) => !value)}
-            title={collapsed ? "展开侧边栏" : "折叠侧边栏"}
-            type="button"
-          >
-            {collapsed ? <ChevronRight aria-hidden="true" size={18} /> : <PanelLeftClose aria-hidden="true" size={18} />}
-          </button>
-        </footer>
-      </aside>
+    <div className="app-shell">
+      <TopNavigation identity={navigationIdentity} examLock={activeExamLock} examMode={examMode}
+        examPath={activeExamPath} examRoute={activeExamRoute} onOpenAssistant={() => setAiOpen(true)} />
       <main className="app-shell__main">
         <Outlet />
       </main>
-      {!examMode && (
-        <button
-          aria-label="打开 AI 学习助手"
-          className="button ai-launcher"
-          onClick={() => setAiOpen(true)}
-          type="button"
-        >
-          <Bot aria-hidden="true" size={17} />
-          AI 助手
-          <ChevronLeft aria-hidden="true" size={15} />
-        </button>
-      )}
       {aiOpen && !examMode && <AiDrawer onClose={() => setAiOpen(false)} />}
     </div>
   );

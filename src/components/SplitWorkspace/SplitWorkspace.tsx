@@ -8,25 +8,29 @@ export type SplitLayout = { left: number; right: number };
 export function SplitWorkspace({
   left,
   right,
-  defaultLayout = { left: 52, right: 48 },
+  defaultLayout = { left: 65, right: 35 },
   onLayoutChanged,
+  visiblePane = null,
 }: {
   left: ReactNode;
   right: ReactNode;
   defaultLayout?: SplitLayout;
   onLayoutChanged?: (layout: SplitLayout) => void;
+  /** Presentation only. Both Pane instances stay mounted with their stable identities. */
+  visiblePane?: "left" | "right" | null;
 }) {
   const handleLayoutChanged = (layout: Layout) => {
     const leftSize = layout.left;
     const rightSize = layout.right;
     if (typeof leftSize === "number" && typeof rightSize === "number") {
-      onLayoutChanged?.({ left: leftSize, right: rightSize });
+      if (!visiblePane) onLayoutChanged?.({ left: leftSize, right: rightSize });
     }
   };
 
   return (
     <Group
       className="split-workspace"
+      data-visible-pane={visiblePane ?? "both"}
       defaultLayout={defaultLayout}
       id="reading-split-workspace"
       onLayoutChanged={handleLayoutChanged}

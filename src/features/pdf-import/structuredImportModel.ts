@@ -8,10 +8,13 @@ import {
   MAX_QUESTION_CONTEXT_TABLE_ROWS,
   MAX_QUESTION_CONTEXT_TEXT_LENGTH,
   StableIdSchema,
+  VisualSourceSchema,
+  VisualContextBlockSchema,
   parseIeltsPack,
   type IELTSPack,
 } from "../../domain";
 import type { LearningRepository } from "../../infrastructure/repositories/LearningRepository";
+import { ImportImageSchema } from "../../infrastructure/repositories/LearningRepository";
 import {
   PDF_IMPORT_PARSER_VERSION,
   parseAnswerKey,
@@ -20,7 +23,7 @@ import {
   type ExtractedPdfPage,
 } from "./pdfImportModel";
 
-export const STRUCTURED_IMPORT_DRAFT_VERSION = 3 as const;
+export const STRUCTURED_IMPORT_DRAFT_VERSION = 4 as const;
 export const STRUCTURED_IMPORT_PARSER_VERSION = `${PDF_IMPORT_PARSER_VERSION}-structured-3`;
 export const STRUCTURED_IMPORT_DRAFT_INDEX_SETTING = "pdfImport.structuredDraftIndex.v1";
 export const MAX_STRUCTURED_IMPORT_DRAFT_SETTING_BYTES = 240 * 1024;
@@ -52,6 +55,7 @@ const DetectedQuestionTypeSchema = z.enum([
 const SourcePageSchema = z.object({
   pageNumber: z.number().int().positive(),
   text: z.string(),
+  layout: z.object({ kind: z.enum(["single-column", "two-column", "complex", "scan"]), confidence: z.number().min(0).max(1), message: z.string() }).strict().optional(),
 }).strict();
 
 const SourceSegmentSchema = z.object({
@@ -151,6 +155,7 @@ const DraftContextBlockSchema = z.discriminatedUnion("type", [
   DraftContextListSchema,
   DraftContextTableSchema,
   DraftContextCompletionSchema,
+  VisualContextBlockSchema,
 ]);
 
 const DraftGroupSchema = z.object({
@@ -169,6 +174,7 @@ const DraftContentBlockSchema = z.object({
   id: StableIdSchema,
   text: z.string(),
   sourcePages: z.array(z.number().int().positive()),
+  visual: VisualSourceSchema.optional(),
 }).strict();
 
 const DraftPassageSchema = z.object({
@@ -179,6 +185,7 @@ const DraftPassageSchema = z.object({
 }).strict();
 
 const StructuredImportDraftV2Schema = z.object({
+  imageAssets: z.array(ImportImageSchema).max(100).default([]),
   schemaVersion: z.literal(STRUCTURED_IMPORT_DRAFT_VERSION),
   id: StableIdSchema,
   packId: StableIdSchema,
@@ -212,7 +219,7 @@ const StructuredImportDraftV2Schema = z.object({
 function migrateLegacyStructuredDraft(input: unknown): unknown {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
   const record = input as Record<string, unknown>;
-  if ((record.schemaVersion !== 1 && record.schemaVersion !== 2) || !Array.isArray(record.passages)) return input;
+  if (![1, 2, 3].includes(record.schemaVersion as number) || !Array.isArray(record.passages)) return input;
   return {
     ...record,
     schemaVersion: STRUCTURED_IMPORT_DRAFT_VERSION,
@@ -710,7 +717,7 @@ export function moveQuestionBetweenGroups(
               ...block,
               parts: block.parts.filter((part) => part.kind !== "answer" || part.questionId !== questionId),
             }
-        : block),
+        : "assetId" in block ? { ...block, linkedQuestionIds: block.linkedQuestionIds?.filter((id) => id !== questionId) } : block),
       questions: group.questions.filter((question) => {
         if (question.id === questionId) selected = question;
         return question.id !== questionId;
@@ -916,6 +923,11 @@ export function validateStructuredImportDraft(draftInput: StructuredImportDraft)
   ];
   const numberOwners = new Map<number, string[]>();
   const validTargets = new Set<string>();
+  const imageIds = new Set(draft.imageAssets.map((asset) => asset.id));
+  draft.imageAssets.forEach((asset, index) => allIds.push({ id: asset.id, path: `imageAssets.${index}.id` }));
+  const validateVisualReference = (assetId: string, path: string) => {
+    if (!imageIds.has(assetId)) issues.push(issue("error", "VISUAL_ASSET_MISSING", path, "原图资源记录丢失；请重新框选，不能安装缺图题包。"));
+  };
   draft.passages.forEach((passage, passageIndex) => {
     const passagePath = `passages.${passageIndex}`;
     allIds.push({ id: passage.id, path: `${passagePath}.id` });
@@ -924,6 +936,7 @@ export function validateStructuredImportDraft(draftInput: StructuredImportDraft)
     const body = passage.contentBlocks.map((block) => block.text).join("\n").trim();
     if (!body) issues.push(issue("error", "PASSAGE_TEXT_REQUIRED", `${passagePath}.contentBlocks`, `${passage.title || `Passage ${passageIndex + 1}`} 缺少正文。`));
     passage.contentBlocks.forEach((block, blockIndex) => allIds.push({ id: block.id, path: `${passagePath}.contentBlocks.${blockIndex}.id` }));
+    passage.contentBlocks.forEach((block, index) => { if (block.visual) validateVisualReference(block.visual.assetId, `${passagePath}.contentBlocks.${index}.visual.assetId`); });
     if (passage.questionGroups.length === 0) issues.push(issue("error", "GROUP_REQUIRED", `${passagePath}.questionGroups`, `${passage.title || `Passage ${passageIndex + 1}`} 至少需要一个题组。`));
     passage.questionGroups.forEach((group, groupIndex) => {
       const groupPath = `${passagePath}.questionGroups.${groupIndex}`;
@@ -938,6 +951,11 @@ export function validateStructuredImportDraft(draftInput: StructuredImportDraft)
       group.contextBlocks.forEach((block, blockIndex) => {
         const blockPath = `${groupPath}.contextBlocks.${blockIndex}`;
         allIds.push({ id: block.id, path: `${blockPath}.id` });
+        if ("assetId" in block) {
+          validateVisualReference(block.assetId, `${blockPath}.assetId`);
+          const links = block.linkedQuestionIds ?? [];
+          if (new Set(links).size !== links.length || links.some((id) => !questionById.has(id))) issues.push(issue("error", "VISUAL_QUESTION_REFERENCE", blockPath, "原版区域必须引用本题组内存在且不重复的 questionId。"));
+        }
         if (block.type === "list") {
           contextNodeCount += block.items.length;
           block.items.forEach((item, itemIndex) => allIds.push({
@@ -1113,6 +1131,7 @@ export async function buildStructuredReadingPack(
       id: block.id,
       kind: "paragraph" as const,
       text: block.text.trim(),
+      ...(block.visual ? { visual: block.visual } : {}),
     })),
     questionGroups: passage.questionGroups.map((group) => ({
       id: group.id,
@@ -1189,7 +1208,16 @@ export async function buildStructuredReadingPack(
     group.contextBlocks.some((block) => block.type === "completion")
     || group.questions.some((question) => ["multiple-choice", "yes-no-not-given", "matching"].includes(question.type))
   )));
-  const sourcePages = draft.source.pages.map((page) => page.pageNumber);
+  // A region may be selected from a PDF page outside the initial text range.
+  // Retain its provenance without renumbering or changing domain identities.
+  const sourcePages = [...draft.source.pages.map((page) => page.pageNumber), ...draft.passages.flatMap((passage) => [
+    ...passage.contentBlocks.flatMap((block) => [...block.sourcePages, ...(block.visual?.sourcePage ? [block.visual.sourcePage] : [])]),
+    ...passage.questionGroups.flatMap((group) => [...group.sourcePages, ...group.questions.flatMap((question) => question.sourcePages), ...group.contextBlocks.flatMap((block) => "assetId" in block && block.sourcePage ? [block.sourcePage] : [])]),
+  ])];
+  const visualIds = new Set(draft.passages.flatMap((passage) => [
+    ...passage.contentBlocks.flatMap((block) => block.visual ? [block.visual.assetId] : []),
+    ...passage.questionGroups.flatMap((group) => group.contextBlocks.flatMap((block) => "assetId" in block ? [block.assetId] : [])),
+  ]));
   const sourceRange = { start: Math.min(...sourcePages), end: Math.max(...sourcePages) };
   return parseIeltsPack({
     manifest: {
@@ -1201,7 +1229,7 @@ export async function buildStructuredReadingPack(
       modules: ["reading"],
       createdAt: importedAt,
       tests: [{ id: draft.testId, title: `Test ${draft.testNumber.trim()}`, moduleIds: [draft.moduleId] }],
-      mediaAssets: [],
+      mediaAssets: draft.imageAssets.filter((asset) => visualIds.has(asset.id)).map((asset) => ({ id: asset.id, relativePath: asset.relativePath, sha256: asset.sha256, width: asset.width, height: asset.height, type: "image", mimeType: "image/png", alt: "Manually selected PDF region" })),
       importMetadata: {
         sourceFileName: draft.source.fileName,
         sourceFileSize: draft.source.fileSize,
@@ -1214,7 +1242,7 @@ export async function buildStructuredReadingPack(
         passagePageRange: sourceRange,
         questionPageRange: sourceRange,
         importedAt,
-        extractionMode: "pdf-text-layer",
+        extractionMode: visualIds.size ? "pdf-visual" : "pdf-text-layer",
         parserVersion: STRUCTURED_IMPORT_PARSER_VERSION,
         pageNumberBase: 1,
         needsReview: draft.passages.some((passage) => passage.questionGroups.some((group) => group.questions.some((question) => question.needsReview || !question.answer.trim()))),
@@ -1222,7 +1250,7 @@ export async function buildStructuredReadingPack(
       },
     },
     modules: [{
-      schemaVersion: usesReadingV3 ? 3 : usesStructuredQuestionContext ? 2 : 1,
+      schemaVersion: visualIds.size ? 4 : usesReadingV3 ? 3 : usesStructuredQuestionContext ? 2 : 1,
       id: draft.moduleId,
       testId: draft.testId,
       type: "reading",

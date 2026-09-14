@@ -8,11 +8,12 @@
   z-index: 4;
   display: flex;
   min-height: 48px;
+  flex-wrap: wrap;
   align-items: center;
   gap: 9px;
   padding: 7px 12px;
   border-bottom: 1px solid var(--border-subtle);
-  background: color-mix(in srgb, var(--surface-panel), transparent 4%);
+  background: var(--surface-panel);
   backdrop-filter: blur(8px);
 }
 
@@ -87,8 +88,8 @@
 
 .text-block--heading {
   margin: 0 0 22px;
-  font-family: var(--font-ui);
-  font-size: 23px;
+  font-family: var(--font-reading);
+  font-size: 27px;
   font-weight: 680;
   line-height: 1.35;
   letter-spacing: -0.015em;

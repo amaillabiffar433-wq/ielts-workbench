@@ -111,7 +111,7 @@
 ### 3.7 App Shell 与可访问性
 
 1. loading、empty、error 与 save 状态均有用户可读文本。
-2. sidebar、toolbar、Pane selector、Question navigation、Submit 均可用键盘到达并具有 visible focus。
+2. Top Navigation、toolbar、Pane selector、Question navigation、Submit 均可用键盘到达并具有 visible focus。
 3. 题目未答/已答/标记/错误状态不仅靠颜色区分。
 4. Exam destructive submit 与工作区重新选择有确认。
 5. 1280×800 不遮挡核心操作；较小窗口显示可理解的窄布局或滚动，而不是让内容完全消失。

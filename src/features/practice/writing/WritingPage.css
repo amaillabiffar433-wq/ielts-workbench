@@ -1,12 +1,14 @@
 .writing-page {
-  display: grid;
+  display: flex;
   height: 100%;
   min-height: 0;
-  grid-template-rows: 62px auto minmax(0, 1fr);
+  flex-direction: column;
   background: var(--surface-panel);
 }
 
 .writing-toolbar {
+  min-height: 62px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 13px;
@@ -40,6 +42,7 @@
 }
 
 .writing-workspace {
+  flex: 1;
   display: grid;
   min-height: 0;
   grid-template-columns: minmax(340px, 42%) minmax(420px, 58%);
@@ -68,6 +71,7 @@
 }
 
 .writing-prompt h1 {
+  font-family: var(--font-reading);
   margin: 20px 0 12px;
   font-size: 24px;
   letter-spacing: -0.02em;

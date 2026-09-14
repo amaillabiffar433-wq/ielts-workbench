@@ -1,0 +1,8 @@
+.pdf-region-editor { padding: 12px; border: 1px solid var(--border-subtle, #aaa); margin-bottom: 12px; min-width: 0; }
+.pdf-region-editor fieldset { border: 0; padding: 0; display: grid; gap: 10px; min-width: 0; }
+.pdf-region-editor label { display: grid; gap: 4px; }
+.pdf-region-editor select, .pdf-region-editor input, .pdf-region-editor textarea { max-width: 100%; min-width: 0; }
+.pdf-region-scroll { max-height: 58vh; overflow: auto; }
+.pdf-region-canvas { position: relative; touch-action: none; user-select: none; cursor: crosshair; }
+.pdf-region-canvas canvas { display: block; width: 100%; height: auto; }
+.pdf-region-selection { position: absolute; border: 2px solid #1473cc; background: #1473cc1c; pointer-events: none; }

@@ -1,8 +1,23 @@
 # IELTS Workbench Windows 桌面验收记录
 
-更新日期：2026-09-09
+更新日期：2026-09-12
+
+## 当前 Visual Fidelity / OCR 验收
+
+实现与自动化门禁已推进；最终标准前端两次 234/234、lint、Cargo 36/36 通过，最终 no-bundle 构建中。原生操作与证据集中在 `VISUAL_PDF_ACCEPTANCE.md`，阶段进度在 `BUILD_STATUS.md`。不得将此前 UI Release 或浏览器测试算作本轮 OCR/图像通过。
+
+第一轮隔离工作区 `D:\IELTS-Workbench-Visual-Acceptance-20260912` 已完成 A/C 原生导入、OCR、截图、共享答案和正常重启后的原生读回；保留该库。最终六类统一验收另用新目录 `D:\IELTS-Workbench-Visual-Final-20260912`。六类原创样本位于仓库 `output/visual-pdf-fixtures-20260912`，脚本与答案在 `samples/visual-pdf-fixtures`。不使用或修改旧学习数据库。
 
 状态定义：`未开始`、`已实现但未原生验证`、`浏览器验证通过`、`环境阻塞`、`验证失败`、`待人工验收`、`原生验证通过`。
+
+## 最新 UI / Layout 验收（2026-09-12）
+
+本轮真实独立 Release：`D:\IELTS-Workbench-Releases\ui-layout-20260912-2107\ielts-workbench.exe`，隔离工作区 `D:\IELTS-Workbench-UI-Acceptance-20260912`。以下历史矩阵保留，不将前轮结果冒充本轮重测。
+
+- 原生验证通过：顶部统一导航；Reading 单/双 Pane、独立选择/滚动、同题同步、标记隔离、原目标导航、表格内作答、整套关联、专注/全屏；5 种逻辑窗口尺寸；Listening 原创音频；Writing 图表/手动版本/快速正常关窗。
+- 完整退出旧进程、重开同一交付 EXE 后，实际 SQLite 读回 P2/题组选择、Q18/Q24、两条标记笔记及 Writing debounce 前最后输入。1420 无监听，真实 origin `http://tauri.localhost`。
+- 标准前端测试两次 215/215，lint/build、Cargo 33/33 和 no-bundle 构建全部通过。详细日志、EXE SHA-256、数据库保护证据及四张真实 Release WebView 截图见 [UI_LAYOUT_ACCEPTANCE.md](UI_LAYOUT_ACCEPTANCE.md)。OS 截图 helper 的黑图已排除，不计验收证据。
+- 本轮未重走完整 PDF 原生导入或完整 Exam 人工流程，原业务源码和自动化回归保持。没有新增 Markdown 笔记/词汇功能，也没有下载角色图。
 
 ## 验收环境
 

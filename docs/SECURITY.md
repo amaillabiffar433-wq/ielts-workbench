@@ -249,3 +249,8 @@ form-action 'none'
 - 活动数据库使用 SQLite online backup API 生成一致性快照。题包及其托管资源、PDF 导入草稿资源和主题一并复制；不包含源码、依赖、构建缓存、工具链或日志。
 - `backup-manifest.json` 最后写入，并包含每个文件的相对路径、长度与 SHA-256。恢复在创建任何成功工作区前校验支持版本、清单重复项、路径边界、symlink/reparse point、文件存在性、长度和哈希。
 - 恢复目标只能是用户选择的已有绝对父目录且不能是盘符根；应用在其下新建唯一工作区和新的 workspaceId，不覆盖当前 SQLite。复制后执行 `PRAGMA integrity_check`；失败时只清理由本次操作创建的半成品目标，当前工作区和 bootstrap 不切换。
+# Visual PDF / offline OCR addendum (2026-09-12)
+
+Snapshot IPC accepts stable draft/asset IDs and bounded PNG bytes, never an arbitrary source or destination path. Rust validates PNG decoding, 8 MiB encoded bytes, 12 megapixels/6000px edge, SHA-256, no links/reparse points and workspace containment. Install re-reads and validates immutable draft images then copies into owned staging before existing full pack checks. Failed staging cleanup does not delete user PDFs or installed packs. Unreferenced draft images remain on disk; cleanup is not implicit.
+
+OCR is explicit, local English Tesseract.js/WASM with model/runtime shipped in frontend assets. It neither uploads text/images nor interprets answers. It has cancel and a 90-second deadline. CSP permits same-origin workers and `wasm-unsafe-eval` only; remote connect hosts and JavaScript `unsafe-eval` remain forbidden. Third-party provenance/licenses and model checksum are in `public/ocr/NOTICE.md`. Build verifies the model checksum. Image object URLs are transient view resources and revoked, not persisted identities.

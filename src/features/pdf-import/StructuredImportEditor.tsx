@@ -7,6 +7,10 @@ import { QuestionGroupContext } from "../../components/QuestionGroupContext/Ques
 import { boundQuestionIdsFromContext } from "../../components/QuestionGroupContext/questionGroupContextModel";
 import { StructuredContextEditor } from "./StructuredContextEditor";
 import { StructuredBatchPanel } from "./StructuredBatchPanel";
+import { PdfRegionEditor } from "./PdfRegionEditor";
+import type { PdfDocumentHandle } from "./documentSource";
+import { PassageBlocksEditor } from "./PassageBlocksEditor";
+import { VisualBlock } from "../../components/VisualBlock/VisualBlock";
 import {
   assignSourceSegments,
   createStructuredGroup,
@@ -107,6 +111,8 @@ function StructuredGroupPreview({ group }: { readonly group: StructuredGroupDraf
 }
 
 export interface StructuredImportEditorProps {
+  readonly onPendingVisualSave?: (promise: Promise<void>) => void;
+  readonly documentHandle?: PdfDocumentHandle | null;
   readonly draft: StructuredImportDraft;
   readonly sourceConnected: boolean;
   readonly saveState: SaveState;
@@ -119,6 +125,8 @@ export interface StructuredImportEditorProps {
 }
 
 export function StructuredImportEditor({
+  onPendingVisualSave,
+  documentHandle = null,
   draft,
   sourceConnected,
   saveState,
@@ -244,7 +252,7 @@ export function StructuredImportEditor({
           }
         : block.type === "completion"
           ? { ...block, parts: block.parts.filter((part) => part.kind !== "answer" || part.questionId !== question.id) }
-          : block),
+          : "assetId" in block ? { ...block, linkedQuestionIds: block.linkedQuestionIds?.filter((id) => id !== question.id) } : block),
       questions: item.questions.filter((candidate) => candidate.id !== question.id),
     })));
   };
@@ -281,6 +289,7 @@ export function StructuredImportEditor({
         <StructuredBatchPanel draft={draft} onChange={onChange} stage="structure" />
         <div className="pdf-structure-layout">
           <aside className="pdf-source-fragments">
+            <PdfRegionEditor draft={draft} documentHandle={documentHandle} onChange={onChange} onPendingSave={onPendingVisualSave} />
             <header><h3>来源文本快照</h3><span>{unassignedSegments.length} 个未处理片段</span></header>
             <p>勾选一行或多行，可跨页分配；同一页的不同片段也可进入不同 Passage。</p>
             <div className="pdf-source-fragments__list">
@@ -337,7 +346,7 @@ export function StructuredImportEditor({
                   </div>
                 </header>
                 <label>Passage title<input onFocus={() => setActivePassageId(passage.id)} onChange={(event) => onChange(updatePassage(draft, passage.id, (item) => ({ ...item, title: event.target.value })))} value={passage.title} /></label>
-                <label>正文<textarea onFocus={() => setActivePassageId(passage.id)} onChange={(event) => onChange(updatePassage(draft, passage.id, (item) => ({ ...item, contentBlocks: [{ ...item.contentBlocks[0], text: event.target.value }, ...item.contentBlocks.slice(1)] })))} rows={7} value={passage.contentBlocks[0].text} /></label>
+                <PassageBlocksEditor passage={passage} onChange={(next) => onChange(updatePassage(draft, passage.id, () => next))} />
                 <p className="pdf-source-reference">来源页：{passage.contentBlocks.flatMap((block) => block.sourcePages).join(", ") || "人工输入 / 尚未分配"}</p>
 
                 {passage.questionGroups.map((group, groupIndex) => (
@@ -427,7 +436,7 @@ export function StructuredImportEditor({
           <header><FileCheck2 size={22} /><div><h3>{validation.valid ? "结构校验通过" : `${validation.errors.length} 个阻塞错误`}</h3><p>{validation.warnings.length} 个警告；警告不会阻止安装，但会在题包中保留待复核状态。</p></div></header>
           {validation.errors.length > 0 && <section className="pdf-validation-list is-error"><h4>阻塞错误</h4>{validation.errors.map((item, index) => <p key={`${item.code}-${index}`}><strong>{item.code}</strong> · {item.message} <code>{item.path}</code> <button className="button button--ghost" onClick={() => locateValidationIssue(item.path)} type="button">定位</button></p>)}</section>}
           {validation.warnings.length > 0 && <section className="pdf-validation-list"><h4>警告</h4>{validation.warnings.map((item, index) => <p key={`${item.code}-${index}`}><strong>{item.code}</strong> · {item.message} <code>{item.path}</code> <button className="button button--ghost" onClick={() => locateValidationIssue(item.path)} type="button">定位</button></p>)}</section>}
-          <section className="pdf-structure-preview"><h3>安装预览</h3>{draft.passages.map((passage, passageIndex) => <article key={passage.id}><h4>Passage {passageIndex + 1}: {passage.title}</h4><p>{passage.contentBlocks.map((block) => block.text).join(" ").slice(0, 220)}{passage.contentBlocks.some((block) => block.text.length > 220) ? "…" : ""}</p>{passage.questionGroups.map((group) => <StructuredGroupPreview group={group} key={group.id} />)}</article>)}</section>
+          <section className="pdf-structure-preview"><h3>安装预览</h3>{draft.passages.map((passage, passageIndex) => <article key={passage.id}><h4>Passage {passageIndex + 1}: {passage.title}</h4>{passage.contentBlocks.map((block) => <div key={block.id}>{block.visual && <VisualBlock visual={block.visual} />}<p>{block.text.slice(0, 220)}{block.text.length > 220 ? "…" : ""}</p></div>)}{passage.questionGroups.map((group) => <StructuredGroupPreview group={group} key={group.id} />)}</article>)}</section>
           <button className="button button--primary" disabled={!validation.valid || busy} onClick={onInstall} type="button"><CheckCircle2 size={16} />{busy ? "正在安装…" : "确认结构并安装题包"}</button>
         </div>
       )}

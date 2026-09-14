@@ -182,3 +182,27 @@
 - 从 PDF 导入页切到 Reading 后首次正常关窗暴露陈旧 close listener 竞态；只强制结束了已确认草稿落库的那一个卡住进程。修复为仅活动导入页可拦截关闭，并增加组件卸载回归测试。重建后的最终 EXE 恢复同一草稿，再从导入页切到 Library/Reading 后正常关窗，2.6 秒内进程和调试监听均结束。
 - 最终 EXE 复制到新目录 `D:\IELTS-Workbench-Releases\daily-use-20260909-191124\ielts-workbench.exe`，13,193,728 字节，修改时间 `2026-09-09 19:10:57 +08:00`，SHA-256 `8BEEAACB85C301EC671157269FFE9D70B954ED895C9E90DA3E4BE909119F17A8`；与修复前交付哈希不同，复制后哈希一致。Vite 1420 未监听时直接启动，origin 为 `http://tauri.localhost`。
 - 新建正式工作区 `D:\IELTS-Workbench`，workspaceId `a18137ae-5b67-4d6a-a77b-dbcb73f61a51`，SQLite 位于同目录；通过最终 EXE 安装原创完整 Reading 题包。范围内没有用户真实 Reading PDF，故真实材料兼容性仍明确保留为待用户私有验收。
+
+## 2026-09-12 — 统一导航与纸张工作台 UI 交付
+
+- 在 D 盘干净基准 `feat/pdf-import-mvp` / `47f7320ed143888fae4c4098afb087d9dd5d8e2d` 上实施；先读约定/计划/数据/安全/ADR，再调整展示层。C 盘旧工程未修改，没有重新初始化、迁移或升级依赖。
+- 提取 TopNavigation 和 ReadingWorkspace，替换全局大侧栏，使用暖纸、Georgia 正文、暗红强调、静态深色边缘及单一壁纸入口。单/双 Pane 只改变可见性；现有领域 ID、题包、答案、标记、Repository/SQLite、PDF 与 Writing 业务源码未重写。Listening/Writing 仅布局 CSS 变化。
+- 原生检查修复两处展示问题：专注模式主区域零高、计时更新 Session 引用导致视图重新挂载。新增 11 条测试覆盖身份/状态保持、路由、字号、已有 note 和最小全屏接口。权限只增加查询/切换当前窗口全屏。
+- 最终独立全量测试在 21:12:40 与 21:13:22 连续执行，均 36 文件、215/215（40.77s/43.31s）；lint 退出码 0；TypeScript/Vite 2017 modules 构建退出码 0；最终 Cargo 33/33、退出码 0。并行构建/原生自动化期间出现的 5000ms 超时日志原样保留；没有改 retries、workers、超时或断言。
+- no-bundle Release 优化编译 2m02s，退出码 0。保留旧交付 EXE，复制新程序到 `D:\IELTS-Workbench-Releases\ui-layout-20260912-2107\ielts-workbench.exe` 并核验与构建源相同：13,198,848 字节；2026-09-12 21:05:47 +08:00；SHA-256 `74557BC2652FDD967953ABAF78C5E7EAB7784D991C29B9C5E325898CBA414D34`。不生成/安装 MSI/NSIS。
+- 在 `D:\IELTS-Workbench-UI-Acceptance-20260912`、真实 SQLite/IPC 下完成 Reading 独立选择/滚动/目标导航、P2 与 Q18/Q24、同题双向同步、标记隔离、整套、字体/专注/全屏、音频/图表。完整关闭 Release 后重新启动，Pane 设置、答案、笔记和 Writing 最后输入恢复。四张页面及不同尺寸截图来自实际 Release WebView，非 localhost 开发预览；OS helper 黑图不纳入证据。
+- 正式工作区指针恢复到 `D:\IELTS-Workbench`，正式数据库前后哈希一致；未清理任何旧工作区/Release/C 盘副本。本轮提供未提交 diff，不暂存、不提交、不 push/tag。完整证据和所有文件见 `docs/UI_LAYOUT_ACCEPTANCE.md`。
+
+## 2026-09-12 — Structured + Visual Fidelity PDF 增量开发
+
+- 恢复 D 盘工作树并保护上轮 UI 未提交成果，读取最新附件需求、规则/规范/数据/安全和 ADR；主实现继续使用既有 Reading/Repository/SQLite。
+- 阅读模块最小数据门槛 4、新可选视觉字段与草稿 1/2/3→4 迁移；图像与作答控件解耦，原 questionId/groupId/blockId 不因视图改变。新增 Rust `import_images` 路径/PNG/哈希/尺寸校验，工作区托管、安装复制及复开测试。
+- 新增 PDF 区域框选、重新截取、缩放、左右栏/页码、正文/题组原图、快速生成题号/字母选项、正文块合并/拆分/排序。本地 Tesseract.js 6.0.1 与 Apache 2.0 固定哈希英文模型随包；CSP 仅开放本地 WASM，不开放 JS eval 或远程连接。
+- npm 仅增项目依赖，官方 registry，缓存 `D:\DevCache\npm`；Cargo 仅为 PNG 解码增加依赖/对应锁文件，工具链/target/TEMP 继续 D 盘进程配置。
+- 新增测试发现并修复 InMemory Repository 设置首次访问未 hydrate 的恢复问题；Rust 新测试初次遗漏 SQLite 初始化，修复测试前置条件后 36/36。未放宽生产校验或测试断言。
+- 22:36:50、22:38:36、22:40:03 标准 `npm test` 均为 40 文件 233/233；后两次覆盖相同功能源码。lint 退出码 0。六类原创 PDF A–F 已生成并记录 SHA-256；C 的两页没有文本层，B/D 渲染图已查看。
+- `npm run tauri -- build --no-bundle` 已执行，beforeBuild `npm run build`（含本地 OCR 资源准备/哈希核验）通过，Vite 2049 modules；Rust Release 优化编译进行中，不生成 MSI/NSIS。未启动前不声称原生验收通过。
+- 上版 EXE 与 `D:\IELTS-Workbench-Releases\ui-layout-20260912-2107\ielts-workbench.exe` 哈希一致（74557BC2…414D34），回退副本已保留。新验收工作区先检查不存在：`D:\IELTS-Workbench-Visual-Acceptance-20260912`。
+- 22:43:54 第一版 EXE 生成，20,871,168 字节、SHA-256 `DBDB17314F2B170FEDE816DC67C52FE891DD60F61D6FEB2AECD8CB8FA702B7E6`；22:44:18 在 1420 无监听时直接启动 PID 15380。通过原生 Windows 对话框导入 A/C PDF，快速正文/原图/控制框/批量键/校验/安装正常；C 页 OCR 实测 8466ms、95%，请求仅为随包三个 OCR 文件。
+- 使用新 SQLite 工作区 `D:\IELTS-Workbench-Visual-Acceptance-20260912`。C 文字 highlighter、note、flag 与双 Pane 同题同步正常。正常退出 PID 15380，再启动 PID 5504，原生 IPC 读回两组答案、C 标记、OCR 正文和托管 PNG，完整 JSON 留在 output/playwright/visual-20260912。
+- 验收修正 Import Center / 简单导入旧 OCR 文案、截图来源页超出初始文字提取范围时的来源记录，补一条回归。234 测试首轮在并行原生自动化时有 1 条原 Reading 5 秒超时（233 pass）；失败日志保留。关闭原生程序后独立执行标准两轮，不改变测试超时、重试或断言。

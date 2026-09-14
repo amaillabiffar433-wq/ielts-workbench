@@ -64,7 +64,7 @@ export const PdfImportMetadataSchema = z
     questionPageRange: SourcePageRangeSchema,
     answerKeyPageRange: SourcePageRangeSchema.optional(),
     importedAt: IsoUtcDateTimeSchema,
-    extractionMode: z.literal("pdf-text-layer"),
+    extractionMode: z.enum(["pdf-text-layer", "pdf-visual"]),
     parserVersion: z.string().trim().min(1),
     pageNumberBase: z.literal(1),
     needsReview: z.boolean(),
@@ -249,11 +249,34 @@ export const QuestionSchema = z
     }
   });
 
+// Crop is immutable source provenance in normalized PDF-page coordinates, never an annotation identity.
+export const PdfCropSchema = z.object({
+  x: z.number().min(0).max(1), y: z.number().min(0).max(1),
+  width: z.number().positive().max(1), height: z.number().positive().max(1),
+}).strict().refine((crop) => crop.x + crop.width <= 1.000001 && crop.y + crop.height <= 1.000001, "Crop must stay inside the source page");
+
+export const VisualSourceSchema = z.object({
+  type: z.enum(["snapshot", "image", "figure"]),
+  assetId: StableIdSchema,
+  sourcePage: z.number().int().positive().optional(),
+  crop: PdfCropSchema.optional(),
+  altText: z.string().min(1).max(1000),
+  ocrText: z.string().max(20_000).optional(),
+}).strict();
+
+export const VisualContextBlockSchema = VisualSourceSchema.extend({
+  id: StableIdSchema,
+  linkedQuestionIds: z.array(StableIdSchema).max(100).optional(),
+});
+export type VisualSource = DeepReadonly<z.infer<typeof VisualSourceSchema>>;
+export type VisualContextBlock = DeepReadonly<z.infer<typeof VisualContextBlockSchema>>;
+
 export const ContentBlockSchema = z
   .object({
     id: StableIdSchema,
     kind: z.enum(["heading", "paragraph", "instruction", "quote"]),
     text: z.string().min(1),
+    visual: VisualSourceSchema.optional(),
   })
   .strict();
 
@@ -358,6 +381,7 @@ export const QuestionContextBlockSchema = z.discriminatedUnion("type", [
   QuestionContextListSchema,
   QuestionContextTableSchema,
   QuestionContextCompletionSchema,
+  VisualContextBlockSchema,
 ]);
 
 export const QuestionGroupSchema = z
@@ -374,6 +398,12 @@ export const QuestionGroupSchema = z
     const boundQuestionIds = new Set<string>();
     let nodeCount = group.contextBlocks?.length ?? 0;
     (group.contextBlocks ?? []).forEach((block, blockIndex) => {
+      if ("assetId" in block) {
+        const ids = block.linkedQuestionIds ?? [];
+        if (new Set(ids).size !== ids.length || ids.some((id) => !questions.has(id))) {
+          context.addIssue({ code: "custom", path: ["contextBlocks", blockIndex, "linkedQuestionIds"], message: "Visual references must be unique questions in this group" });
+        }
+      }
       if (block.type === "list") nodeCount += block.items.length;
       if (block.type === "completion") {
         nodeCount += block.parts.length;
@@ -454,13 +484,20 @@ const moduleIdentityShape = {
 
 export const ReadingModuleSchema = z
   .object({
-    schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
     ...moduleIdentityShape,
     type: z.literal("reading"),
     sections: z.array(ReadingSectionSchema).min(1),
   })
   .strict()
   .superRefine((module, context) => {
+    if (module.schemaVersion < 4) {
+      module.sections.forEach((section, sectionIndex) => {
+        if (section.contentBlocks.some((block) => block.visual) || section.questionGroups.some((group) => group.contextBlocks?.some((block) => "assetId" in block))) {
+          context.addIssue({ code: "custom", path: ["sections", sectionIndex], message: "Visual context requires Reading module schemaVersion 4" });
+        }
+      });
+    }
     if (module.schemaVersion === 1) {
       module.sections.forEach((section, sectionIndex) => {
         section.questionGroups.forEach((group, groupIndex) => {
@@ -511,6 +548,9 @@ export const ListeningSectionSchema = z
   })
   .strict()
   .superRefine((section, context) => {
+    if (section.contentBlocks.some((block) => block.visual)) {
+      context.addIssue({ code: "custom", path: ["contentBlocks"], message: "Visual source blocks are supported only in Reading" });
+    }
     if (section.endMs !== undefined && section.endMs <= section.startMs) {
       context.addIssue({
         code: "custom",
@@ -802,6 +842,17 @@ const IELTSPackStrictSchema = z
 
     const mediaById = new Map(pack.manifest.mediaAssets.map((asset) => [asset.id, asset]));
     pack.modules.forEach((module, moduleIndex) => {
+      if (module.type === "reading") {
+        module.sections.forEach((section, sectionIndex) => {
+          const visuals = [...section.contentBlocks.flatMap((block) => block.visual ? [block.visual] : []),
+            ...section.questionGroups.flatMap((group) => (group.contextBlocks ?? []).filter((block) => "assetId" in block))];
+          for (const visual of visuals) {
+            if (mediaById.get(visual.assetId)?.type !== "image") {
+              context.addIssue({ code: "custom", path: ["modules", moduleIndex, "sections", sectionIndex], message: "Visual assetId must reference an image media asset" });
+            }
+          }
+        });
+      }
       if (module.type === "listening") {
         const asset = mediaById.get(module.audioAssetId);
         if (!asset || asset.type !== "audio") {
@@ -892,7 +943,7 @@ const IELTSPackStrictSchema = z
               ],
             ),
           );
-          if (module.type === "reading" && module.schemaVersion === 2) {
+          if (module.type === "reading" && module.schemaVersion >= 2) {
             (group.contextBlocks ?? []).forEach((block, blockIndex) => {
               const blockPath = [
                 "modules", moduleIndex, "sections", sectionIndex,

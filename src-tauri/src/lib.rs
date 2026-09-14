@@ -3,6 +3,7 @@ mod backup;
 mod commands;
 mod error;
 mod models;
+mod import_images;
 mod packs;
 mod storage;
 mod workspace;
@@ -45,6 +46,8 @@ pub fn run() {
             commands::install_generated_pack,
             commands::read_pack_media,
             commands::select_pdf_file,
+            commands::save_import_image,
+            commands::read_import_image,
         ])
         .run(tauri::generate_context!())
         .expect("failed to run IELTS Workbench");

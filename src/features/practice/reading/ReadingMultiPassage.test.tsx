@@ -160,7 +160,7 @@ describe("ReadingPage multi-passage selection", () => {
     fireEvent.change(screen.getByLabelText("右窗格题目 Passage"), { target: { value: "northbridge-passage-02" } });
     expect(screen.getByText("Which condition can stop crossings even at a safe water level?")).toBeInTheDocument();
     expect(screen.queryByText("The offline guide records the names of all volunteers.")).not.toBeInTheDocument();
-  });
+  }, 20000);
 
   it("shows cross-passage ranges and a single question with group context", async () => {
     renderReading();

@@ -51,7 +51,7 @@ export type WorkbenchState = {
   saveSetting: (key: string, value: string) => Promise<void>;
   validatePack: (path: string) => Promise<PackValidationReport>;
   installPack: (path: string) => Promise<InstalledPackSummary>;
-  installImportedPack: (pack: IELTSPack) => Promise<InstalledPackSummary>;
+  installImportedPack: (pack: IELTSPack, draftId?: string) => Promise<InstalledPackSummary>;
   readPackMedia: (packId: string, relativePath: string) => Promise<Uint8Array<ArrayBuffer>>;
   clearError: () => void;
 };
@@ -446,9 +446,9 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
       }
     },
 
-    installImportedPack: async (pack) => {
+    installImportedPack: async (pack, draftId) => {
       try {
-        const installed = await repository.installImportedPack(pack);
+        const installed = await repository.installImportedPack(pack, draftId);
         const installedPacks = await repository.listInstalledPacks();
         set({ installedPacks, activePack: pack, error: null });
         return installed;

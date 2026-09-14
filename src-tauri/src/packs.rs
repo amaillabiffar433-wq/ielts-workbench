@@ -1,7 +1,7 @@
 use std::{
     collections::{BTreeSet, HashMap, HashSet},
     fs::{self, File},
-    io::{BufReader, Read},
+    io::{BufReader, Read, Write},
     path::{Component, Path, PathBuf},
 };
 
@@ -255,7 +255,7 @@ impl PackModuleV1 {
 
     fn has_supported_schema_version(&self) -> bool {
         match self {
-            Self::Reading(module) => matches!(module.schema_version, 1 | 2 | 3),
+            Self::Reading(module) => matches!(module.schema_version, 1 | 2 | 3 | 4),
             Self::Listening(module) => module.schema_version == 1,
             Self::Writing(module) => module.schema_version == 1,
         }
@@ -406,6 +406,47 @@ struct ContentBlockV1 {
     id: String,
     kind: ContentBlockKind,
     text: String,
+    visual: Option<VisualSource>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct PdfCrop { x: f64, y: f64, width: f64, height: f64 }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum VisualKind { Snapshot, Image, Figure }
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct VisualSource {
+    #[serde(rename = "type")]
+    kind: VisualKind,
+    asset_id: String,
+    source_page: Option<u32>,
+    crop: Option<PdfCrop>,
+    alt_text: String,
+    ocr_text: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct VisualContext {
+    id: String,
+    asset_id: String,
+    source_page: Option<u32>,
+    crop: Option<PdfCrop>,
+    alt_text: String,
+    ocr_text: Option<String>,
+    linked_question_ids: Option<Vec<String>>,
+}
+
+fn valid_visual(asset: &str, page: Option<u32>, crop: &Option<PdfCrop>, alt: &str, ocr: &Option<String>) -> bool {
+    valid_stable_id(asset) && page != Some(0) && non_blank(alt) && alt.chars().count() <= 1000
+        && ocr.as_ref().is_none_or(|text| text.chars().count() <= 20000)
+        && crop.as_ref().is_none_or(|c| c.x.is_finite() && c.y.is_finite() && c.width.is_finite() && c.height.is_finite()
+            && c.x >= 0.0 && c.y >= 0.0 && c.width > 0.0 && c.height > 0.0
+            && c.width <= 1.0 && c.height <= 1.0 && c.x + c.width <= 1.000001 && c.y + c.height <= 1.000001)
 }
 
 #[derive(Debug, Deserialize)]
@@ -438,21 +479,32 @@ enum QuestionContextBlockV2 {
     Table(QuestionContextTableV2),
     #[serde(rename = "completion")]
     Completion(QuestionContextCompletionV3),
+    #[serde(rename = "snapshot")]
+    Snapshot(VisualContext),
+    #[serde(rename = "image")]
+    Image(VisualContext),
+    #[serde(rename = "figure")]
+    Figure(VisualContext),
 }
 
 impl QuestionContextBlockV2 {
+    fn visual(&self) -> Option<&VisualContext> {
+        match self { Self::Snapshot(block) | Self::Image(block) | Self::Figure(block) => Some(block), _ => None }
+    }
     fn id(&self) -> &str {
         match self {
             Self::Paragraph(block) => &block.id,
             Self::List(block) => &block.id,
             Self::Table(block) => &block.id,
             Self::Completion(block) => &block.id,
+            Self::Snapshot(block) | Self::Image(block) | Self::Figure(block) => &block.id,
         }
     }
 
     fn contains_text_block_id(&self, block_id: &str) -> bool {
         match self {
             Self::Paragraph(block) => block.id == block_id,
+            Self::Snapshot(block) | Self::Image(block) | Self::Figure(block) => block.id == block_id && block.ocr_text.as_ref().is_some_and(|text| !text.is_empty()),
             Self::List(block) => block.items.iter().any(|item| item.id == block_id),
             Self::Table(block) => block
                 .rows
@@ -974,9 +1026,7 @@ pub fn install_pack(
 }
 
 pub fn install_generated_pack(
-    workspace: &Workspace,
-    connection: &Connection,
-    pack: Value,
+    workspace: &Workspace, connection: &Connection, pack: Value, draft_id: Option<&str>,
 ) -> Result<InstalledPackRecord> {
     let object = pack.as_object().ok_or_else(|| {
         BackendError::InvalidInput("Generated IELTSPack must be a JSON object.".to_string())
@@ -1039,6 +1089,25 @@ pub fn install_generated_pack(
     let result = (|| -> Result<InstalledPackRecord> {
         fs::create_dir(temporary.join("modules"))?;
         fs::write(temporary.join("manifest.json"), manifest_bytes)?;
+        if let Some(assets) = manifest.get("mediaAssets").and_then(Value::as_array) {
+            if !assets.is_empty() {
+                let draft = draft_id.ok_or_else(|| BackendError::InvalidInput("Generated images require an owning draft.".into()))?;
+                if assets.len() > 100 { return Err(BackendError::InvalidInput("Too many generated images.".into())); }
+                fs::create_dir_all(temporary.join("media/images"))?;
+                for asset in assets {
+                    let id = asset.get("id").and_then(Value::as_str).unwrap_or("");
+                    let expected = format!("media/images/{id}.png");
+                    if asset.get("type").and_then(Value::as_str) != Some("image")
+                        || asset.get("mimeType").and_then(Value::as_str) != Some("image/png")
+                        || asset.get("relativePath").and_then(Value::as_str) != Some(expected.as_str()) {
+                        return Err(BackendError::InvalidInput("Generated image path/type mismatch.".into()));
+                    }
+                    let bytes = crate::import_images::read(workspace, draft, id)?;
+                    fs::OpenOptions::new().write(true).create_new(true).open(temporary.join(&expected))?
+                        .write_all(&bytes)?;
+                }
+            }
+        }
         for (module_type, bytes) in module_bytes {
             fs::write(
                 temporary.join("modules").join(format!("{module_type}.json")),
@@ -1361,7 +1430,10 @@ fn selected_module_media_references_are_valid(
         .map(|asset| (asset.id(), asset.kind()))
         .collect();
     match module {
-        PackModuleV1::Reading(_) => true,
+        PackModuleV1::Reading(reading) => reading.sections.iter().all(|section| {
+            section.content_blocks.iter().all(|block| block.visual.as_ref().is_none_or(|visual| media_by_id.get(visual.asset_id.as_str()) == Some(&MediaKind::Image)))
+                && section.question_groups.iter().all(|group| group.context_blocks.iter().flatten().all(|block| block.visual().is_none_or(|visual| media_by_id.get(visual.asset_id.as_str()) == Some(&MediaKind::Image))))
+        }),
         PackModuleV1::Listening(listening) => {
             media_by_id.get(listening.audio_asset_id.as_str()) == Some(&MediaKind::Audio)
         }
@@ -1487,6 +1559,9 @@ fn validate_internal(path: &str) -> (PackValidationReport, Option<ValidatedPack>
         match serde_json::from_value::<PackModuleV1>(module_json) {
             Ok(module) if module.kind() == module_kind => {
                 validate_module_schema(&module, &relative, &mut stable_ids, &mut errors);
+                if !selected_module_media_references_are_valid(&manifest_schema, &module) {
+                    errors.push(issue("INVALID_MEDIA_REFERENCE", "Module refers to a missing or wrong-kind media asset.", Some(&relative)));
+                }
                 modules.push(module);
             }
             Ok(_) => errors.push(issue(
@@ -1741,7 +1816,7 @@ fn validate_pdf_import_metadata(
             .is_some_and(|range| !valid_range(range))
         || !(1..=3).contains(&metadata.passage_number)
         || metadata.module != "reading"
-        || metadata.extraction_mode != "pdf-text-layer"
+        || !matches!(metadata.extraction_mode.as_str(), "pdf-text-layer" | "pdf-visual")
         || metadata.page_number_base != 1
         || !valid_iso_utc_timestamp(&metadata.imported_at)
     {
@@ -1997,6 +2072,11 @@ fn validate_module_schema(
                 ));
             }
             for (section_index, section) in reading.sections.iter().enumerate() {
+                let has_visual = section.content_blocks.iter().any(|block| block.visual.is_some())
+                    || section.question_groups.iter().any(|group| group.context_blocks.iter().flatten().any(|block| block.visual().is_some()));
+                if has_visual && reading.schema_version < 4 {
+                    errors.push(issue("VISUAL_REQUIRES_V4", "Visual content requires Reading schemaVersion 4.", Some(file_path)));
+                }
                 validate_reading_section(
                     section,
                     &format!("{file_path}#sections[{section_index}]"),
@@ -2023,6 +2103,9 @@ fn validate_module_schema(
                 ));
             }
             for (section_index, section) in listening.sections.iter().enumerate() {
+                if section.content_blocks.iter().any(|block| block.visual.is_some()) {
+                    errors.push(issue("VISUAL_READING_ONLY", "Visual PDF contexts are Reading-only.", Some(file_path)));
+                }
                 validate_listening_section(
                     section,
                     &format!("{file_path}#sections[{section_index}]"),
@@ -2211,6 +2294,12 @@ fn validate_content_block(
 ) {
     stable_ids.record(&block.id, &format!("{path}.id"), errors);
     let _ = &block.kind;
+    if let Some(visual) = &block.visual {
+        let _ = &visual.kind;
+        if !valid_visual(&visual.asset_id, visual.source_page, &visual.crop, &visual.alt_text, &visual.ocr_text) {
+            errors.push(issue("INVALID_VISUAL", "Invalid image reference, crop or description.", Some(path)));
+        }
+    }
     if block.text.is_empty() {
         errors.push(issue(
             "EMPTY_CONTENT_BLOCK",
@@ -2315,6 +2404,14 @@ fn validate_question_context(
         let block_path = format!("{group_path}.contextBlocks[{block_index}]");
         stable_ids.record(block.id(), &format!("{block_path}.id"), errors);
         match block {
+            QuestionContextBlockV2::Snapshot(visual) | QuestionContextBlockV2::Image(visual) | QuestionContextBlockV2::Figure(visual) => {
+                let links = visual.linked_question_ids.as_deref().unwrap_or(&[]);
+                let unique: HashSet<_> = links.iter().collect();
+                if !valid_visual(&visual.asset_id, visual.source_page, &visual.crop, &visual.alt_text, &visual.ocr_text)
+                    || links.len() > 100 || unique.len() != links.len() || links.iter().any(|id| !question_by_id.contains_key(id.as_str())) {
+                    errors.push(issue("INVALID_VISUAL", "Invalid visual context or linked question IDs.", Some(&block_path)));
+                }
+            }
             QuestionContextBlockV2::Paragraph(paragraph) => {
                 validate_question_context_text(&paragraph.text, &format!("{block_path}.text"), errors);
             }
@@ -3582,6 +3679,42 @@ mod tests {
                 ]
             }
         ])
+    }
+
+    #[test]
+    fn generated_visual_images_install_and_survive_reopen_with_checked_references() {
+        let root = tempfile::tempdir().unwrap();
+        let workspace = Workspace::initialize(root.path().join("workspace").to_str().unwrap()).unwrap();
+        storage::initialize_database(&workspace.database_path()).unwrap();
+        let connection = storage::open_database(&workspace.database_path()).unwrap();
+        let source = root.path().join("source");
+        write_valid_pack(&source);
+        let mut manifest = read_fixture_json(&source, "manifest.json");
+        let mut reading = read_fixture_json(&source, "modules/reading.json");
+        let mut bytes = Vec::new();
+        { let mut encoder = png::Encoder::new(&mut bytes, 2, 2); encoder.set_color(png::ColorType::Rgb); encoder.set_depth(png::BitDepth::Eight); encoder.write_header().unwrap().write_image_data(&[180; 12]).unwrap(); }
+        let asset = crate::import_images::save(&workspace, "draft-native-test", &STANDARD.encode(&bytes)).unwrap();
+        manifest["modules"] = serde_json::json!(["reading"]);
+        manifest["tests"][0]["moduleIds"] = serde_json::json!([reading["id"]]);
+        manifest["mediaAssets"] = serde_json::json!([{"id":asset.id,"type":"image","relativePath":asset.relative_path,"mimeType":"image/png","alt":"Original test crop","width":2,"height":2,"sha256":asset.sha256}]);
+        reading["schemaVersion"] = Value::from(4);
+        let visual = serde_json::json!({"type":"snapshot","assetId":asset.id,"sourcePage":1,"altText":"Original table","crop":{"x":0.0,"y":0.0,"width":1.0,"height":1.0}});
+        reading["sections"][0]["contentBlocks"][0]["visual"] = visual.clone();
+        let mut context = visual.clone(); context["id"] = Value::from("test-visual-context");
+        reading["sections"][0]["questionGroups"][0]["contextBlocks"] = serde_json::json!([context]);
+        let pack = serde_json::json!({"manifest":manifest,"modules":[reading]});
+        assert!(install_generated_pack(&workspace, &connection, pack.clone(), None).is_err());
+        assert!(install_generated_pack(&workspace, &connection, pack.clone(), Some("wrong-draft")).is_err());
+        let mut missing = pack.clone(); missing["modules"][0]["sections"][0]["contentBlocks"][0]["visual"]["assetId"] = Value::from("missing-asset");
+        assert!(install_generated_pack(&workspace, &connection, missing, Some("draft-native-test")).is_err());
+        let mut old_version = pack.clone(); old_version["modules"][0]["schemaVersion"] = Value::from(3);
+        assert!(install_generated_pack(&workspace, &connection, old_version, Some("draft-native-test")).is_err());
+        let installed = install_generated_pack(&workspace, &connection, pack, Some("draft-native-test")).unwrap();
+        drop(connection);
+        let reopened = Workspace::open(workspace.root().to_str().unwrap()).unwrap();
+        assert_eq!(fs::read(reopened.root().join("packs").join(&installed.id).join(&asset.relative_path)).unwrap(), bytes);
+        let report = validate_pack_folder(reopened.root().join("packs").join(&installed.id).to_str().unwrap());
+        assert!(report.valid, "{:?}", report.errors);
     }
 
     #[test]

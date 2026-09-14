@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -175,6 +175,72 @@ describe("ReadingPage shared panes and question navigation", () => {
       question.id,
       option.id,
     );
+  });
+
+  it("retains both Pane instances, stable identities and answers across single and dual presentation", async () => {
+    const question = firstSingleChoiceQuestion();
+    renderReading();
+    await screen.findByTestId("reading-split-workspace");
+    const left = document.querySelector('[data-pane-scroll="left"]');
+    const right = document.querySelector('[data-pane-scroll="right"]');
+    const group = document.getElementById("reading-split-workspace");
+    const option = screen.getByRole("radio", { name: `${question.options[0].label}${question.options[0].text}` });
+    fireEvent.click(option);
+    await waitFor(() => expect(option).toBeChecked());
+    const savedAnswers = workbenchStore.getState().answers;
+    fireEvent.click(screen.getByRole("button", { name: "单 Pane" }));
+    expect(group).toHaveAttribute("data-visible-pane", "left");
+    fireEvent.click(screen.getByRole("button", { name: "Pane B" }));
+    expect(group).toHaveAttribute("data-visible-pane", "right");
+    fireEvent.click(screen.getByRole("button", { name: "双 Pane" }));
+    expect(group).toHaveAttribute("data-visible-pane", "both");
+    expect(document.querySelector('[data-pane-scroll="left"]')).toBe(left);
+    expect(document.querySelector('[data-pane-scroll="right"]')).toBe(right);
+    expect(workbenchStore.getState().answers).toBe(savedAnswers);
+    expect(option).toBeChecked();
+    expect(workbenchStore.getState().ensureSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("reveals the original question navigation target when it was hidden by single-Pane display", async () => {
+    const question = firstSingleChoiceQuestion();
+    renderReading();
+    await screen.findByTestId("reading-split-workspace");
+    fireEvent.click(screen.getByRole("button", { name: "单 Pane" }));
+    fireEvent.click(screen.getByRole("button", { name: `跳到第 ${question.number} 题，未答，右窗格` }));
+    await waitFor(() => {
+      expect(document.getElementById("reading-split-workspace")).toHaveAttribute("data-visible-pane", "right");
+      expect(document.activeElement).toBe(document.getElementById(questionContainerId("right-pane", question.id)));
+    });
+  });
+
+  it("does not rehydrate or remount view tools when timer persistence updates the same Session", async () => {
+    renderReading();
+    await screen.findByTestId("reading-split-workspace");
+    const pane = document.querySelector('[data-pane-scroll="left"]');
+    const loadSetting = vi.mocked(workbenchStore.getState().loadSetting);
+    const calls = loadSetting.mock.calls.filter(([key]) => key === readingViewStateSettingKey(session.sessionId)).length;
+    fireEvent.click(screen.getByRole("button", { name: "专注" }));
+    await act(async () => { workbenchStore.setState({ session: { ...session, elapsedSeconds: 10 } }); });
+    expect(screen.getByRole("button", { name: "退出专注" })).toBeInTheDocument();
+    expect(document.querySelector('[data-pane-scroll="left"]')).toBe(pane);
+    expect(loadSetting.mock.calls.filter(([key]) => key === readingViewStateSettingKey(session.sessionId))).toHaveLength(calls);
+  });
+
+  it("changes only the existing font setting after user input and keeps focus mode presentation-only", async () => {
+    renderReading();
+    await screen.findByTestId("reading-split-workspace");
+    const saveSetting = workbenchStore.getState().saveSetting;
+    expect(saveSetting).not.toHaveBeenCalledWith("appearance.readingFontSize", expect.anything());
+    fireEvent.click(screen.getByRole("button", { name: "字体" }));
+    fireEvent.change(screen.getByLabelText(/正文字号/u), { target: { value: "20" } });
+    expect(saveSetting).toHaveBeenCalledWith("appearance.readingFontSize", "20");
+    expect(document.documentElement.style.getPropertyValue("--font-size-reading")).toBe("20px");
+    fireEvent.click(screen.getByRole("button", { name: "专注" }));
+    expect(document.querySelector(".reading-workbench--focus")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "退出专注" }));
+    expect(document.querySelector(".reading-workbench--focus")).toBeNull();
+    expect(workbenchStore.getState().session?.sessionId).toBe(session.sessionId);
+    document.documentElement.style.removeProperty("--font-size-reading");
   });
 
   it("uses unique pane-scoped IDs and focuses the deterministic right-pane navigation target", async () => {

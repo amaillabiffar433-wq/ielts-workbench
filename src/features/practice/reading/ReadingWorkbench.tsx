@@ -12,6 +12,7 @@ import { answerKey, useWorkbenchStore } from "../../../stores/workbenchStore";
 import { usePracticeRoutePack } from "../usePracticeRoutePack";
 import { derivePracticeElapsed, formatPracticeTime } from "../practiceTimer";
 import { ReadingPane } from "./ReadingPane";
+import { ReadingWorkspace } from "./ReadingWorkspace";
 import {
   paneInstanceId,
   paneShowsQuestions,
@@ -82,7 +83,8 @@ export function ReadingWorkbench() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const mode: PracticeMode = searchParams.get("mode") === "exam" ? "exam" : "study";
-  const [layout, setLayout] = useState<SplitLayout>({ left: 52, right: 48 });
+  const [layout, setLayout] = useState<SplitLayout>(() => window.innerWidth < 1440 ? { left: 60, right: 40 } : { left: 65, right: 35 });
+  const [visiblePane, setVisiblePane] = useState<PaneSide | null>(null);
   const [viewState, setViewState] = useState<ReadingViewState | null>(null);
   const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(null);
   const [viewStateNotice, setViewStateNotice] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export function ReadingWorkbench() {
   const activePack = routePack.pack;
   const test = routePack.test;
   const session = useWorkbenchStore((state) => state.session);
+  const practiceSessionId = session?.sessionId;
   const answers = useWorkbenchStore((state) => state.answers);
   const saveState = useWorkbenchStore((state) => state.saveState);
   const ensureSession = useWorkbenchStore((state) => state.ensureSession);
@@ -164,9 +167,9 @@ export function ReadingWorkbench() {
   }, [activePack, ensureSession, mode, module, sessionRetryRevision, test]);
 
   useEffect(() => {
-    if (!module || !session || !sessionMatchesRoute) return;
+    if (!module || !practiceSessionId || !sessionMatchesRoute) return;
     let active = true;
-    const sessionId = session.sessionId;
+    const sessionId = practiceSessionId;
     setHydratedSessionId(null);
     setViewState(null);
     setViewStateNotice(null);
@@ -185,7 +188,7 @@ export function ReadingWorkbench() {
       setViewStateNotice(`无法恢复 Pane 选择，已使用默认视图：${error instanceof Error ? error.message : String(error)}`);
     });
     return () => { active = false; };
-  }, [loadSetting, module, session, sessionMatchesRoute]);
+  }, [loadSetting, module, practiceSessionId, sessionMatchesRoute]);
 
   useEffect(() => {
     if (!session || !viewState || hydratedSessionId !== session.sessionId) return;
@@ -262,6 +265,8 @@ export function ReadingWorkbench() {
       singleNumber: entry.displayNumber,
     });
     setQuestionNavigationTarget({ side, questionId: entry.question.id });
+    // Reveal the existing navigation target in single-Pane presentation; do not change its identity.
+    if (visiblePane) setVisiblePane(side);
   };
 
   if (routePack.status === "loading") {
@@ -289,11 +294,13 @@ export function ReadingWorkbench() {
   }
 
   return (
-    <div className="reading-workbench">
+    <ReadingWorkspace answered={answeredCount} total={questionEntries.length}
+      visiblePane={visiblePane} onVisiblePaneChange={setVisiblePane}
+      toolbar={
       <header className="practice-toolbar">
         <div className="practice-toolbar__identity">
           <Columns2 aria-hidden="true" size={19} />
-          <div><strong>{module.title}</strong><span>{activePack.manifest.title}</span></div>
+          <div><strong>{module.title}</strong><span title={`${activePack.manifest.title} / ${test.title}`}>{activePack.manifest.title} / {test.title}</span></div>
         </div>
         <SegmentedControl
           label="练习模式"
@@ -334,18 +341,19 @@ export function ReadingWorkbench() {
           <CheckCircle2 aria-hidden="true" size={16} />
           {submitting ? "提交中…" : "提交"}
         </button>
-      </header>
-      <div className="reading-workbench__panes">
+      </header>}
+      panes={
         <SplitWorkspace
           defaultLayout={layout}
+          visiblePane={visiblePane}
           left={<ReadingPane entries={questionEntries} module={module} onPaneStateChange={(next) => updatePane("left", next)} onScrollPositionChange={(key, top) => updateScrollPosition("left", key, top)} paneState={viewState.left} side="left" />}
           onLayoutChanged={(nextLayout) => {
             setLayout(nextLayout);
             void saveSetting("reading.splitLayout", JSON.stringify(nextLayout));
           }}
           right={<ReadingPane entries={questionEntries} module={module} onPaneStateChange={(next) => updatePane("right", next)} onScrollPositionChange={(key, top) => updateScrollPosition("right", key, top)} paneState={viewState.right} side="right" />}
-        />
-      </div>
+        />}
+      navigator={
       <footer className="question-navigator" aria-label="题号导航">
         <div className="question-navigator__summary"><ListChecks aria-hidden="true" size={17} />已答 {answeredCount}/{questionEntries.length} · 未答 {questionEntries.length - answeredCount} · 标记 {questionFlags.size}</div>
         <div className="question-navigator__numbers">
@@ -370,7 +378,7 @@ export function ReadingWorkbench() {
             );
           })}
         </div>
-      </footer>
-    </div>
+      </footer>}
+    />
   );
 }

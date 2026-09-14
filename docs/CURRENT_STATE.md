@@ -1,6 +1,23 @@
 # IELTS Workbench 当前状态
 
-更新日期：2026-09-09
+更新日期：2026-09-12
+
+## 最新开发：Visual Fidelity PDF / 本地 OCR
+
+- 在下方 UI 成果上增量实现原版区域、正文/题组混合图片、页/区域 OCR、基础双栏与快速作答框；没有重写 Reading 或数据库。
+- 实时进度、门禁及原生验收以仓库根 `BUILD_STATUS.md` 为准。Cambridge 十分钟标准等待用户提供可合法本地使用的材料，未宣称完成。
+- 数据兼容与资源归属见 ADR 0005；新读取端兼容 Reading 1/2/3/4，旧题包不变。
+- 第一版真实 EXE 已完成 A/C 原生导入、8.466 秒离线 OCR、截图/答案/笔记落库及完整退出后的读回；最终源码小修后正在重跑门禁，详细证据与操作见 `VISUAL_PDF_ACCEPTANCE.md`。
+
+## 前一轮：顶部导航与纸张阅读工作台
+
+- 当前基准 HEAD：`47f7320ed143888fae4c4098afb087d9dd5d8e2d`，分支 `feat/pdf-import-mvp`；本轮 UI 改动未提交，供查看 diff。后文旧日期/提交是保留的历史记录。
+- 大型全局左侧栏已由 60px `TopNavigation` 替代；Reading 组合原 Pane/导航/标记笔记，提供单/双显示、专注、已有字号设置与原生全屏。Listening/Writing 同用顶部导航和暖纸/暗红样式。壁纸为单一本地入口，目前无版权角色图。
+- 题包 schema、稳定 ID、Session 答案/标记、评分、Review、PDF 人工导入、SQLite 和 Writing 保存业务未重写。修复 Pane 设置恢复依赖整个 Session 引用导致计时更新时重复挂载的问题；现在按同一 Session ID 保持原视图。
+- 最终回归：36 文件、215/215 连续两次；lint、Vite production build、Cargo 33/33 和 Tauri no-bundle 构建均退出码 0。中间资源并行期间的超时日志保留，未加重试或修改全局超时。
+- 新可运行 EXE：`D:\IELTS-Workbench-Releases\ui-layout-20260912-2107\ielts-workbench.exe`；13,198,848 字节，2026-09-12 21:05:47 +08:00；SHA-256 `74557BC2652FDD967953ABAF78C5E7EAB7784D991C29B9C5E325898CBA414D34`。已在 Vite/1420 关闭时从交付目录独立启动，无 MSI/NSIS。
+- 原生验收工作区为 `D:\IELTS-Workbench-UI-Acceptance-20260912`，SQLite 位于同目录。P2/题组/Q18/Q24、同题答案、标记/笔记、目标 Pane 导航和完整退出重启恢复通过；Writing 快速关窗最后输入读回通过；原创音频/图表可用。
+- 正式工作区指针已恢复 `D:\IELTS-Workbench`，其数据库验收前后哈希一致。旧 EXE、旧工作区、C 盘副本均保留。截图、完整修改清单和边界统一见 [UI_LAYOUT_ACCEPTANCE.md](UI_LAYOUT_ACCEPTANCE.md)。
 
 ## 当前仓库
 

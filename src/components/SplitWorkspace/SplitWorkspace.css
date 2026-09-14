@@ -3,6 +3,13 @@
   height: 100%;
 }
 
+/* Do not remount, rename or renumber hidden content when changing presentation. */
+.split-workspace[data-visible-pane="left"] > #right,
+.split-workspace[data-visible-pane="right"] > #left,
+.split-workspace:not([data-visible-pane="both"]) > .split-separator { display: none !important; }
+.split-workspace[data-visible-pane="left"] > #left,
+.split-workspace[data-visible-pane="right"] > #right { flex: 1 1 100% !important; }
+
 .split-panel {
   min-width: 0;
   min-height: 0;

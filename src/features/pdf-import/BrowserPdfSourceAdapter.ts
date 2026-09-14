@@ -1,8 +1,8 @@
 import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 
-import { sha256Hex } from "./pdfImportModel";
+import { mergePdfTextFragments, sha256Hex } from "./pdfImportModel";
+import { analyzePdfLayout, pdfFragments } from "./pdfLayout";
 import {
-  extractedTextFromPdfItems,
   type DocumentSourceAdapter,
   type PdfBinarySource,
   type PdfDocumentHandle,
@@ -36,7 +36,18 @@ export class BrowserPdfSourceAdapter implements DocumentSourceAdapter {
           }
           const page = await document.getPage(pageNumber);
           const content = await page.getTextContent();
-          return { pageNumber, text: extractedTextFromPdfItems(content.items) };
+          const layout = analyzePdfLayout(pdfFragments(content.items), page.getViewport({ scale: 1 }).width);
+          return { pageNumber, text: layout.text, layout: { kind: layout.kind, confidence: layout.confidence, message: layout.message } };
+        },
+        async extractRegion(pageNumber, crop) {
+          const page = await document.getPage(pageNumber);
+          const viewport = page.getViewport({ scale: 1 });
+          const content = await page.getTextContent();
+          const fragments = pdfFragments(content.items).filter((fragment) => {
+            const [x, y] = viewport.convertToViewportPoint(fragment.x + (fragment.width ?? 0) / 2, fragment.y + fragment.height / 2);
+            return x / viewport.width >= crop.x && x / viewport.width <= crop.x + crop.width && y / viewport.height >= crop.y && y / viewport.height <= crop.y + crop.height;
+          });
+          return mergePdfTextFragments(fragments);
         },
         async renderPage(pageNumber, canvas, maxWidth) {
           if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > document.numPages) {
@@ -44,7 +55,7 @@ export class BrowserPdfSourceAdapter implements DocumentSourceAdapter {
           }
           const page = await document.getPage(pageNumber);
           const initialViewport = page.getViewport({ scale: 1 });
-          const scale = Math.min(2, Math.max(0.5, maxWidth / initialViewport.width));
+          const scale = Math.min(3, Math.sqrt(12_000_000 / (initialViewport.width * initialViewport.height)), 6000 / Math.max(initialViewport.width, initialViewport.height), Math.max(0.5, maxWidth / initialViewport.width));
           const viewport = page.getViewport({ scale });
           const context = canvas.getContext("2d", { alpha: false });
           if (!context) throw new Error("当前环境无法创建 PDF 预览画布。");

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { workbenchStore } from "../../stores/workbenchStore";
@@ -41,6 +41,19 @@ describe("AppShell exam restrictions", () => {
 
   afterEach(cleanup);
 
+  it("uses the ordered top navigation with real existing destinations and an unavailable vocabulary label", () => {
+    renderShell("/practice/reading?mode=study");
+    const navigation = screen.getByRole("navigation", { name: "主导航" });
+    expect(within(navigation).getAllByRole("link").map((link) => link.textContent)).toEqual(["首页", "阅读", "听力", "写作", "错题本"]);
+    expect(within(navigation).getByText("词汇")).toHaveAttribute("aria-disabled", "true");
+    expect(screen.getByRole("link", { name: "首页" })).toHaveAttribute("href", "/library");
+    expect(screen.getByRole("link", { name: "错题本" })).toHaveAttribute("href", "/review");
+    expect(screen.getByRole("link", { name: "阅读" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "导入中心" })).toHaveAttribute("href", "/import");
+    expect(screen.getByRole("link", { name: "设置" })).toHaveAttribute("href", "/settings");
+    expect(document.querySelector(".sidebar")).toBeNull();
+  });
+
   it("does not render the AI launcher in Exam mode", () => {
     renderShell("/practice/reading?mode=exam");
     expect(screen.queryByRole("button", { name: "打开 AI 学习助手" })).not.toBeInTheDocument();
@@ -56,7 +69,7 @@ describe("AppShell exam restrictions", () => {
 
     renderShell("/practice/reading?mode=study");
 
-    expect(screen.queryByRole("link", { name: "复盘" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "错题本" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "打开 AI 学习助手" })).not.toBeInTheDocument();
   });
 
@@ -71,10 +84,10 @@ describe("AppShell exam restrictions", () => {
 
     await waitFor(() => expect(screen.getByTestId("current-route")).toHaveTextContent(activeReadingExamRoute));
     expect(screen.getByRole("link", { name: "阅读" })).toHaveAttribute("href", activeReadingExamRoute);
-    expect(screen.queryByRole("link", { name: "题库" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "首页" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "听力" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "写作" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "复盘" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "错题本" })).not.toBeInTheDocument();
   });
 
   it("allows the locked Review route without exposing other navigation", () => {
@@ -84,7 +97,7 @@ describe("AppShell exam restrictions", () => {
 
     expect(screen.getByTestId("current-route")).toHaveTextContent("/review");
     expect(screen.getByRole("link", { name: "阅读" })).toHaveAttribute("href", activeReadingExamRoute);
-    expect(screen.queryByRole("link", { name: "复盘" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "错题本" })).not.toBeInTheDocument();
   });
 
   it("restores Review navigation after an Exam session is submitted", () => {
@@ -100,7 +113,7 @@ describe("AppShell exam restrictions", () => {
 
     renderShell("/practice/reading?mode=study");
 
-    expect(screen.getByRole("link", { name: "复盘" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "错题本" })).toBeInTheDocument();
   });
 
   it("keeps the current Study pack and test identity when switching modules", () => {

@@ -20,6 +20,7 @@ import {
   type StructuredGroupDraft,
 } from "./structuredImportModel";
 import "./StructuredContextEditor.css";
+import { VisualBlock } from "../../components/VisualBlock/VisualBlock";
 
 function blockBindingCount(block: StructuredContextBlockDraft): number {
   return block.type === "table"
@@ -86,7 +87,7 @@ export function StructuredContextEditor({
       {group.contextBlocks.map((block, blockIndex) => (
         <article className="structured-context-block" key={block.id}>
           <header>
-            <strong>{block.type === "paragraph" ? "段落" : block.type === "list" ? "列表" : block.type === "table" ? "规则表格" : "摘要/笔记填空"}</strong>
+            <strong>{"assetId" in block ? `原版 ${block.type}` : block.type === "paragraph" ? "段落" : block.type === "list" ? "列表" : block.type === "table" ? "规则表格" : "摘要/笔记填空"}</strong>
             <code>{block.id}</code>
             <div>
               <button aria-label="上移上下文块" className="button button--ghost" disabled={blockIndex === 0} onClick={() => onChange({ ...group, contextBlocks: moveArrayItem(group.contextBlocks, blockIndex, blockIndex - 1) })} type="button"><ArrowUp size={13} /></button>
@@ -98,6 +99,10 @@ export function StructuredContextEditor({
           {block.type === "paragraph" && (
             <label>段落文字<textarea maxLength={4_000} onChange={(event) => updateBlock(block.id, () => ({ ...block, text: event.target.value }))} rows={3} value={block.text} /></label>
           )}
+          {"assetId" in block && <div><VisualBlock visual={block} />
+            <label>原图说明<input maxLength={1000} value={block.altText} onChange={(event) => updateBlock(block.id, () => ({ ...block, altText: event.target.value }))} /></label>
+            <label>校对文字 / OCR（可选）<textarea rows={4} maxLength={20000} value={block.ocrText ?? ""} onChange={(event) => updateBlock(block.id, () => ({ ...block, ocrText: event.target.value }))} /></label>
+          </div>}
 
           {block.type === "list" && (
             <div className="structured-context-list-editor">

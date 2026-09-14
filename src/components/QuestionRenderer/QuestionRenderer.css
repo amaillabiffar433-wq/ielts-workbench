@@ -2,8 +2,10 @@
   display: grid;
   grid-template-columns: 30px minmax(0, 1fr);
   gap: 12px;
-  padding: 18px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 14px;
+  margin-top: 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 9px;
   scroll-margin-top: 92px;
 }
 
@@ -19,17 +21,17 @@
 }
 
 .question:first-child {
-  padding-top: 4px;
+  margin-top: 0;
 }
 
 .question__number {
   display: grid;
   width: 28px;
   height: 28px;
-  border: 1px solid var(--border-strong);
-  border-radius: 50%;
-  background: var(--surface-raised);
-  color: var(--text-secondary);
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: var(--accent);
+  color: #fff;
   font-size: 12px;
   font-weight: 700;
   place-items: center;

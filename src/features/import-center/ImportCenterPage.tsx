@@ -330,7 +330,7 @@ export function ImportCenterPage() {
               <h2 id="unsupported-import-title">文档来源</h2>
             </div>
           </div>
-          <p>Reading PDF 已提供本地文本层提取；扫描件 OCR 与其他格式仍保持关闭。</p>
+          <p>Reading PDF 支持文本提取、离线英文 OCR 与原版区域截图。复杂版面可直接配作答框；DOCX 暂未开放。</p>
           <ul className="unsupported-import-list">
             <li>
               <FileText aria-hidden="true" size={18} />
@@ -344,8 +344,8 @@ export function ImportCenterPage() {
             </li>
             <li>
               <ScanText aria-hidden="true" size={18} />
-              <div><strong>扫描件 / OCR</strong><span>不会把图片自动发送到外部服务</span></div>
-              <button className="button" disabled type="button">暂不可用</button>
+              <div><strong>扫描件 / OCR</strong><span>快速导入后，对整页或框选区域执行本地英文 OCR；也可直接保留原图</span></div>
+              <Link className="button" to="/import/pdf">导入扫描 PDF</Link>
             </li>
             <li>
               <Bot aria-hidden="true" size={18} />

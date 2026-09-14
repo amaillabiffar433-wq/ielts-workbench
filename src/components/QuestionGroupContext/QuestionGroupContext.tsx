@@ -13,6 +13,7 @@ import type {
   DisplayAnnotation,
 } from "../TextDocument/TextDocument";
 import "./QuestionGroupContext.css";
+import { VisualBlock } from "../VisualBlock/VisualBlock";
 
 export type ContextQuestionDescriptor = {
   readonly id: string;
@@ -127,6 +128,7 @@ export function QuestionGroupContext({
     [questions],
   );
   const textByBlockId = useMemo(() => new Map(blocks.flatMap((block) => {
+    if ("assetId" in block) return block.ocrText ? [[block.id, block.ocrText] as const] : [];
     if (block.type === "paragraph") return [[block.id, block.text] as const];
     if (block.type === "list") return block.items.map((item) => [item.id, item.text] as const);
     if (block.type === "completion") {
@@ -207,6 +209,7 @@ export function QuestionGroupContext({
       )}
       <div className="question-context__blocks">
         {blocks.map((block) => {
+          if ("assetId" in block) return <div key={block.id}><VisualBlock visual={block} />{block.ocrText && <details><summary>已校对文字 / OCR（可标记）</summary>{renderText(block.id, block.ocrText)}</details>}</div>;
           if (block.type === "paragraph") {
             return <p className="question-context__paragraph" key={block.id}>{renderText(block.id, block.text)}</p>;
           }

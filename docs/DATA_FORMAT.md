@@ -501,3 +501,12 @@ PDF 辅助导入只生成现有 `IELTSPack`，不建立平行数据库。为保�
 - 破坏性迁移前先备份工作区数据库；若备份失败则中止。
 - 新版本读取旧锚点时必须保留显式 unresolved 状态。
 - `speaking`、多 Test、自定义模块映射、OCR 和远程 AI 都不属于 v1。
+# Reading Visual Fidelity extension (2026-09-12)
+
+Reading `schemaVersion: 4` adds visual contexts on the existing Reading module. The envelope is still IELTSPack v1 and old Reading 1/2/3 modules remain readable without rewriting. See ADR 0005 for the compatibility boundary.
+
+Group contexts add `{ id, type: "snapshot" | "image" | "figure", assetId, altText, sourcePage?, crop?, ocrText?, linkedQuestionIds? }`. Passage text blocks can additionally hold `visual: { type, assetId, altText, sourcePage?, crop?, ocrText? }`, keeping caption/text anchors on their existing block ID. Crop x/y/width/height are normalized PDF-page provenance, not annotation coordinates. Group links refer only to existing questions in that group and do not replace canonical answer identities.
+
+`assetId` must resolve to a manifest image media asset; missing/wrong-kind media is invalid. Installed PNG relative paths are `media/images/visual-{sha256}.png`, with SHA-256 in the manifest. No blob/data URI or absolute/temporary path is persisted. Drafts store image metadata separately from workspace files. New visual imports use `importMetadata.extractionMode: "pdf-visual"` (including manually reviewed OCR); text-only imports retain `pdf-text-layer`.
+
+Draft versions 1/2/3 migrate to 4 with empty image metadata, retaining IDs and settings keys. No SQLite migration is required. Mixed paragraph/list/table/completion/visual ordering is preserved. Text/TFNG/YNNG/single/multiple/matching primitives cover diagram/map/flow-chart tasks using visual contexts and independent answer controls.

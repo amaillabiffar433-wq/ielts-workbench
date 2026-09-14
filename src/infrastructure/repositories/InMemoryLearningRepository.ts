@@ -8,6 +8,7 @@ import {
   parseIeltsPack,
   type IELTSPack,
 } from "../../domain";
+import { describeImportPng } from "./importImageModel";
 import {
   ORIGINAL_DEMO_AUDIO_PATH,
   ORIGINAL_DEMO_PACK_FOLDER,
@@ -64,6 +65,7 @@ export interface InMemoryLearningRepositoryOptions {
 }
 
 export interface InMemoryRepositorySnapshot {
+  readonly media?: Readonly<Record<string, readonly number[]>>;
   readonly packs: readonly IELTSPack[];
   readonly packInstalledAt: Readonly<Record<string, string>>;
   readonly sessions: readonly SessionSnapshot[];
@@ -190,6 +192,7 @@ export class InMemoryLearningRepository implements LearningRepository {
     this.hydrationPromise ??= (async () => {
       const snapshot = await this.stateStore!.load();
       if (!snapshot) return;
+      for (const [key, bytes] of Object.entries(snapshot.media ?? {})) this.media.set(key, new Uint8Array(bytes));
       for (const packInput of snapshot.packs) {
         const pack = parseIeltsPack(cloneJson(packInput));
         this.packs.set(pack.manifest.id, pack);
@@ -337,12 +340,26 @@ export class InMemoryLearningRepository implements LearningRepository {
     return cloneJson(toPackSummary(pack, installedAt));
   }
 
-  async installImportedPack(packInput: IELTSPack): Promise<InstalledPackSummary> {
+  async installImportedPack(packInput: IELTSPack, draftId?: string): Promise<InstalledPackSummary> {
     await this.ensureHydrated();
     const pack = parseIeltsPack(cloneJson(packInput));
     if (this.packs.has(pack.manifest.id)) {
       throw new Error(`Pack is already installed: ${pack.manifest.id}`);
     }
+    const images = await Promise.all(pack.manifest.mediaAssets.map(async (asset) => {
+      if (!draftId) {
+        const existing = this.media.get(mediaKey(pack.manifest.id, asset.relativePath));
+        if (existing) return [asset.relativePath, existing] as const;
+        // Existing synthetic repositories can register their own media separately.
+        if (asset.type !== "image" || !asset.id.startsWith("visual-")) return null;
+        throw new Error("图片资源缺少所属草稿。");
+      }
+      const bytes = await this.readImportImage(draftId, asset.id);
+      const descriptor = await describeImportPng(bytes);
+      if (asset.relativePath !== descriptor.relativePath || asset.sha256 !== descriptor.sha256) throw new Error("图片资源校验失败。");
+      return [asset.relativePath, bytes] as const;
+    }));
+    for (const entry of images) if (entry) this.media.set(mediaKey(pack.manifest.id, entry[0]), entry[1]);
     const installedAt = this.now().toISOString();
     this.packs.set(pack.manifest.id, pack);
     this.packInstalledAt.set(pack.manifest.id, installedAt);
@@ -351,6 +368,7 @@ export class InMemoryLearningRepository implements LearningRepository {
   }
 
   async readPackMedia(packId: string, relativePath: string): Promise<Uint8Array<ArrayBuffer>> {
+    await this.ensureHydrated();
     const validatedPackId = StableIdSchema.parse(packId);
     const validatedRelativePath = RelativePackPathSchema.parse(relativePath);
     if (!this.packs.has(validatedPackId)) {
@@ -360,6 +378,24 @@ export class InMemoryLearningRepository implements LearningRepository {
     if (!bytes) {
       throw new Error(`Pack media is not registered: ${validatedRelativePath}`);
     }
+    return new Uint8Array(bytes);
+  }
+
+  async saveImportImage(draftId: string, bytes: Uint8Array<ArrayBuffer>) {
+    await this.ensureHydrated();
+    StableIdSchema.parse(draftId);
+    const descriptor = await describeImportPng(bytes);
+    this.media.set(mediaKey(`draft:${draftId}`, descriptor.id), new Uint8Array(bytes));
+    await this.persist();
+    return descriptor;
+  }
+
+  async readImportImage(draftId: string, assetId: string) {
+    await this.ensureHydrated();
+    StableIdSchema.parse(draftId);
+    StableIdSchema.parse(assetId);
+    const bytes = this.media.get(mediaKey(`draft:${draftId}`, assetId));
+    if (!bytes || (await describeImportPng(bytes)).id !== assetId) throw new Error("截图资源丢失或损坏；请重新连接 PDF 截取。");
     return new Uint8Array(bytes);
   }
 
@@ -544,10 +580,12 @@ export class InMemoryLearningRepository implements LearningRepository {
   }
 
   async getSetting(key: string): Promise<string | null> {
+    await this.ensureHydrated();
     return this.settings.get(key) ?? null;
   }
 
   async setSetting(key: string, value: string): Promise<void> {
+    await this.ensureHydrated();
     if (key.trim() === "") {
       throw new Error("Setting key cannot be empty");
     }
@@ -614,6 +652,7 @@ export class InMemoryLearningRepository implements LearningRepository {
   snapshot(): InMemoryRepositorySnapshot {
     return deepFreeze({
       packs: [...this.packs.values()].map((pack) => cloneJson(pack)),
+      media: Object.fromEntries([...this.media].map(([key, bytes]) => [key, Array.from(bytes)])),
       packInstalledAt: Object.fromEntries(this.packInstalledAt),
       sessions: [...this.sessions.values()].map((session) => cloneJson(session)),
       settings: Object.fromEntries(this.settings),

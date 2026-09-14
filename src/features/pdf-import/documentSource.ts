@@ -1,4 +1,5 @@
 import { mergePdfTextFragments, type ExtractedPdfPage, type PdfTextFragment } from "./pdfImportModel";
+import type { PdfCrop } from "./visualImportModel";
 
 export interface PdfBinarySource {
   readonly name: string;
@@ -18,6 +19,7 @@ export interface PdfDocumentHandle {
   readonly pageCount: number;
   readonly sourceSha256: string;
   extractPage(pageNumber: number): Promise<ExtractedPdfPage>;
+  extractRegion?(pageNumber: number, crop: PdfCrop): Promise<string>;
   renderPage(pageNumber: number, canvas: HTMLCanvasElement, maxWidth: number): Promise<PdfRenderResult>;
   destroy(): Promise<void>;
 }

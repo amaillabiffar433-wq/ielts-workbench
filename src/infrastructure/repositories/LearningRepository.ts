@@ -23,6 +23,13 @@ export const WorkspaceSummarySchema = z
 
 export type WorkspaceSummary = z.infer<typeof WorkspaceSummarySchema>;
 
+export const ImportImageSchema = z.object({
+  id: StableIdSchema, relativePath: z.string().regex(/^media\/images\/visual-[a-f0-9]{64}\.png$/u),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/u), width: z.number().int().positive().max(6000),
+  height: z.number().int().positive().max(6000), byteLength: z.number().int().positive().max(8 * 1024 * 1024),
+}).strict();
+export type ImportImage = z.infer<typeof ImportImageSchema>;
+
 export const WorkspaceBackupSummarySchema = z.object({
   path: z.string().min(1),
   createdAt: IsoUtcDateTimeSchema,
@@ -318,7 +325,9 @@ export interface LearningRepository {
   loadPack(packId: string): Promise<IELTSPack | null>;
   validatePackFolder(path: string): Promise<PackValidationReport>;
   installPack(path: string): Promise<InstalledPackSummary>;
-  installImportedPack(pack: IELTSPack): Promise<InstalledPackSummary>;
+  installImportedPack(pack: IELTSPack, draftId?: string): Promise<InstalledPackSummary>;
+  saveImportImage(draftId: string, bytes: Uint8Array<ArrayBuffer>): Promise<ImportImage>;
+  readImportImage(draftId: string, assetId: string): Promise<Uint8Array<ArrayBuffer>>;
   readPackMedia(packId: string, relativePath: string): Promise<Uint8Array<ArrayBuffer>>;
 
   createSession(input: CreateSessionInput): Promise<SessionSnapshot>;

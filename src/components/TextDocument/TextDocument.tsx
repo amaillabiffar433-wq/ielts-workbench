@@ -8,6 +8,7 @@ import {
   type TextAnchor,
 } from "../../domain/annotation";
 import "./TextDocument.css";
+import { VisualBlock } from "../VisualBlock/VisualBlock";
 
 export type DisplayAnnotation = {
   id: string;
@@ -72,6 +73,7 @@ function AnnotatedBlock({
   );
   return (
     <>
+      {block.visual && <VisualBlock visual={block.visual} />}
       <BlockElement blockId={block.id} kind={block.kind}>
         {segments.map((segment) => {
           if (segment.annotationIds.length === 0) {

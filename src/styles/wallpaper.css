@@ -1,0 +1,27 @@
+/* One local wallpaper entry point. See assets/themes/uchiha/README.md. */
+:root {
+  --app-wallpaper: none;
+  --wallpaper-position: center;
+  --wallpaper-base: #22242d;
+}
+
+.app-shell::before,
+.app-shell::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  content: "";
+}
+
+.app-shell::before {
+  background-color: var(--wallpaper-base);
+  background-image: var(--app-wallpaper);
+  background-position: var(--wallpaper-position);
+  background-size: cover;
+  filter: saturate(.7) brightness(.8) blur(1px);
+}
+
+.app-shell::after {
+  background: linear-gradient(110deg, rgb(17 21 31 / 46%), rgb(24 19 28 / 38%) 65%, rgb(51 21 28 / 48%));
+}

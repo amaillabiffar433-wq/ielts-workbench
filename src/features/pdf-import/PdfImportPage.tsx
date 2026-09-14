@@ -40,6 +40,8 @@ import {
   type ReadingImportDraft,
 } from "./pdfImportModel";
 import { StructuredImportEditor } from "./StructuredImportEditor";
+import { DraftImageContext } from "../../components/VisualBlock/DraftImageContext";
+import { prepareQuickImport } from "./visualImportModel";
 import {
   buildStructuredReadingPack,
   createStructuredImportDraft,
@@ -130,6 +132,7 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
   const structuredDraftRef = useRef<StructuredImportDraft | null>(null);
   const draftSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const draftWriteQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const pendingVisualSaveRef = useRef<Promise<void>>(Promise.resolve());
   const lastSavedDraftJsonRef = useRef<string | null>(null);
   const allowCloseRef = useRef(false);
   const structuredInstallLockRef = useRef(false);
@@ -179,6 +182,12 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
   }, [draftsLoaded, repository]);
 
   const flushStructuredDraft = useCallback(async (): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([pendingVisualSaveRef.current, new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("原版区域仍在保存，请稍后重试关闭。")), 10_000);
+      })]);
+    } finally { if (timer) clearTimeout(timer); }
     if (draftSaveTimerRef.current) {
       clearTimeout(draftSaveTimerRef.current);
       draftSaveTimerRef.current = null;
@@ -245,8 +254,9 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
     ]).then(([, page]) => {
       if (!active) return;
       setCurrentText(page.text);
+      if (page.layout) setWarning(page.layout.message);
       if (!page.text.trim()) {
-        setWarning("当前页没有可提取文本层，可能是扫描页；本轮不会自动 OCR。");
+        setWarning("此页可能为扫描页面；请使用快速导入中的原版区域或本地 OCR。");
       }
     }).catch((nextError: unknown) => {
       if (active) setError(errorMessage(nextError));
@@ -316,9 +326,9 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
     if (file) void openFile(file);
   };
 
-  const analyze = async () => {
+  const analyze = async (quick = false) => {
     if (!documentHandle) return;
-    const errors = (mode === "structured" ? [
+    const errors = (quick || mode === "structured" ? [
       validatePageRange(passageRange, documentHandle.pageCount, "来源页码"),
       answerRange ? validatePageRange(answerRange, documentHandle.pageCount, "Answer Key 页码") : null,
     ] : [
@@ -333,7 +343,8 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
     setBusy(true);
     setError(null);
     try {
-      if (mode === "structured") {
+      if (quick || mode === "structured") {
+        setMode("structured");
         const existingDraft = (await loadStructuredImportDrafts(repository)).find(
           (item) => item.source.sourceSha256 === documentHandle.sourceSha256,
         );
@@ -346,9 +357,6 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
           extractRange(documentHandle, passageRange),
           answerRange ? extractRange(documentHandle, answerRange) : Promise.resolve([]),
         ]);
-        if (!sourcePages.some((page) => page.text.trim())) {
-          throw new Error("所选来源页没有原生文本层。请更换文本版 PDF；本轮不启用 OCR。");
-        }
         const nextDraft = createStructuredImportDraft({
           fileName: documentHandle.fileName,
           fileSize: documentHandle.fileSize,
@@ -356,9 +364,10 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
           pageCount: documentHandle.pageCount,
           pages: sourcePages,
         });
+        const prepared = quick ? prepareQuickImport(nextDraft) : nextDraft;
         const withAnswers = answerPages.length > 0
-          ? touchStructuredDraft(nextDraft, { answerKeyText: answerPages.map((page) => page.text).join("\n") })
-          : nextDraft;
+          ? touchStructuredDraft(prepared, { answerKeyText: answerPages.map((page) => page.text).join("\n") })
+          : prepared;
         structuredDraftRef.current = withAnswers;
         setStructuredDraft(withAnswers);
         setDraftSaveState("saving");
@@ -375,7 +384,7 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
         answerRange ? extractRange(documentHandle, answerRange) : Promise.resolve([]),
       ]);
       if (![...passagePages, ...questionPages].some((page) => page.text.trim())) {
-        throw new Error("所选页没有原生文本层。请更换文本版 PDF；本轮不启用 OCR。");
+        throw new Error("所选页没有原生文本层。请使用“快速导入”，在整理器执行本地 OCR 或保留原版区域。");
       }
       const nextDraft = createReadingImportDraft(passagePages, questionPages, passageNumber);
       if (!nextDraft.passageText.trim()) throw new Error("Passage 页未提取到正文，请调整页码范围。");
@@ -555,7 +564,7 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
         throw new Error(`Pack ID ${structuredDraft.packId} 已存在。来源去重与 Pack ID 冲突已分别检查；没有覆盖现有题包。`);
       }
       const pack = await buildStructuredReadingPack(structuredDraft);
-      await installImportedPack(pack);
+      await installImportedPack(pack, structuredDraft.id);
       const installedDraft = touchStructuredDraft(structuredDraft, { installedPackId: pack.manifest.id });
       structuredDraftRef.current = installedDraft;
       setStructuredDraft(installedDraft);
@@ -577,7 +586,7 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
     <main className="page pdf-import-page">
       <PageHeader
         actions={<Link className="button" to="/import"><ArrowLeft aria-hidden="true" size={16} /> 返回导入中心</Link>}
-        description="本地、半自动的 Reading PDF 导入。页面序号统一从 1 开始；原文需人工复核，扫描版暂不 OCR。"
+        description="本地 Reading PDF 导入：能解析的结构化，复杂版式保留原图。页码从 1 开始；题型与答案由你确认。"
         title="导入 Reading PDF"
       />
 
@@ -656,7 +665,7 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
               <fieldset><legend>Answer Key（可选）</legend><label>从<input aria-label="Answer Key 开始页" min={1} onChange={(event) => setAnswerStart(event.target.value)} type="number" value={answerStart} /></label><label>到<input aria-label="Answer Key 结束页" min={1} onChange={(event) => setAnswerEnd(event.target.value)} type="number" value={answerEnd} /></label></fieldset>
             </div>
             {mode === "simple" && <label>Passage 编号<select aria-label="Passage 编号" onChange={(event) => setPassageNumber(Number(event.target.value))} value={passageNumber}><option value={1}>1</option><option value={2}>2</option><option value={3}>3</option></select></label>}
-            <div className="pdf-actions"><button className="button" onClick={() => setStep("source")} type="button">重新选择</button><button className="button button--primary" disabled={busy} onClick={() => void analyze()} type="button"><ScanText size={16} />{busy ? "正在提取…" : "提取并整理"}</button></div>
+            <div className="pdf-actions"><button className="button" onClick={() => setStep("source")} type="button">重新选择</button><button className="button button--primary" disabled={busy} onClick={() => void analyze()} type="button"><ScanText size={16} />{busy ? "正在提取…" : "提取并整理"}</button><button className="button" disabled={busy} onClick={() => void analyze(true)} type="button">快速导入</button></div>
           </aside>
         </div>
       )}
@@ -695,7 +704,10 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
       )}
 
       {step === "review" && mode === "structured" && structuredDraft && (
+        <DraftImageContext.Provider value={structuredDraft.id}>
         <StructuredImportEditor
+          onPendingVisualSave={(promise) => { pendingVisualSaveRef.current = promise; void promise.catch(() => undefined); }}
+          documentHandle={documentHandle}
           busy={busy}
           draft={structuredDraft}
           onChange={(nextDraft) => {
@@ -709,6 +721,7 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
           saveState={draftSaveState}
           sourceConnected={documentHandle?.sourceSha256 === structuredDraft.source.sourceSha256}
         />
+        </DraftImageContext.Provider>
       )}
 
       {step === "complete" && installedIdentity && (

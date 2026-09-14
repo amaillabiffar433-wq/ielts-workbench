@@ -1,0 +1,6 @@
+.visual-block { margin: 12px 0; min-width: 0; }
+.visual-block figcaption { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; }
+.visual-block figcaption span { flex: 1; }
+.visual-block button { padding: 4px 8px; }
+.visual-block__viewport { overflow: auto; max-height: 58vh; border: 1px solid var(--border-subtle, #aaa); background: white; }
+.visual-block__viewport img { display: block; max-width: none; height: auto; }

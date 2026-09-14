@@ -14,6 +14,7 @@ import {
 } from "../../domain";
 import {
   AnswerValueSchema,
+  ImportImageSchema,
   BootstrapStateSchema,
   CreateSessionInputSchema,
   CreateWritingVersionInputSchema,
@@ -407,10 +408,10 @@ export class TauriLearningRepository implements LearningRepository {
     );
   }
 
-  async installImportedPack(packInput: IELTSPack): Promise<InstalledPackSummary> {
+  async installImportedPack(packInput: IELTSPack, draftId?: string): Promise<InstalledPackSummary> {
     const pack = parseIeltsPack(packInput);
     return mapInstalledPack(
-      await this.invokeCommand("install_generated_pack", { pack }),
+      await this.invokeCommand("install_generated_pack", { pack, ...(draftId ? { draftId: StableIdSchema.parse(draftId) } : {}) }),
     );
   }
 
@@ -430,6 +431,19 @@ export class TauriLearningRepository implements LearningRepository {
       );
     }
     return bytes;
+  }
+
+  async saveImportImage(draftId: string, bytes: Uint8Array<ArrayBuffer>) {
+    if (!bytes.length || bytes.length > 8 * 1024 * 1024) throw new Error("图片不能超过 8 MiB。");
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 8192) binary += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+    return ImportImageSchema.parse(await this.invokeCommand("save_import_image", { draftId: StableIdSchema.parse(draftId), base64: btoa(binary) }));
+  }
+
+  async readImportImage(draftId: string, assetId: string) {
+    return decodeBase64(z.string().parse(await this.invokeCommand("read_import_image", {
+      draftId: StableIdSchema.parse(draftId), assetId: StableIdSchema.parse(assetId),
+    })));
   }
 
   async createSession(input: CreateSessionInput): Promise<SessionSnapshot> {

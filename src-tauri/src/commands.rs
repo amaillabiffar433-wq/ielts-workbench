@@ -351,10 +351,24 @@ pub fn install_pack(
 pub fn install_generated_pack(
     state: State<'_, AppBackend>,
     pack: Value,
+    draft_id: Option<String>,
 ) -> CommandResult<InstalledPackRecord> {
     let _guard = state.lock_mutation().map_err(CommandError::from)?;
     let (workspace, connection) = state.workspace_and_database().map_err(CommandError::from)?;
-    packs::install_generated_pack(&workspace, &connection, pack).map_err(Into::into)
+    packs::install_generated_pack(&workspace, &connection, pack, draft_id.as_deref()).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn save_import_image(state: State<'_, AppBackend>, draft_id: String, base64: String) -> CommandResult<crate::import_images::ImportImage> {
+    let _guard = state.lock_mutation().map_err(CommandError::from)?;
+    let (workspace, _) = state.workspace_and_database().map_err(CommandError::from)?;
+    crate::import_images::save(&workspace, &draft_id, &base64).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn read_import_image(state: State<'_, AppBackend>, draft_id: String, asset_id: String) -> CommandResult<String> {
+    let (workspace, _) = state.workspace_and_database().map_err(CommandError::from)?;
+    crate::import_images::read(&workspace, &draft_id, &asset_id).map(|bytes| STANDARD.encode(bytes)).map_err(Into::into)
 }
 
 #[tauri::command]
