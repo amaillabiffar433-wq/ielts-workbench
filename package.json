@@ -2,6 +2,14 @@
   "name": "ielts-workbench",
   "private": true,
   "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/amaillabiffar433-wq/ielts-workbench.git"
+  },
+  "bugs": {
+    "url": "https://github.com/amaillabiffar433-wq/ielts-workbench/issues"
+  },
+  "homepage": "https://github.com/amaillabiffar433-wq/ielts-workbench#readme",
   "type": "module",
   "scripts": {
     "predev": "node scripts/prepare-ocr.mjs",
