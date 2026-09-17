@@ -27,7 +27,7 @@ export function TopNavigation({ identity, examLock, examMode, examPath, examRout
             title={to === "/review" ? "复盘：查看完整练习与错题" : undefined}
             to={examLock ? examRoute : moduleType ? buildPracticeRoute(moduleType, { identity }) : to}>{label}</NavLink>
         ))}
-        {!examLock && <span aria-disabled="true" className="top-navigation__unavailable" title="词汇本尚未启用">词汇</span>}
+        {!examLock && <NavLink className={({ isActive }) => `top-navigation__link${isActive ? " active" : ""}`} to="/vocabulary">词汇</NavLink>}
       </nav>
       <div className="top-navigation__utilities">
         {examLock && <span className="top-navigation__exam">Exam · 考试进行中</span>}

@@ -121,6 +121,48 @@ export interface SaveAnnotationInput {
   readonly note?: string;
 }
 
+export const VocabularyLearningStateSchema = z.enum(["new", "learning", "familiar", "mastered"]);
+export type VocabularyLearningState = z.infer<typeof VocabularyLearningStateSchema>;
+
+export const VocabularyItemSchema = z.object({
+  id: StableIdSchema,
+  term: z.string().trim().min(1).max(160),
+  normalizedTerm: z.string().trim().min(1).max(160),
+  sentence: z.string().max(4_000),
+  contextBefore: z.string().max(1_000),
+  contextAfter: z.string().max(1_000),
+  sourcePackId: StableIdSchema.optional(),
+  sourceTestId: StableIdSchema.optional(),
+  sourceModule: z.literal("reading").optional(),
+  sourceBlockId: StableIdSchema.optional(),
+  sourceBookTitle: z.string().max(300).optional(),
+  sourceTestTitle: z.string().max(300).optional(),
+  sourceSectionId: StableIdSchema.optional(),
+  sourceSectionTitle: z.string().max(300).optional(),
+  sourceQuestionId: StableIdSchema.optional(),
+  sourceQuestionNumber: z.number().int().positive().optional(),
+  note: z.string().max(2_000),
+  learningState: VocabularyLearningStateSchema,
+  createdAt: IsoUtcDateTimeSchema,
+  updatedAt: IsoUtcDateTimeSchema,
+}).strict();
+
+export type VocabularyItem = z.infer<typeof VocabularyItemSchema>;
+
+export const SaveVocabularyItemInputSchema = VocabularyItemSchema.omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+}).extend({ id: StableIdSchema.optional() }).strict();
+export type SaveVocabularyItemInput = z.input<typeof SaveVocabularyItemInputSchema>;
+
+export const UpdateVocabularyItemInputSchema = z.object({
+  id: StableIdSchema,
+  note: z.string().max(2_000),
+  learningState: VocabularyLearningStateSchema,
+}).strict();
+export type UpdateVocabularyItemInput = z.infer<typeof UpdateVocabularyItemInputSchema>;
+
 export const SaveAnnotationInputSchema = z
   .object({
     id: StableIdSchema.optional(),
@@ -338,6 +380,11 @@ export interface LearningRepository {
   saveAnswer(input: SaveAnswerInput): Promise<AnswerRecord>;
   saveAnnotation(input: SaveAnnotationInput): Promise<AnnotationRecord>;
   deleteAnnotation(annotationId: string): Promise<void>;
+
+  listVocabularyItems(): Promise<VocabularyItem[]>;
+  saveVocabularyItem(input: SaveVocabularyItemInput): Promise<VocabularyItem>;
+  updateVocabularyItem(input: UpdateVocabularyItemInput): Promise<VocabularyItem>;
+  deleteVocabularyItem(itemId: string): Promise<void>;
 
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;

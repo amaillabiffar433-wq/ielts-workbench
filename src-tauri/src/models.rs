@@ -175,6 +175,70 @@ pub struct AnnotationRecord {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SaveVocabularyItemInput {
+    pub id: Option<String>,
+    pub term: String,
+    pub normalized_term: String,
+    pub sentence: String,
+    #[serde(default)]
+    pub context_before: String,
+    #[serde(default)]
+    pub context_after: String,
+    pub source_pack_id: Option<String>,
+    pub source_test_id: Option<String>,
+    pub source_module: Option<String>,
+    pub source_block_id: Option<String>,
+    pub source_book_title: Option<String>,
+    pub source_test_title: Option<String>,
+    pub source_section_id: Option<String>,
+    pub source_section_title: Option<String>,
+    pub source_question_id: Option<String>,
+    pub source_question_number: Option<u32>,
+    #[serde(default)]
+    pub note: String,
+    #[serde(default = "default_vocabulary_learning_state")]
+    pub learning_state: String,
+}
+
+fn default_vocabulary_learning_state() -> String {
+    "new".to_string()
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UpdateVocabularyItemInput {
+    pub id: String,
+    pub note: String,
+    pub learning_state: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VocabularyItemRecord {
+    pub id: String,
+    pub term: String,
+    pub normalized_term: String,
+    pub sentence: String,
+    pub context_before: String,
+    pub context_after: String,
+    pub source_pack_id: Option<String>,
+    pub source_test_id: Option<String>,
+    pub source_module: Option<String>,
+    pub source_block_id: Option<String>,
+    pub source_book_title: Option<String>,
+    pub source_test_title: Option<String>,
+    pub source_section_id: Option<String>,
+    pub source_section_title: Option<String>,
+    pub source_question_id: Option<String>,
+    pub source_question_number: Option<u32>,
+    pub note: String,
+    pub learning_state: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSnapshot {

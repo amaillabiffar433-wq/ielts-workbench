@@ -37,6 +37,9 @@ import type {
   WorkspaceSummary,
   WritingDraft,
   WritingVersion,
+  SaveVocabularyItemInput,
+  UpdateVocabularyItemInput,
+  VocabularyItem,
 } from "./LearningRepository";
 import {
   BootstrapStateSchema,
@@ -45,6 +48,9 @@ import {
   SaveAnnotationInputSchema,
   SaveAnswerInputSchema,
   SaveWritingDraftInputSchema,
+  SaveVocabularyItemInputSchema,
+  UpdateVocabularyItemInputSchema,
+  VocabularyItemSchema,
   deriveRecentSessionId,
   sortRecentSessionSummaries,
 } from "./LearningRepository";
@@ -57,6 +63,7 @@ export interface InMemoryLearningRepositoryOptions {
   readonly settings?: Readonly<Record<string, string>>;
   readonly drafts?: readonly WritingDraft[];
   readonly writingVersions?: readonly WritingVersion[];
+  readonly vocabularyItems?: readonly VocabularyItem[];
   readonly packFolders?: Readonly<Record<string, IELTSPack>>;
   readonly media?: Readonly<Record<string, Uint8Array<ArrayBufferLike>>>;
   readonly now?: () => Date;
@@ -72,6 +79,7 @@ export interface InMemoryRepositorySnapshot {
   readonly settings: Readonly<Record<string, string>>;
   readonly drafts: readonly WritingDraft[];
   readonly writingVersions: readonly WritingVersion[];
+  readonly vocabularyItems?: readonly VocabularyItem[];
 }
 
 export interface InMemoryRepositoryStateStore {
@@ -142,6 +150,7 @@ export class InMemoryLearningRepository implements LearningRepository {
   private readonly settings = new Map<string, string>();
   private readonly drafts = new Map<string, WritingDraft>();
   private readonly writingVersions = new Map<string, WritingVersion[]>();
+  private readonly vocabularyItems = new Map<string, VocabularyItem>();
   private readonly packFolders = new Map<string, IELTSPack>();
   private readonly media = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly now: () => Date;
@@ -178,6 +187,10 @@ export class InMemoryLearningRepository implements LearningRepository {
         ...(this.writingVersions.get(key) ?? []),
         deepFreeze(cloneJson(version)),
       ]);
+    }
+    for (const item of options.vocabularyItems ?? []) {
+      const parsed = VocabularyItemSchema.parse(item);
+      this.vocabularyItems.set(parsed.id, deepFreeze(cloneJson(parsed)));
     }
     for (const [folder, packInput] of Object.entries(options.packFolders ?? {})) {
       this.packFolders.set(normalizeFolderKey(folder), parseIeltsPack(cloneJson(packInput)));
@@ -216,6 +229,10 @@ export class InMemoryLearningRepository implements LearningRepository {
           ...(this.writingVersions.get(key) ?? []),
           deepFreeze(cloneJson(version)),
         ]);
+      }
+      for (const item of snapshot.vocabularyItems ?? []) {
+        const parsed = VocabularyItemSchema.parse(item);
+        this.vocabularyItems.set(parsed.id, deepFreeze(cloneJson(parsed)));
       }
     })();
     await this.hydrationPromise;
@@ -579,6 +596,54 @@ export class InMemoryLearningRepository implements LearningRepository {
     }
   }
 
+  async listVocabularyItems(): Promise<VocabularyItem[]> {
+    await this.ensureHydrated();
+    return [...this.vocabularyItems.values()]
+      .map((item) => cloneJson(item))
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt) || right.id.localeCompare(left.id));
+  }
+
+  async saveVocabularyItem(input: SaveVocabularyItemInput): Promise<VocabularyItem> {
+    await this.ensureHydrated();
+    const validated = SaveVocabularyItemInputSchema.parse(input);
+    const existing = [...this.vocabularyItems.values()].find((item) => (
+      item.normalizedTerm === validated.normalizedTerm
+      && item.sourcePackId === validated.sourcePackId
+      && item.sourceTestId === validated.sourceTestId
+      && item.sourceBlockId === validated.sourceBlockId
+      && item.sentence === validated.sentence
+    ));
+    const now = this.now().toISOString();
+    const item = VocabularyItemSchema.parse({
+      ...validated,
+      id: existing?.id ?? validated.id ?? this.idFactory(),
+      note: existing?.note || validated.note,
+      learningState: existing?.learningState ?? validated.learningState,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+    this.vocabularyItems.set(item.id, deepFreeze(cloneJson(item)));
+    await this.persist();
+    return deepFreeze(cloneJson(item));
+  }
+
+  async updateVocabularyItem(input: UpdateVocabularyItemInput): Promise<VocabularyItem> {
+    await this.ensureHydrated();
+    const validated = UpdateVocabularyItemInputSchema.parse(input);
+    const current = this.vocabularyItems.get(validated.id);
+    if (!current) throw new Error("The vocabulary item does not exist.");
+    const updated = VocabularyItemSchema.parse({ ...current, ...validated, updatedAt: this.now().toISOString() });
+    this.vocabularyItems.set(updated.id, deepFreeze(cloneJson(updated)));
+    await this.persist();
+    return deepFreeze(cloneJson(updated));
+  }
+
+  async deleteVocabularyItem(itemId: string): Promise<void> {
+    await this.ensureHydrated();
+    this.vocabularyItems.delete(StableIdSchema.parse(itemId));
+    await this.persist();
+  }
+
   async getSetting(key: string): Promise<string | null> {
     await this.ensureHydrated();
     return this.settings.get(key) ?? null;
@@ -658,6 +723,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       settings: Object.fromEntries(this.settings),
       drafts: [...this.drafts.values()].map((draft) => cloneJson(draft)),
       writingVersions: [...this.writingVersions.values()].flat().map((version) => cloneJson(version)),
+      vocabularyItems: [...this.vocabularyItems.values()].map((item) => cloneJson(item)),
     });
   }
 }

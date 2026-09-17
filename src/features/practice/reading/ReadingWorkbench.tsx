@@ -29,6 +29,7 @@ import {
 import "./ReadingPage.css";
 
 type PracticeMode = "study" | "exam";
+type QuestionNavigatorFilter = "all" | "unanswered" | "flagged";
 
 type QuestionNavigationTarget = {
   readonly side: PaneSide;
@@ -93,6 +94,9 @@ export function ReadingWorkbench() {
   const [sessionRetryRevision, setSessionRetryRevision] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [questionNavigationTarget, setQuestionNavigationTarget] = useState<QuestionNavigationTarget | null>(null);
+  const [activeQuestionId, setActiveQuestionId] = useState<string | null>(null);
+  const [navigatorFilter, setNavigatorFilter] = useState<QuestionNavigatorFilter>("all");
+  const sourceNavigationApplied = useRef<string | null>(null);
   const routePack = usePracticeRoutePack();
   const activePack = routePack.pack;
   const test = routePack.test;
@@ -133,6 +137,25 @@ export function ReadingWorkbench() {
       return Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0;
     }).length;
   }, [answers, questionEntries, session]);
+  const answeredQuestionIds = useMemo(() => new Set(session ? questionEntries.flatMap((entry) => {
+    const value = answers[answerKey(session.sessionId, entry.question.id)]?.value;
+    const answered = Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0;
+    return answered ? [entry.question.id] : [];
+  }) : []), [answers, questionEntries, session]);
+  const visibleNavigationEntries = useMemo(() => questionEntries.filter((entry) => (
+    navigatorFilter === "all"
+      || (navigatorFilter === "unanswered" && !answeredQuestionIds.has(entry.question.id))
+      || (navigatorFilter === "flagged" && questionFlags.has(entry.question.id))
+  )), [answeredQuestionIds, navigatorFilter, questionEntries, questionFlags]);
+  const currentQuestion = useMemo(() => {
+    const active = questionEntries.find((entry) => entry.question.id === activeQuestionId);
+    if (active) return { id: active.question.id, number: active.displayNumber };
+    if (!viewState) return undefined;
+    const questionPane = paneShowsQuestions(viewState.right.view) ? viewState.right : paneShowsQuestions(viewState.left.view) ? viewState.left : null;
+    if (!questionPane || questionPane.questionScope !== "single") return undefined;
+    const entry = questionEntries.find((candidate) => candidate.displayNumber === questionPane.singleNumber);
+    return entry ? { id: entry.question.id, number: entry.displayNumber } : undefined;
+  }, [activeQuestionId, questionEntries, viewState]);
 
   useEffect(() => {
     let active = true;
@@ -231,6 +254,28 @@ export function ReadingWorkbench() {
     setQuestionNavigationTarget(null);
   }, [questionNavigationTarget, viewState]);
 
+  useEffect(() => {
+    if (!module || !viewState || !session || hydratedSessionId !== session.sessionId) return;
+    const sectionId = searchParams.get("sourceSectionId");
+    const blockId = searchParams.get("sourceBlockId");
+    const questionNumber = Number(searchParams.get("sourceQuestionNumber"));
+    const key = `${session.sessionId}:${sectionId ?? ""}:${blockId ?? ""}:${questionNumber || ""}`;
+    if ((!sectionId && !blockId && !questionNumber) || sourceNavigationApplied.current === key) return;
+    const section = module.sections.find((candidate) => candidate.id === sectionId) ?? module.sections[0];
+    setViewState((current) => current ? {
+      ...current,
+      left: { ...current.left, view: "passage", passageId: section.id },
+      ...(Number.isInteger(questionNumber) && questionNumber > 0 ? {
+        right: { ...current.right, view: "questions", questionScope: "single", singleNumber: questionNumber },
+      } : {}),
+    } : current);
+    sourceNavigationApplied.current = key;
+    window.setTimeout(() => {
+      const target = blockId ? document.querySelector<HTMLElement>(`[data-pane-scroll="left"] [data-content-block-id="${CSS.escape(blockId)}"]`) : null;
+      target?.scrollIntoView({ block: "center", behavior: "smooth" });
+    }, 120);
+  }, [hydratedSessionId, module, searchParams, session, viewState]);
+
   const updatePane = useCallback((side: PaneSide, next: ReadingPaneState) => {
     setViewState((current) => current ? { ...current, [side]: next } : current);
   }, []);
@@ -265,6 +310,7 @@ export function ReadingWorkbench() {
       singleNumber: entry.displayNumber,
     });
     setQuestionNavigationTarget({ side, questionId: entry.question.id });
+    setActiveQuestionId(entry.question.id);
     // Reveal the existing navigation target in single-Pane presentation; do not change its identity.
     if (visiblePane) setVisiblePane(side);
   };
@@ -346,18 +392,31 @@ export function ReadingWorkbench() {
         <SplitWorkspace
           defaultLayout={layout}
           visiblePane={visiblePane}
-          left={<ReadingPane entries={questionEntries} module={module} onPaneStateChange={(next) => updatePane("left", next)} onScrollPositionChange={(key, top) => updateScrollPosition("left", key, top)} paneState={viewState.left} side="left" />}
+          left={<ReadingPane entries={questionEntries} module={module} onActiveQuestionChange={setActiveQuestionId} onPaneStateChange={(next) => updatePane("left", next)} onScrollPositionChange={(key, top) => updateScrollPosition("left", key, top)} paneState={viewState.left} side="left" vocabularySource={{ packId: activePack.manifest.id, testId: test.id, bookTitle: activePack.manifest.title, testTitle: test.title, ...(currentQuestion ? { currentQuestion } : {}) }} />}
           onLayoutChanged={(nextLayout) => {
             setLayout(nextLayout);
             void saveSetting("reading.splitLayout", JSON.stringify(nextLayout));
           }}
-          right={<ReadingPane entries={questionEntries} module={module} onPaneStateChange={(next) => updatePane("right", next)} onScrollPositionChange={(key, top) => updateScrollPosition("right", key, top)} paneState={viewState.right} side="right" />}
+          right={<ReadingPane entries={questionEntries} module={module} onActiveQuestionChange={setActiveQuestionId} onPaneStateChange={(next) => updatePane("right", next)} onScrollPositionChange={(key, top) => updateScrollPosition("right", key, top)} paneState={viewState.right} side="right" vocabularySource={{ packId: activePack.manifest.id, testId: test.id, bookTitle: activePack.manifest.title, testTitle: test.title, ...(currentQuestion ? { currentQuestion } : {}) }} />}
         />}
       navigator={
       <footer className="question-navigator" aria-label="题号导航">
         <div className="question-navigator__summary"><ListChecks aria-hidden="true" size={17} />已答 {answeredCount}/{questionEntries.length} · 未答 {questionEntries.length - answeredCount} · 标记 {questionFlags.size}</div>
+        <div className="question-navigator__tools">
+          <div aria-label="题号筛选" className="question-navigator__filters" role="group">
+            {([['all', '全部'], ['unanswered', '未答'], ['flagged', '已标记']] as const).map(([value, label]) => (
+              <button aria-pressed={navigatorFilter === value} key={value} onClick={() => setNavigatorFilter(value)} type="button">{label}</button>
+            ))}
+          </div>
+          <button className="question-navigator__next-flagged" disabled={questionFlags.size === 0} onClick={() => {
+            const flaggedEntries = questionEntries.filter((entry) => questionFlags.has(entry.question.id));
+            if (flaggedEntries.length === 0) return;
+            const activeIndex = flaggedEntries.findIndex((entry) => entry.question.id === activeQuestionId);
+            navigateToQuestion(flaggedEntries[(activeIndex + 1) % flaggedEntries.length]);
+          }} type="button"><Flag aria-hidden="true" size={12} />下一标记</button>
+        </div>
         <div className="question-navigator__numbers">
-          {questionEntries.map((entry) => {
+          {visibleNavigationEntries.map((entry) => {
             const value = answers[answerKey(session.sessionId, entry.question.id)]?.value;
             const answered = Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0;
             const targetSide: PaneSide = paneShowsQuestions(viewState.right.view) ? "right" : paneShowsQuestions(viewState.left.view) ? "left" : "right";
@@ -366,8 +425,8 @@ export function ReadingWorkbench() {
               <span className="question-navigator__item" key={entry.question.id}>
               <button
                 aria-controls={questionContainerId(paneInstanceId(targetSide), entry.question.id)}
-                aria-label={`跳到第 ${entry.displayNumber} 题，${answered ? "已答" : "未答"}，${targetSide === "right" ? "右" : "左"}窗格`}
-                className={answered ? "is-answered" : undefined}
+                aria-label={`跳到第 ${entry.displayNumber} 题，${answered ? "已答" : "未答"}${flagged ? "，已标记" : ""}，${targetSide === "right" ? "右" : "左"}窗格`}
+                className={`${answered ? "is-answered" : ""}${activeQuestionId === entry.question.id ? " is-current" : ""}`.trim() || undefined}
                 onClick={() => navigateToQuestion(entry)}
                 type="button"
               >
@@ -377,6 +436,7 @@ export function ReadingWorkbench() {
               </span>
             );
           })}
+          {visibleNavigationEntries.length === 0 && <span className="question-navigator__empty">当前筛选没有题目</span>}
         </div>
       </footer>}
     />

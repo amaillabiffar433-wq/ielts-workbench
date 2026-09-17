@@ -84,6 +84,21 @@ async function extractRange(document: PdfDocumentHandle, range: PageRange): Prom
   return pages;
 }
 
+async function renderCoverPng(document: PdfDocumentHandle): Promise<Uint8Array<ArrayBuffer>> {
+  if (/jsdom/iu.test(window.navigator.userAgent)) {
+    throw new Error("测试环境不提供 Canvas PNG 编码。 ");
+  }
+  const canvas = window.document.createElement("canvas");
+  await document.renderPage(1, canvas, 480);
+  const blob = await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((value) => {
+      if (value) resolve(value);
+      else reject(new Error("PDF 第一页无法编码为封面 PNG。"));
+    }, "image/png");
+  });
+  return new Uint8Array(await blob.arrayBuffer());
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -357,13 +372,25 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
           extractRange(documentHandle, passageRange),
           answerRange ? extractRange(documentHandle, answerRange) : Promise.resolve([]),
         ]);
-        const nextDraft = createStructuredImportDraft({
+        let nextDraft = createStructuredImportDraft({
           fileName: documentHandle.fileName,
           fileSize: documentHandle.fileSize,
           sourceSha256: documentHandle.sourceSha256,
           pageCount: documentHandle.pageCount,
           pages: sourcePages,
         });
+        try {
+          const cover = await repository.saveImportImage(
+            nextDraft.id,
+            await renderCoverPng(documentHandle),
+          );
+          nextDraft = touchStructuredDraft(nextDraft, {
+            coverAssetId: cover.id,
+            imageAssets: [cover, ...nextDraft.imageAssets.filter((asset) => asset.id !== cover.id)],
+          });
+        } catch (coverError) {
+          setWarning(`PDF 第一页未能缓存为封面，将使用书架备用封面：${errorMessage(coverError)}`);
+        }
         const prepared = quick ? prepareQuickImport(nextDraft) : nextDraft;
         const withAnswers = answerPages.length > 0
           ? touchStructuredDraft(prepared, { answerKeyText: answerPages.map((page) => page.text).join("\n") })

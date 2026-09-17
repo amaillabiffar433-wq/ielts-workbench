@@ -254,6 +254,49 @@ pub fn delete_annotation(
 }
 
 #[tauri::command]
+pub fn list_vocabulary_items(
+    state: State<'_, AppBackend>,
+) -> CommandResult<Vec<crate::models::VocabularyItemRecord>> {
+    let (_, connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    repositories::list_vocabulary_items(&connection).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn save_vocabulary_item(
+    state: State<'_, AppBackend>,
+    input: crate::models::SaveVocabularyItemInput,
+) -> CommandResult<crate::models::VocabularyItemRecord> {
+    let (workspace, connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    if let (Some(pack_id), Some(test_id), Some(module_type), Some(block_id)) = (
+        input.source_pack_id.as_deref(), input.source_test_id.as_deref(),
+        input.source_module.as_deref(), input.source_block_id.as_deref(),
+    ) {
+        packs::ensure_installed_content_block_id(
+            &workspace, &connection, pack_id, test_id, module_type, block_id,
+        ).map_err(CommandError::from)?;
+    }
+    repositories::save_vocabulary_item(&connection, input).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn update_vocabulary_item(
+    state: State<'_, AppBackend>,
+    input: crate::models::UpdateVocabularyItemInput,
+) -> CommandResult<crate::models::VocabularyItemRecord> {
+    let (_, connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    repositories::update_vocabulary_item(&connection, input).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn delete_vocabulary_item(
+    state: State<'_, AppBackend>,
+    item_id: String,
+) -> CommandResult<bool> {
+    let (_, connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    repositories::delete_vocabulary_item(&connection, &item_id).map_err(Into::into)
+}
+
+#[tauri::command]
 pub fn get_setting(
     state: State<'_, AppBackend>,
     key: String,

@@ -119,6 +119,7 @@ struct PackManifestV1 {
     tests: Vec<PackTestDescriptorV1>,
     #[serde(default)]
     media_assets: Vec<MediaAssetV1>,
+    cover_image_asset_id: Option<String>,
     import_metadata: Option<PdfImportMetadataV1>,
 }
 
@@ -1395,6 +1396,17 @@ fn load_installed_target_module(
             &mut semantic_errors,
         );
     }
+    if manifest.cover_image_asset_id.as_ref().is_some_and(|cover_id| {
+        !manifest.media_assets.iter().any(|asset| {
+            asset.id() == cover_id.as_str() && asset.kind() == MediaKind::Image
+        })
+    }) {
+        semantic_errors.push(issue(
+            "INVALID_COVER_IMAGE_REFERENCE",
+            "coverImageAssetId must reference a declared image media asset.",
+            Some("manifest.json#coverImageAssetId"),
+        ));
+    }
     validate_module_schema(
         &module,
         &relative_path,
@@ -1757,6 +1769,17 @@ fn validate_manifest_schema(
             media_references,
             errors,
         );
+    }
+    if manifest.cover_image_asset_id.as_ref().is_some_and(|cover_id| {
+        !manifest.media_assets.iter().any(|asset| {
+            asset.id() == cover_id.as_str() && asset.kind() == MediaKind::Image
+        })
+    }) {
+        errors.push(issue(
+            "INVALID_COVER_IMAGE_REFERENCE",
+            "coverImageAssetId must reference a declared image media asset.",
+            Some("manifest.json#coverImageAssetId"),
+        ));
     }
     if manifest.attribution.is_none() {
         warnings.push(issue(

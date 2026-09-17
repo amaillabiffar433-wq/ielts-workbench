@@ -39,12 +39,14 @@ describe("Visual PDF import identity and persistence", () => {
     for (const range of ["0-3", "20-14", "1-101", "Q18", ""]) expect(() => addQuickQuestions(draft, groupId, range, "short-answer")).toThrow();
   });
   it("validates mixed visual contexts, emits schema 4, keeps IDs and de-duplicates image content", async () => {
-    const { draft, asset } = await visualDraft();
+    const { draft: visualSource, asset } = await visualDraft();
+    const draft = { ...visualSource, coverAssetId: asset.id };
     expect(validateStructuredImportDraft(draft).errors).toEqual([]);
     const pack = await buildStructuredReadingPack(draft);
     expect(pack.modules[0].schemaVersion).toBe(4);
     expect(pack.manifest.mediaAssets).toHaveLength(1);
     expect(pack.manifest.mediaAssets[0].id).toBe(asset.id);
+    expect(pack.manifest.coverImageAssetId).toBe(asset.id);
     expect(JSON.stringify(pack)).not.toMatch(/blob:|data:image/u);
     const module = pack.modules[0];
     if (module.type !== "reading") throw new Error("Reading expected");
@@ -93,13 +95,14 @@ describe("Visual PDF import identity and persistence", () => {
     expect((await second.loadSession(session.sessionId))?.answers[0]).toMatchObject({ questionId, value: "tank" });
     await expect(second.readImportImage("other-draft", asset.id)).rejects.toThrow();
   });
-  it.each([1, 2, 3])("migrates draft v%i without changing identities or overwriting answers", (version) => {
+  it.each([1, 2, 3, 4])("migrates draft v%i without changing identities or overwriting answers", (version) => {
     const draft = sample();
     const legacy = { ...draft, schemaVersion: version, imageAssets: undefined };
     const restored = StructuredImportDraftSchema.parse(legacy);
-    expect(restored.schemaVersion).toBe(4);
+    expect(restored.schemaVersion).toBe(5);
     expect(restored.passages).toEqual(draft.passages);
     expect(restored.id).toBe(draft.id);
     expect(restored.imageAssets).toEqual([]);
+    expect(restored.coverAssetId).toBeNull();
   });
 });

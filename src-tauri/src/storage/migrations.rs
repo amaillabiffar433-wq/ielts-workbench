@@ -24,6 +24,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "session_immutability",
         sql: include_str!("../../migrations/0003_session_immutability.sql"),
     },
+    Migration {
+        version: 4,
+        name: "vocabulary_context",
+        sql: include_str!("../../migrations/0004_vocabulary_context.sql"),
+    },
 ];
 
 pub fn run(connection: &mut Connection) -> Result<()> {
@@ -169,5 +174,45 @@ mod tests {
                 ],
             )
             .is_err());
+    }
+
+    #[test]
+    fn upgrades_the_original_vocabulary_table_without_losing_rows() {
+        let mut connection = Connection::open_in_memory().unwrap();
+        connection.pragma_update(None, "foreign_keys", "ON").unwrap();
+        connection.execute_batch(
+            "CREATE TABLE schema_migrations (
+                version INTEGER PRIMARY KEY NOT NULL,
+                name TEXT NOT NULL,
+                applied_at TEXT NOT NULL
+            );",
+        ).unwrap();
+        for migration in &MIGRATIONS[..3] {
+            let transaction = connection
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .unwrap();
+            transaction.execute_batch(migration.sql).unwrap();
+            transaction.execute(
+                "INSERT INTO schema_migrations(version, name, applied_at)
+                 VALUES (?1, ?2, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))",
+                params![migration.version, migration.name],
+            ).unwrap();
+            transaction.commit().unwrap();
+        }
+        connection.execute(
+            "INSERT INTO vocabulary_items(
+                id, term, normalized_term, context, learning_state, created_at, updated_at
+             ) VALUES ('word-1', 'Scrolls', 'scrolls', 'old context', 'new', '2026-09-01T00:00:00.000Z', '2026-09-01T00:00:00.000Z')",
+            [],
+        ).unwrap();
+
+        run(&mut connection).unwrap();
+
+        let row: (String, String, String) = connection.query_row(
+            "SELECT term, sentence, note FROM vocabulary_items WHERE id = 'word-1'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        ).unwrap();
+        assert_eq!(row, ("Scrolls".into(), "".into(), "".into()));
     }
 }

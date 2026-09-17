@@ -65,6 +65,42 @@ describe("InMemoryLearningRepository", () => {
     });
   });
 
+  it("persists vocabulary context, de-duplicates the same source selection, and updates learning state", async () => {
+    const repository = InMemoryLearningRepository.withOriginalDemo({
+      now: () => new Date("2026-09-16T08:00:00.000Z"),
+      idFactory: deterministicIds(),
+    });
+    const input = {
+      term: "Discrepancy",
+      normalizedTerm: "discrepancy",
+      sentence: "Researchers found a discrepancy in the records.",
+      contextBefore: "found a ",
+      contextAfter: " in the records",
+      sourcePackId: "original-demo-pack",
+      sourceTestId: "demo-test-01",
+      sourceModule: "reading" as const,
+      sourceBlockId: "demo-reading-passage-01-p2",
+      sourceBookTitle: "Alderwick Skills Sampler",
+      sourceTestTitle: "Original Local Practice Test",
+      sourceSectionId: "demo-reading-passage-01",
+      sourceSectionTitle: "Reading Passage 1",
+      sourceQuestionId: "demo-reading-q01",
+      sourceQuestionNumber: 1,
+      note: "",
+      learningState: "new" as const,
+    };
+
+    const first = await repository.saveVocabularyItem(input);
+    const duplicate = await repository.saveVocabularyItem(input);
+    expect(duplicate.id).toBe(first.id);
+    await expect(repository.listVocabularyItems()).resolves.toHaveLength(1);
+
+    const updated = await repository.updateVocabularyItem({ id: first.id, note: "review", learningState: "learning" });
+    expect(updated).toMatchObject({ note: "review", learningState: "learning", sentence: input.sentence });
+    await repository.deleteVocabularyItem(first.id);
+    await expect(repository.listVocabularyItems()).resolves.toEqual([]);
+  });
+
   it("validates the registered demo folder and returns detached media bytes", async () => {
     const repository = InMemoryLearningRepository.withOriginalDemo();
 

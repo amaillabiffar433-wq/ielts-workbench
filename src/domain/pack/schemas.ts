@@ -686,6 +686,7 @@ export const PackManifestSchema = z
     attribution: z.string().trim().min(1).optional(),
     tests: z.array(PackTestDescriptorSchema).min(1),
     mediaAssets: z.array(MediaAssetSchema).default([]),
+    coverImageAssetId: StableIdSchema.optional(),
     importMetadata: PdfImportMetadataSchema.optional(),
   })
   .strict()
@@ -705,6 +706,16 @@ export const PackManifestSchema = z
         code: "custom",
         path: ["mediaAssets"],
         message: "Media asset IDs must be unique",
+      });
+    }
+    if (
+      manifest.coverImageAssetId !== undefined
+      && manifest.mediaAssets.find((asset) => asset.id === manifest.coverImageAssetId)?.type !== "image"
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["coverImageAssetId"],
+        message: "coverImageAssetId must reference an image media asset",
       });
     }
   });

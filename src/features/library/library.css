@@ -306,3 +306,347 @@
     justify-self: start;
   }
 }
+
+.library-continue,
+.library-bookshelf,
+.library-book-detail,
+.library-history {
+  margin-bottom: 22px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-panel);
+}
+
+.continue-study-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+}
+
+.continue-study-row__count {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.book-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 22px;
+  padding: 22px;
+}
+
+.book-tile {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.book-tile:hover .book-cover,
+.book-tile:focus-visible .book-cover {
+  border-color: var(--accent);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 22px rgb(25 36 48 / 14%);
+}
+
+.book-tile:focus-visible {
+  outline: none;
+}
+
+.book-cover {
+  display: block;
+  width: min(100%, 184px);
+  aspect-ratio: 0.72;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px 9px 9px 5px;
+  background: #e7e5df;
+  transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
+}
+
+.book-cover__image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.book-cover__fallback {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: 100%;
+  height: 100%;
+  padding: 17px 15px;
+  border-left: 8px solid #23374a;
+  background: #f3f0e8;
+  color: #172738;
+}
+
+.book-cover__fallback span {
+  padding-bottom: 9px;
+  border-bottom: 1px solid #aab2b8;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+}
+
+.book-cover__fallback strong {
+  align-self: center;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(44px, 5vw, 68px);
+  font-weight: 500;
+  line-height: 1;
+  overflow-wrap: anywhere;
+}
+
+.book-cover__fallback strong:not(:only-child) {
+  max-width: 100%;
+}
+
+.book-cover__fallback--local strong {
+  font-family: inherit;
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+}
+
+.book-cover__fallback small {
+  color: #415363;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.book-tile__copy {
+  display: grid;
+  gap: 3px;
+  padding-top: 11px;
+}
+
+.book-tile__copy strong {
+  overflow: hidden;
+  font-size: 14px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+}
+
+.book-tile__copy small {
+  color: var(--text-secondary);
+}
+
+.library-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 14px 18px 0;
+  padding: 6px 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.library-back:hover {
+  color: var(--text-primary);
+}
+
+.library-book-detail__header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px 20px;
+}
+
+.book-cover--small {
+  width: 72px;
+  flex: 0 0 72px;
+}
+
+.book-cover--small .book-cover__fallback {
+  padding: 8px 7px;
+  border-left-width: 4px;
+}
+
+.book-cover--small .book-cover__fallback span,
+.book-cover--small .book-cover__fallback small {
+  font-size: 6px;
+}
+
+.book-cover--small .book-cover__fallback strong {
+  font-size: 28px;
+}
+
+.library-book-detail__header h2 {
+  margin: 3px 0 5px;
+  font-size: 22px;
+}
+
+.library-book-detail__header p {
+  margin: 0;
+  color: var(--text-secondary);
+}
+
+.library-test-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  padding: 0 20px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.library-test-tabs button {
+  padding: 7px 13px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.library-test-tabs button:hover {
+  background: var(--surface-raised);
+  color: var(--text-primary);
+}
+
+.library-test-tabs button.is-current {
+  border-color: var(--border-strong);
+  background: var(--surface-raised);
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.library-module-grid {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px 22px;
+}
+
+.library-module {
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.library-module__heading {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 42px;
+  padding: 9px 13px;
+  background: var(--surface-raised);
+}
+
+.library-module__heading h3 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.library-module__heading span {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.library-module.is-unavailable {
+  opacity: 0.62;
+}
+
+.library-section-row {
+  display: grid;
+  grid-template-columns: auto minmax(180px, 1fr) minmax(210px, auto) auto;
+  align-items: center;
+  width: 100%;
+  gap: 11px;
+  padding: 11px 13px;
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.library-section-row:hover {
+  background: var(--surface-hover);
+}
+
+.library-section-row__identity {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.library-section-row__identity small,
+.library-section-row__progress {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.library-section-row__identity strong {
+  overflow: hidden;
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.library-section-row__progress {
+  text-align: right;
+}
+
+.library-progress-dot {
+  width: 8px;
+  height: 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: var(--surface-panel);
+}
+
+.library-progress-dot--in-progress {
+  border-color: #a46a1c;
+  background: #d99b3d;
+}
+
+.library-progress-dot--completed {
+  border-color: #417659;
+  background: #5b9a74;
+}
+
+.library-history summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 17px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.library-history[open] summary {
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+@media (max-width: 760px) {
+  .continue-study-row,
+  .library-section-row {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .continue-study-row__count,
+  .library-section-row__progress {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+
+  .book-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    padding: 16px;
+  }
+}

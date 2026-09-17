@@ -1,0 +1,354 @@
+import { useEffect, useMemo, useState } from "react";
+import {
+  ArrowLeft,
+  BookOpenText,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  FileInput,
+  Headphones,
+  LibraryBig,
+  Mic2,
+  PackageOpen,
+  PenLine,
+  Play,
+  RefreshCw,
+} from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+
+import { PageHeader } from "../../components/common/PageHeader";
+import type { IELTSPack, PackModule, Question } from "../../domain";
+import { answerIsPresent, scoreQuestion } from "../../domain/questionScoring";
+import type {
+  LearningRepository,
+  PracticeSessionSummary,
+  SessionSnapshot,
+} from "../../infrastructure/repositories/LearningRepository";
+import { sortRecentSessionSummaries } from "../../infrastructure/repositories/LearningRepository";
+import { useWorkbenchStore } from "../../stores/workbenchStore";
+import { buildPracticeRoute, type PracticeModuleType } from "../practice/practiceRoute";
+import { findRecentResumableSession, getModuleProgressStatus } from "./libraryProgress";
+import { groupLibraryBooks, type BookEntry } from "./libraryBooks";
+import "./library.css";
+
+type AvailableModule = Extract<PackModule, { type: PracticeModuleType }>;
+
+interface ModuleCandidate {
+  readonly pack: IELTSPack;
+  readonly testId: string;
+  readonly testTitle: string;
+  readonly module: AvailableModule;
+}
+
+interface TestEntry {
+  readonly key: string;
+  readonly title: string;
+  readonly candidates: readonly ModuleCandidate[];
+}
+
+interface SessionScore {
+  readonly earned: number;
+  readonly total: number;
+}
+
+const moduleMeta = {
+  listening: { label: "Listening", icon: Headphones },
+  reading: { label: "Reading", icon: BookOpenText },
+  writing: { label: "Writing", icon: PenLine },
+} satisfies Record<PracticeModuleType, { label: string; icon: typeof BookOpenText }>;
+
+const allBookModules = ["listening", "reading", "writing", "speaking"] as const;
+
+function normalizeKey(value: string): string {
+  return value.trim().toLocaleLowerCase().replace(/\s+/gu, " ");
+}
+
+function testsForBook(book: BookEntry): TestEntry[] {
+  const tests = new Map<string, { title: string; candidates: ModuleCandidate[] }>();
+  book.packs.forEach((pack) => {
+    pack.manifest.tests.forEach((test) => {
+      const testKey = normalizeKey(test.title);
+      const target = tests.get(testKey) ?? { title: test.title, candidates: [] };
+      test.moduleIds.forEach((moduleId) => {
+        const module = pack.modules.find((candidate) => candidate.id === moduleId);
+        if (module) target.candidates.push({ pack, testId: test.id, testTitle: test.title, module });
+      });
+      tests.set(testKey, target);
+    });
+  });
+  return [...tests.entries()]
+    .map(([key, value]) => ({ key, ...value }))
+    .sort((left, right) => {
+      const leftNumber = Number(left.title.match(/\d+/u)?.[0] ?? Number.MAX_SAFE_INTEGER);
+      const rightNumber = Number(right.title.match(/\d+/u)?.[0] ?? Number.MAX_SAFE_INTEGER);
+      return leftNumber - rightNumber || left.title.localeCompare(right.title);
+    });
+}
+
+function sessionKey(packId: string, testId: string, moduleType: PracticeModuleType): string {
+  return `${packId}\u0000${testId}\u0000${moduleType}`;
+}
+
+function latestModuleSession(
+  sessions: readonly PracticeSessionSummary[],
+  candidate: ModuleCandidate,
+): PracticeSessionSummary | undefined {
+  return sortRecentSessionSummaries(sessions).find((session) => (
+    session.status !== "abandoned"
+    && session.packId === candidate.pack.manifest.id
+    && session.testId === candidate.testId
+    && session.moduleType === candidate.module.type
+  ));
+}
+
+function moduleQuestions(module: AvailableModule): readonly Question[] {
+  if (module.type === "writing") return [];
+  return module.sections.flatMap((section) => section.questionGroups.flatMap((group) => group.questions));
+}
+
+function scoreSubmittedSession(module: AvailableModule, snapshot: SessionSnapshot): SessionScore | null {
+  const answers = new Map(snapshot.answers.map((answer) => [answer.questionId, answer.value]));
+  const score = moduleQuestions(module).reduce((total, question) => {
+    const result = scoreQuestion(question, answers.get(question.id));
+    return { earned: total.earned + result.earnedPoints, total: total.total + result.scorablePoints };
+  }, { earned: 0, total: 0 });
+  return score.total > 0 ? score : null;
+}
+
+function formatDuration(seconds: number): string {
+  return seconds >= 60 ? `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒` : `${seconds} 秒`;
+}
+
+function questionRange(questions: readonly Question[]): string {
+  if (questions.length === 0) return "无客观题";
+  const numbers = questions.flatMap((question) => (
+    question.type === "multiple-choice" ? [question.number, ...question.additionalNumbers] : [question.number]
+  ));
+  return numbers.length === 1 ? `Q${numbers[0]}` : `Q${Math.min(...numbers)}–${Math.max(...numbers)}`;
+}
+
+function BookCover({ book, repository }: { readonly book: BookEntry; readonly repository: LearningRepository }) {
+  const coverOwner = book.packs.find((pack) => pack.manifest.coverImageAssetId);
+  const coverAsset = coverOwner?.manifest.mediaAssets.find(
+    (asset) => asset.id === coverOwner.manifest.coverImageAssetId && asset.type === "image",
+  );
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    let objectUrl: string | undefined;
+    setUrl(null);
+    setFailed(false);
+    if (!coverOwner || !coverAsset) return () => { alive = false; };
+    void repository.readPackMedia(coverOwner.manifest.id, coverAsset.relativePath).then((bytes) => {
+      if (!alive) return;
+      objectUrl = URL.createObjectURL(new Blob([bytes], { type: coverAsset.mimeType }));
+      setUrl(objectUrl);
+    }).catch(() => { if (alive) setFailed(true); });
+    return () => {
+      alive = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [coverAsset, coverOwner, repository]);
+
+  if (url && !failed) return <img alt={`${book.title} 封面`} className="book-cover__image" src={url} />;
+  return (
+    <div aria-label={`${book.title} 备用封面`} className={`book-cover__fallback${book.cambridgeNumber ? "" : " book-cover__fallback--local"}`} role="img">
+      <span>{book.cambridgeNumber ? "CAMBRIDGE" : "IELTS WORKBENCH"}</span>
+      <strong>{book.cambridgeNumber ?? "PRACTICE"}</strong>
+      <small>{book.cambridgeNumber ? (/general/iu.test(book.title) ? "GENERAL TRAINING" : "ACADEMIC") : "LOCAL MATERIAL"}</small>
+    </div>
+  );
+}
+
+function completionCopy(session: PracticeSessionSummary | undefined, score: SessionScore | undefined): string {
+  if (!session) return "未开始";
+  if (session.status !== "submitted") return `进行中 · 已学习 ${formatDuration(session.elapsedSeconds)}`;
+  const accuracy = score ? ` · 正确率 ${Math.round((score.earned / score.total) * 100)}%` : "";
+  return `已完成${accuracy} · ${formatDuration(session.elapsedSeconds)} · ${new Date(session.submittedAt ?? session.updatedAt).toLocaleDateString("zh-CN")}`;
+}
+
+function SectionRows({ candidate, recentSessions, scores, onOpen }: {
+  readonly candidate: ModuleCandidate;
+  readonly recentSessions: readonly PracticeSessionSummary[];
+  readonly scores: Readonly<Record<string, SessionScore>>;
+  readonly onOpen: (candidate: ModuleCandidate) => void;
+}) {
+  const session = latestModuleSession(recentSessions, candidate);
+  const score = scores[sessionKey(candidate.pack.manifest.id, candidate.testId, candidate.module.type)];
+  const status = getModuleProgressStatus(recentSessions, candidate.pack.manifest.id, candidate.testId, candidate.module.type);
+  return <div className="library-section-list">
+    {candidate.module.sections.map((section, index) => {
+      const questions = "questionGroups" in section
+        ? section.questionGroups.flatMap((group) => group.questions)
+        : [];
+      const passageLabel = candidate.module.type === "reading"
+        ? `Passage ${index + 1}`
+        : candidate.module.type === "listening" ? `Section ${index + 1}` : `Writing ${index + 1}`;
+      return <button className="library-section-row" key={section.id} onClick={() => onOpen(candidate)} type="button">
+        <span className={`library-progress-dot library-progress-dot--${status}`} />
+        <span className="library-section-row__identity"><small>{passageLabel} · {questionRange(questions)}</small><strong>{section.title}</strong></span>
+        <span className="library-section-row__progress">{completionCopy(session, score)}</span>
+        <ChevronRight aria-hidden="true" size={16} />
+      </button>;
+    })}
+  </div>;
+}
+
+export function LibraryShelfPage() {
+  const navigate = useNavigate();
+  const bootstrapPhase = useWorkbenchStore((state) => state.bootstrapPhase);
+  const bootstrap = useWorkbenchStore((state) => state.bootstrap);
+  const installedPacks = useWorkbenchStore((state) => state.installedPacks);
+  const repository = useWorkbenchStore((state) => state.repository);
+  const refreshPacks = useWorkbenchStore((state) => state.refreshPacks);
+  const loadHistoricalSession = useWorkbenchStore((state) => state.loadHistoricalSession);
+  const storeError = useWorkbenchStore((state) => state.error);
+  const clearError = useWorkbenchStore((state) => state.clearError);
+  const [loadedPacks, setLoadedPacks] = useState<readonly IELTSPack[]>([]);
+  const [packsLoading, setPacksLoading] = useState(false);
+  const [packsError, setPacksError] = useState<string | null>(null);
+  const [recentSessions, setRecentSessions] = useState<readonly PracticeSessionSummary[]>(bootstrap?.recentSessions ?? []);
+  const [recentError, setRecentError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedBookKey, setSelectedBookKey] = useState<string | null>(null);
+  const [selectedTestKey, setSelectedTestKey] = useState<string | null>(null);
+  const [scores, setScores] = useState<Readonly<Record<string, SessionScore>>>({});
+  const [recentSnapshot, setRecentSnapshot] = useState<SessionSnapshot | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setPacksLoading(true);
+    setPacksError(null);
+    void Promise.all(installedPacks.map((summary) => repository.loadPack(summary.id))).then((packs) => {
+      if (!active) return;
+      setLoadedPacks(packs.filter((pack): pack is IELTSPack => pack !== null));
+      setPacksLoading(false);
+    }).catch((error: unknown) => {
+      if (!active) return;
+      setPacksError(error instanceof Error ? error.message : String(error));
+      setPacksLoading(false);
+    });
+    return () => { active = false; };
+  }, [installedPacks, repository]);
+
+  useEffect(() => {
+    let active = true;
+    setRecentSessions(bootstrap?.recentSessions ?? []);
+    if (!bootstrap?.available) return () => { active = false; };
+    void repository.listRecentSessions().then((sessions) => {
+      if (active) setRecentSessions(sessions);
+    }).catch((error: unknown) => {
+      if (active) setRecentError(error instanceof Error ? error.message : String(error));
+    });
+    return () => { active = false; };
+  }, [bootstrap, repository]);
+
+  const books = useMemo(() => groupLibraryBooks(loadedPacks), [loadedPacks]);
+  const selectedBook = books.find((book) => book.key === selectedBookKey) ?? null;
+  const selectedBookTests = useMemo(() => selectedBook ? testsForBook(selectedBook) : [], [selectedBook]);
+  const selectedTest = selectedBookTests.find((test) => test.key === selectedTestKey) ?? null;
+  const recentSession = useMemo(() => findRecentResumableSession(recentSessions), [recentSessions]);
+
+  useEffect(() => {
+    let active = true;
+    if (!recentSession) {
+      setRecentSnapshot(null);
+      return () => { active = false; };
+    }
+    void repository.loadSession(recentSession.sessionId).then((snapshot) => {
+      if (active) setRecentSnapshot(snapshot);
+    }).catch(() => { if (active) setRecentSnapshot(null); });
+    return () => { active = false; };
+  }, [recentSession, repository]);
+
+  useEffect(() => {
+    let active = true;
+    const targets = loadedPacks.flatMap((pack) => pack.manifest.tests.flatMap((test) => (
+      pack.modules.filter((module) => module.testId === test.id).flatMap((module) => {
+        const candidate: ModuleCandidate = { pack, testId: test.id, testTitle: test.title, module };
+        const session = latestModuleSession(recentSessions, candidate);
+        return session?.status === "submitted" ? [{ candidate, session }] : [];
+      })
+    )));
+    void Promise.all(targets.map(async ({ candidate, session }) => {
+      const snapshot = await repository.loadSession(session.sessionId);
+      const score = snapshot ? scoreSubmittedSession(candidate.module, snapshot) : null;
+      return score ? [sessionKey(candidate.pack.manifest.id, candidate.testId, candidate.module.type), score] as const : null;
+    })).then((values) => {
+      if (!active) return;
+      setScores(Object.fromEntries(values.filter((value): value is readonly [string, SessionScore] => value !== null)));
+    }).catch(() => { if (active) setScores({}); });
+    return () => { active = false; };
+  }, [loadedPacks, recentSessions, repository]);
+
+  useEffect(() => {
+    if (selectedBook && selectedBookTests.length > 0 && !selectedTest) setSelectedTestKey(selectedBookTests[0].key);
+  }, [selectedBook, selectedBookTests, selectedTest]);
+
+  const openCandidate = (candidate: ModuleCandidate) => navigate(buildPracticeRoute(candidate.module.type, {
+    identity: { packId: candidate.pack.manifest.id, testId: candidate.testId }, mode: "study",
+  }));
+
+  const refresh = async () => {
+    clearError();
+    setRefreshing(true);
+    setRecentError(null);
+    try {
+      await refreshPacks();
+      setRecentSessions(await repository.listRecentSessions());
+    } catch (error) {
+      setRecentError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const recentCandidate = recentSession ? loadedPacks.flatMap((pack) => pack.modules.map((module) => ({ pack, module }))).find(
+    ({ pack, module }) => pack.manifest.id === recentSession.packId && module.testId === recentSession.testId && module.type === recentSession.moduleType,
+  ) : undefined;
+  const recentQuestions = recentCandidate ? moduleQuestions(recentCandidate.module) : [];
+  const answeredCount = recentSnapshot?.answers.filter((answer) => answerIsPresent(answer.value)).length ?? 0;
+  const recentSection = recentCandidate?.module.sections[0];
+  const submittedSessions = recentSessions.filter((session) => session.status === "submitted");
+
+  return <main className="page library-page">
+    <PageHeader actions={<div className="library-header-actions">
+      <button className="button" disabled={refreshing} onClick={refresh} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "is-spinning" : ""} size={16} />{refreshing ? "正在刷新…" : "刷新"}</button>
+      <Link className="button button--primary" to="/import"><FileInput aria-hidden="true" size={16} />导入资料</Link>
+    </div>} description="从书本进入 Test 与练习；题包内容只读，作答、标记和生词单独保存。" title="IELTS Library" />
+
+    {(storeError || packsError || recentError) && <div className="error-banner library-error" role="alert"><PackageOpen aria-hidden="true" size={18} /><div><strong>书库读取失败</strong><div>{storeError ?? packsError ?? recentError}</div></div><button className="button button--ghost" onClick={clearError} type="button">关闭</button></div>}
+
+    <section aria-labelledby="continue-title" className="library-continue">
+      <div className="library-section-heading"><div><h2 id="continue-title">继续学习</h2><p>恢复同一个未提交 Session。</p></div></div>
+      {recentSession && recentCandidate ? <div className="continue-study-row">
+        <span className="recent-session-row__icon"><Clock3 aria-hidden="true" size={19} /></span>
+        <div className="recent-session-row__copy"><strong>{recentCandidate.pack.manifest.title}</strong><span>{moduleMeta[recentCandidate.module.type].label} · {recentSection?.title ?? recentSession.testId}</span></div>
+        {recentQuestions.length > 0 && <span className="continue-study-row__count">{answeredCount} / {recentQuestions.length}</span>}
+        <button className="button button--primary" onClick={() => openCandidate({ pack: recentCandidate.pack, testId: recentSession.testId!, testTitle: recentSession.testId!, module: recentCandidate.module })} type="button"><Play aria-hidden="true" size={15} />继续</button>
+      </div> : <div className="recent-empty"><Clock3 aria-hidden="true" size={18} />暂无未完成练习，从书架选择一本书开始。</div>}
+    </section>
+
+    {bootstrapPhase === "loading" || packsLoading ? <div className="empty-state" role="status">正在读取本地书库…</div>
+      : books.length === 0 ? <div className="empty-state library-empty-state"><div><LibraryBig aria-hidden="true" size={28} /><h3>书库还是空的</h3><p>从导入中心安装本地持有的 IELTS 资料。</p><Link className="button" to="/import">前往导入中心</Link></div></div>
+        : !selectedBook ? <section aria-labelledby="bookshelf-title" className="library-bookshelf">
+          <div className="library-section-heading"><div><h2 id="bookshelf-title">书架</h2><p>{books.length} 本书 · 点击封面查看 Test</p></div></div>
+          <div className="book-grid">{books.map((book) => <button className="book-tile" key={book.key} onClick={() => { setSelectedBookKey(book.key); setSelectedTestKey(null); }} type="button"><span className="book-cover"><BookCover book={book} repository={repository} /></span><span className="book-tile__copy"><strong>{book.title}</strong><small>{testsForBook(book).length} 个 Test</small></span></button>)}</div>
+        </section>
+          : <section aria-labelledby="book-title" className="library-book-detail">
+            <button className="library-back" onClick={() => { setSelectedBookKey(null); setSelectedTestKey(null); }} type="button"><ArrowLeft aria-hidden="true" size={16} />返回书架</button>
+            <div className="library-book-detail__header"><span className="book-cover book-cover--small"><BookCover book={selectedBook} repository={repository} /></span><div><span className="test-record__eyebrow">BOOK</span><h2 id="book-title">{selectedBook.title}</h2><p>{selectedBook.edition ?? "本地题库"} · {selectedBookTests.length} 个 Test</p></div></div>
+            <div aria-label="选择 Test" className="library-test-tabs" role="tablist">{selectedBookTests.map((test) => <button aria-selected={test.key === selectedTest?.key} className={test.key === selectedTest?.key ? "is-current" : undefined} key={test.key} onClick={() => setSelectedTestKey(test.key)} role="tab" type="button">{test.title}</button>)}</div>
+            {selectedTest && <div className="library-module-grid">{allBookModules.map((moduleType) => {
+              const candidates = moduleType === "speaking" ? [] : selectedTest.candidates.filter((candidate) => candidate.module.type === moduleType);
+              const meta = moduleType === "speaking" ? { label: "Speaking", icon: Mic2 } : moduleMeta[moduleType];
+              const Icon = meta.icon;
+              return <section className={`library-module ${candidates.length === 0 ? "is-unavailable" : ""}`} key={moduleType}><div className="library-module__heading"><Icon aria-hidden="true" size={18} /><h3>{meta.label}</h3>{candidates.length === 0 && <span>资源未安装</span>}</div>{candidates.map((candidate) => <SectionRows candidate={candidate} key={`${candidate.pack.manifest.id}:${candidate.module.id}`} onOpen={openCandidate} recentSessions={recentSessions} scores={scores} />)}</section>;
+            })}</div>}
+          </section>}
+
+    {submittedSessions.length > 0 && <details className="library-history"><summary><CheckCircle2 aria-hidden="true" size={16} />练习历史（{submittedSessions.length}）</summary><div>{submittedSessions.slice(0, 20).map((history) => <div className="recent-session-row" key={history.sessionId}><div className="recent-session-row__copy"><strong>{history.moduleType ? moduleMeta[history.moduleType].label : "未知模块"}</strong><span>{new Date(history.submittedAt ?? history.updatedAt).toLocaleString("zh-CN")} · {formatDuration(history.elapsedSeconds)}</span></div><button className="button" onClick={async () => { if (await loadHistoricalSession(history.sessionId)) navigate("/review"); }} type="button">查看复盘</button></div>)}</div></details>}
+  </main>;
+}

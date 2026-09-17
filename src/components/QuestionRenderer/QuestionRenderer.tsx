@@ -1,3 +1,4 @@
+import { Flag } from "lucide-react";
 import { displayQuestionCorrectAnswer, questionNumberLabel, type QuestionAnswerValue } from "../../domain";
 import type { Question } from "../../domain/pack";
 import { questionContainerId } from "./questionDomIds";
@@ -13,6 +14,8 @@ export type QuestionRendererProps = {
   displayNumber?: number;
   inline?: boolean;
   disabledOptionIds?: ReadonlySet<string>;
+  flagged?: boolean;
+  onToggleFlag?: () => void;
 };
 
 function CorrectAnswer({ question }: { question: Question }) {
@@ -29,25 +32,81 @@ export function QuestionRenderer({
   displayNumber = question.number,
   inline = false,
   disabledOptionIds = new Set(),
+  flagged = false,
+  onToggleFlag,
 }: QuestionRendererProps) {
   const domPrefix = `${instanceId}-${question.id}`;
   const legendId = `${domPrefix}-legend`;
   const containerId = questionContainerId(instanceId, question.id);
 
+  if (inline && (question.type === "short-answer" || question.type === "fill-blank")) {
+    const answerId = `${domPrefix}-answer`;
+    const limitId = `${domPrefix}-limit`;
+    return (
+      <span
+        aria-labelledby={legendId}
+        className={`question question--inline${flagged ? " question--flagged" : ""}`}
+        data-question-id={question.id}
+        id={containerId}
+        tabIndex={-1}
+      >
+        <span className="question__number" aria-hidden="true">{displayNumber}</span>
+        <span className="question__body">
+          <span className="sr-only" id={legendId}>{question.prompt}</span>
+          <span className="question__text-answer">
+            <label className="sr-only" htmlFor={answerId}>第 {displayNumber} 题答案</label>
+            <input
+              aria-describedby={question.maxWords ? limitId : undefined}
+              className="input"
+              disabled={disabled}
+              id={answerId}
+              onChange={(event) => onAnswer(question.id, event.target.value)}
+              spellCheck={false}
+              type="text"
+              value={Array.isArray(answer) ? answer.join(" ") : answer}
+            />
+            {question.maxWords && (
+              <span className="sr-only" id={limitId}>Maximum {question.maxWords} word{question.maxWords === 1 ? "" : "s"}</span>
+            )}
+          </span>
+        </span>
+        {onToggleFlag && (
+          <button
+            aria-label={`${flagged ? "取消" : "标记"}第 ${displayNumber} 题稍后复查`}
+            aria-pressed={flagged}
+            className="question__flag"
+            onClick={onToggleFlag}
+            title={flagged ? "取消稍后复查" : "标记为稍后复查"}
+            type="button"
+          ><Flag aria-hidden="true" size={13} /></button>
+        )}
+      </span>
+    );
+  }
+
   return (
     <section
       aria-labelledby={legendId}
-      className={`question${inline ? " question--inline" : ""}`}
+      className={`question${inline ? " question--inline" : ""}${flagged ? " question--flagged" : ""}`}
       data-question-id={question.id}
       id={containerId}
       tabIndex={-1}
     >
-      <div className="question__number" aria-hidden="true">{question.type === "multiple-choice" ? questionNumberLabel(question) : displayNumber}</div>
+      <div className="question__index">
+        <div className="question__number" aria-hidden="true">{question.type === "multiple-choice" ? questionNumberLabel(question) : displayNumber}</div>
+        {onToggleFlag && (
+          <button
+            aria-label={`${flagged ? "取消" : "标记"}第 ${displayNumber} 题稍后复查`}
+            aria-pressed={flagged}
+            className="question__flag"
+            onClick={onToggleFlag}
+            title={flagged ? "取消稍后复查" : "标记为稍后复查"}
+            type="button"
+          ><Flag aria-hidden="true" size={13} /></button>
+        )}
+      </div>
       <div className="question__body">
         <p className="question__prompt" id={legendId}>{question.prompt}</p>
-        {question.source?.needsReview && (
-          <span className="question__review-badge">待完善题型 · 保留原始提取文本</span>
-        )}
         {question.type === "single-choice" && (
           <fieldset aria-labelledby={legendId} className="question__options" disabled={disabled}>
             <legend className="sr-only">选择一个答案</legend>

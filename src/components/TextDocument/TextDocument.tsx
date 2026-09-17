@@ -1,5 +1,5 @@
-import { useMemo, useState, type ReactNode } from "react";
-import { Highlighter, MessageSquareText, Underline } from "lucide-react";
+import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
+import { BookPlus, Highlighter, MessageSquareText, Underline, X } from "lucide-react";
 import type { ContentBlock } from "../../domain/pack";
 import {
   createTextAnchor,
@@ -9,6 +9,10 @@ import {
 } from "../../domain/annotation";
 import "./TextDocument.css";
 import { VisualBlock } from "../VisualBlock/VisualBlock";
+import {
+  vocabularySelectionFromAnchor,
+  type VocabularyTextSelection,
+} from "./vocabularySelection";
 
 export type DisplayAnnotation = {
   id: string;
@@ -117,19 +121,23 @@ export function TextDocument({
   annotations,
   onCreateAnnotation,
   onDeleteAnnotation,
+  onSaveVocabulary,
   readOnly = false,
 }: {
   blocks: readonly ContentBlock[];
   annotations: readonly DisplayAnnotation[];
   onCreateAnnotation: (input: CreateAnnotationInput) => void;
   onDeleteAnnotation: (annotationId: string) => void;
+  onSaveVocabulary?: (selection: VocabularyTextSelection) => Promise<void>;
   readOnly?: boolean;
 }) {
   const [pendingAnchor, setPendingAnchor] = useState<TextAnchor | null>(null);
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("选中同一段落中的文字以添加标记。");
+  const [selectionPoint, setSelectionPoint] = useState<{ readonly x: number; readonly y: number } | null>(null);
+  const [vocabularySaveState, setVocabularySaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
-  const captureSelection = () => {
+  const captureSelection = (event: MouseEvent<HTMLElement>) => {
     if (readOnly) return;
     const selection = window.getSelection();
     if (!selection || selection.isCollapsed || !selection.anchorNode || !selection.focusNode) return;
@@ -137,6 +145,7 @@ export function TextDocument({
     const endBlock = findBlockElement(selection.focusNode);
     if (!startBlock || !endBlock || startBlock !== endBlock) {
       setPendingAnchor(null);
+      setSelectionPoint(null);
       setMessage("一次标记只能位于同一个稳定内容块内，请重新选择。");
       return;
     }
@@ -150,10 +159,23 @@ export function TextDocument({
     if (start > end) [start, end] = [end, start];
     try {
       const anchor = createTextAnchor(blockId, block.text, start, end);
+      const term = anchor.quote.trim();
+      if (!/[A-Za-z]/u.test(term) || term.length > 160) {
+        setPendingAnchor(null);
+        setSelectionPoint(null);
+        setMessage("请选择不超过 160 个字符的英文单词或短语。");
+        return;
+      }
       setPendingAnchor(anchor);
+      setSelectionPoint({
+        x: Math.min(window.innerWidth - 190, Math.max(12, event.clientX + 8)),
+        y: Math.min(window.innerHeight - 56, Math.max(12, event.clientY + 10)),
+      });
+      setVocabularySaveState("idle");
       setMessage(`已选中“${anchor.quote}”。请选择标记样式。`);
     } catch {
       setPendingAnchor(null);
+      setSelectionPoint(null);
       setMessage("没有捕获到可保存的文字选择。");
     }
   };
@@ -166,12 +188,58 @@ export function TextDocument({
     onCreateAnnotation({ anchor: pendingAnchor, style, note: note.trim() || undefined });
     setMessage(`已保存“${pendingAnchor.quote}”的标记，两侧相同内容会同步显示。`);
     setPendingAnchor(null);
+    setSelectionPoint(null);
     setNote("");
     window.getSelection()?.removeAllRanges();
   };
 
+  const saveVocabulary = async () => {
+    if (!pendingAnchor || !onSaveVocabulary) return;
+    const block = blocks.find((candidate) => candidate.id === pendingAnchor.blockId);
+    if (!block) return;
+    setVocabularySaveState("saving");
+    try {
+      await onSaveVocabulary(vocabularySelectionFromAnchor(block.text, pendingAnchor));
+      setVocabularySaveState("saved");
+      setMessage(`已将“${pendingAnchor.quote.trim()}”加入生词本。`);
+      window.getSelection()?.removeAllRanges();
+      window.setTimeout(() => {
+        setPendingAnchor(null);
+        setSelectionPoint(null);
+        setVocabularySaveState("idle");
+      }, 900);
+    } catch {
+      setVocabularySaveState("error");
+      setMessage("加入生词本失败，请重试。");
+    }
+  };
+
   return (
     <article className="text-document" onMouseUp={captureSelection}>
+      {!readOnly && pendingAnchor && selectionPoint && onSaveVocabulary && (
+        <div
+          className={`selection-popover selection-popover--${vocabularySaveState}`}
+          onMouseUp={(event) => event.stopPropagation()}
+          role="toolbar"
+          style={{ left: selectionPoint.x, top: selectionPoint.y }}
+        >
+          <button
+            disabled={vocabularySaveState === "saving" || vocabularySaveState === "saved"}
+            onClick={() => void saveVocabulary()}
+            onMouseDown={(event) => event.preventDefault()}
+            type="button"
+          >
+            <BookPlus aria-hidden="true" size={14} />
+            {vocabularySaveState === "saving" ? "保存中…" : vocabularySaveState === "saved" ? "已加入" : "加入生词本"}
+          </button>
+          <button
+            aria-label="关闭选词操作"
+            className="selection-popover__close"
+            onClick={() => { setPendingAnchor(null); setSelectionPoint(null); window.getSelection()?.removeAllRanges(); }}
+            type="button"
+          ><X aria-hidden="true" size={13} /></button>
+        </div>
+      )}
       {!readOnly && (
         <div className="annotation-toolbar" onMouseUp={(event) => event.stopPropagation()}>
           <div className="annotation-toolbar__styles" aria-label="文字标记样式" role="group">

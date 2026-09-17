@@ -25,6 +25,9 @@ import {
   SaveAnswerInputSchema,
   SaveWritingDraftInputSchema,
   SessionSnapshotSchema,
+  SaveVocabularyItemInputSchema,
+  UpdateVocabularyItemInputSchema,
+  VocabularyItemSchema,
   WorkspaceSummarySchema,
   WorkspaceBackupSummarySchema,
   WritingDraftSchema,
@@ -44,6 +47,9 @@ import {
   type SaveAnswerInput,
   type SaveWritingDraftInput,
   type SessionSnapshot,
+  type SaveVocabularyItemInput,
+  type UpdateVocabularyItemInput,
+  type VocabularyItem,
   type WritingDraft,
   type WritingVersion,
   type WorkspaceBackupSummary,
@@ -530,6 +536,32 @@ export class TauriLearningRepository implements LearningRepository {
   async deleteAnnotation(annotationId: string): Promise<void> {
     await this.invokeCommand("delete_annotation", {
       annotationId: StableIdSchema.parse(annotationId),
+    });
+  }
+
+  async listVocabularyItems(): Promise<VocabularyItem[]> {
+    return z.array(VocabularyItemSchema).parse(
+      await this.invokeCommand("list_vocabulary_items"),
+    );
+  }
+
+  async saveVocabularyItem(input: SaveVocabularyItemInput): Promise<VocabularyItem> {
+    const validated = SaveVocabularyItemInputSchema.parse(input);
+    return VocabularyItemSchema.parse(
+      await this.invokeCommand("save_vocabulary_item", { input: validated }),
+    );
+  }
+
+  async updateVocabularyItem(input: UpdateVocabularyItemInput): Promise<VocabularyItem> {
+    const validated = UpdateVocabularyItemInputSchema.parse(input);
+    return VocabularyItemSchema.parse(
+      await this.invokeCommand("update_vocabulary_item", { input: validated }),
+    );
+  }
+
+  async deleteVocabularyItem(itemId: string): Promise<void> {
+    await this.invokeCommand("delete_vocabulary_item", {
+      itemId: StableIdSchema.parse(itemId),
     });
   }
 

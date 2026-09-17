@@ -41,11 +41,11 @@ describe("AppShell exam restrictions", () => {
 
   afterEach(cleanup);
 
-  it("uses the ordered top navigation with real existing destinations and an unavailable vocabulary label", () => {
+  it("uses the ordered top navigation with real existing destinations including vocabulary", () => {
     renderShell("/practice/reading?mode=study");
     const navigation = screen.getByRole("navigation", { name: "主导航" });
-    expect(within(navigation).getAllByRole("link").map((link) => link.textContent)).toEqual(["首页", "阅读", "听力", "写作", "错题本"]);
-    expect(within(navigation).getByText("词汇")).toHaveAttribute("aria-disabled", "true");
+    expect(within(navigation).getAllByRole("link").map((link) => link.textContent)).toEqual(["首页", "阅读", "听力", "写作", "错题本", "词汇"]);
+    expect(within(navigation).getByRole("link", { name: "词汇" })).toHaveAttribute("href", "/vocabulary");
     expect(screen.getByRole("link", { name: "首页" })).toHaveAttribute("href", "/library");
     expect(screen.getByRole("link", { name: "错题本" })).toHaveAttribute("href", "/review");
     expect(screen.getByRole("link", { name: "阅读" })).toHaveAttribute("aria-current", "page");

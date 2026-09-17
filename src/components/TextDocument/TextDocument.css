@@ -2,6 +2,38 @@
   min-width: 0;
 }
 
+.selection-popover {
+  position: fixed;
+  z-index: 40;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-float);
+}
+
+.selection-popover button {
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 12px;
+}
+
+.selection-popover button:hover:not(:disabled) { background: var(--surface-hover); }
+.selection-popover--saved { border-color: var(--success); }
+.selection-popover--error { border-color: var(--danger); }
+.selection-popover .selection-popover__close { min-width: 26px; padding: 4px; color: var(--text-muted); }
+
 .annotation-toolbar {
   position: sticky;
   top: 0;

@@ -1,5 +1,22 @@
 # IELTS Workbench 执行计划
 
+## 2026-09-16：日常使用前 P0 收尾（题目标记、词汇、Cambridge 书架）
+
+工作副本为 `D:\Projects\雅思or算法软件项目`；`D:\IELTS-Workbench*` 是工作区/验收数据，不作为源码目录。开始前保留现有 4 个未提交的 completion inline 修复，并建立只读 Git 快照引用 `refs/codex-snapshots/20260916-pre-daily-use`（`0f5e01f62898ba7fe23aabf673c77eb3f1bee540`）。正式学习工作区 `D:\IELTS-Workbench` 仅用于修改前只读复现，数据库 SHA-256 在启动前后均为 `49FEC6255B349AA022D086CAF53E3B1A4A6E6C0E12FD1DCDA88FEA8F83AB0CFF`；后续写入验收一律使用隔离副本。
+
+| 步骤 | 内容 | 状态 |
+| --- | --- | --- |
+| F1 | 原生 Release 复现书库、Reading/Listening、题号导航、题目标记、提交状态与 Cambridge 17 Test 2 Passage 1；审计现有题包、SQLite、导入、媒体、词汇/封面能力 | 进行中：已确认原生 `http://tauri.localhost`、正式工作区 4 个题包和 Cambridge 17 Reading/Listening；书库仍为题包列表，词汇入口尚无完整实现 |
+| F2 | 将题目标记改为题目内轻量操作，补齐全部/未答/已标记筛选、下一标记跳转、未提交/提交后状态语义和高 DPI/缩放布局 | 待开始 |
+| F3 | 新增有 migration 的词汇持久化、选词轻浮层、来源上下文、状态/备注、独立紧凑词汇页、Markdown/JSON/CSV 导出及回到原文 | 待开始 |
+| F4 | 将 Library 改为 Cambridge 书架优先，按书聚合 Test/Module/Passage，提供继续学习和封面缓存/fallback；不合并不同来源题包内容 | 待开始 |
+| F5 | 补齐 Reading/Listening 基础批改与复盘入口的范围内缺口；保持首次提交不可变和提交前不泄露答案 | 待开始 |
+| F6 | 全量 typecheck/build、lint、前端测试、Rust/迁移/重复导入/删除前校验测试；构建 no-bundle Release | 待开始 |
+| F7 | 在隔离 D 盘工作区原生验收 Cambridge 17 Test 2 Passage 1 Q1–13、标记/生词重启恢复、书架/导航/复盘，并审计 SQLite 与长期资源引用 | 待开始 |
+| F8 | 等待用户明确提供下载目录后，再扫描、分类、去重、导入、重启校验和按逐文件白名单清理；未提供前不猜路径、不删除 | 阻塞于用户路径，其他工作继续 |
+
+硬边界：不联网获取、生成或补写 Cambridge 真题；不修改/提交私有题包、数据库或媒体；不删除任何源文件；不把 Vite 或 mock IPC 当原生验收；数据库变更必须新 migration、事务化并覆盖旧库升级测试。
+
 ## 2026-09-12：Structured + Visual Fidelity 双模式 PDF 导入
 
 本轮以 `BUILD_STATUS.md` 为实时断点记录。保留上一轮所有未提交 UI 成果与已验证 EXE。
@@ -240,3 +257,10 @@
 - 核心界面存在 loading、empty、error、save 状态，并支持键盘 focus。
 - 真实 Tauri 流程验证工作区、SQLite、题包安装、共享 Pane、Listening 媒体和 Writing 重启恢复。
 - 文档明确本轮完成项、未完成项、安全边界和可复现命令。
+# Current slice: compact Reading completion answers (2026-09-15)
+
+| Step | Work | Status |
+| --- | --- | --- |
+| A | Reproduce the completion-layout defect in the native Reading workbench and identify the invalid block-in-inline rendering path | Complete |
+| B | Render completion-bound text answers as compact inline controls without repeating prompts or word-limit text | Complete |
+| C | Add focused component coverage, run lint/tests/build, rebuild the Tauri Release, and repeat native visual acceptance | Complete: lint passed; 235/235 full tests and 16/16 focused tests passed; production and Tauri Release builds passed; native Q1-Q5 visual check passed |

@@ -4,6 +4,7 @@ import { QuestionRenderer } from "../../../components/QuestionRenderer/QuestionR
 import { QuestionGroupContext } from "../../../components/QuestionGroupContext/QuestionGroupContext";
 import { boundQuestionIdsFromContext } from "../../../components/QuestionGroupContext/questionGroupContextModel";
 import { TextDocument, type CreateAnnotationInput } from "../../../components/TextDocument/TextDocument";
+import type { VocabularyTextSelection } from "../../../components/TextDocument/vocabularySelection";
 import type { ReadingModule } from "../../../domain";
 import { answerKey, useWorkbenchStore } from "../../../stores/workbenchStore";
 import {
@@ -23,7 +24,7 @@ import {
   type ReadingPaneView,
   type ReadingQuestionScope,
 } from "./readingViewState";
-import { paneInstanceId, type PaneSide } from "./readingPaneIdentity";
+import { paneInstanceId, paneShowsQuestions, type PaneSide } from "./readingPaneIdentity";
 
 const paneOptions = [
   { value: "passage" as const, label: "文章" },
@@ -58,6 +59,8 @@ function QuestionGroups({
   const answerQuestion = useWorkbenchStore((state) => state.answerQuestion);
   const addAnnotation = useWorkbenchStore((state) => state.addAnnotation);
   const removeAnnotation = useWorkbenchStore((state) => state.removeAnnotation);
+  const questionFlags = useWorkbenchStore((state) => state.questionFlags);
+  const toggleQuestionFlag = useWorkbenchStore((state) => state.toggleQuestionFlag);
   const selection = selectionResult.error ? null : selectionResult.entries;
   const groups = useMemo(
     () => groupSelectedReadingQuestions(selection ?? []),
@@ -74,7 +77,7 @@ function QuestionGroups({
         <div className="reading-selection-error" role="alert">{selectionResult.error}</div>
       ) : groups.length === 0 ? (
         <div className="empty-state reading-questions__empty">当前范围没有可显示的题目。</div>
-      ) : groups.map((selectedGroup) => {
+      ) : groups.map((selectedGroup, groupIndex) => {
         const contextBlocks = selectedGroup.group.contextBlocks ?? [];
         const boundQuestionIds = boundQuestionIdsFromContext(contextBlocks);
         const editableQuestionIds = new Set(selectedGroup.entries.map((entry) => entry.question.id));
@@ -102,9 +105,11 @@ function QuestionGroups({
               inline={inline}
               instanceId={paneInstanceId(side)}
               key={entry.question.id}
+              flagged={questionFlags.has(entry.question.id)}
               onAnswer={(questionId, answer) => {
                 if (session) void answerQuestion(session.sessionId, questionId, answer);
               }}
+              onToggleFlag={session ? () => void toggleQuestionFlag(session.sessionId, entry.question.id) : undefined}
               question={entry.question}
             />
           );
@@ -116,7 +121,9 @@ function QuestionGroups({
             key={`${selectedGroup.section.id}:${selectedGroup.group.id}`}
           >
             <header className="reading-question-group__header">
-              <span>{passageLabel(selectedGroup.section, selectedGroup.sectionIndex)}</span>
+              {(groupIndex === 0 || groups[groupIndex - 1].section.id !== selectedGroup.section.id) && (
+                <span>{passageLabel(selectedGroup.section, selectedGroup.sectionIndex)}</span>
+              )}
               {selectedGroup.group.title && <h3>{selectedGroup.group.title}</h3>}
               <p>{selectedGroup.group.instructions}</p>
             </header>
@@ -152,6 +159,14 @@ function QuestionGroups({
   );
 }
 
+export type ReadingVocabularySource = {
+  readonly packId: string;
+  readonly testId: string;
+  readonly bookTitle: string;
+  readonly testTitle: string;
+  readonly currentQuestion?: { readonly id: string; readonly number: number };
+};
+
 export function ReadingPane({
   side,
   paneState,
@@ -159,6 +174,8 @@ export function ReadingPane({
   onScrollPositionChange,
   module,
   entries,
+  vocabularySource,
+  onActiveQuestionChange,
 }: {
   readonly side: PaneSide;
   readonly paneState: ReadingPaneState;
@@ -166,11 +183,14 @@ export function ReadingPane({
   readonly onScrollPositionChange: (contentKey: string, scrollTop: number) => void;
   readonly module: ReadingModule;
   readonly entries: readonly ReadingQuestionEntry[];
+  readonly vocabularySource: ReadingVocabularySource;
+  readonly onActiveQuestionChange?: (questionId: string) => void;
 }) {
   const session = useWorkbenchStore((state) => state.session);
   const annotations = useWorkbenchStore((state) => state.annotations);
   const addAnnotation = useWorkbenchStore((state) => state.addAnnotation);
   const removeAnnotation = useWorkbenchStore((state) => state.removeAnnotation);
+  const repository = useWorkbenchStore((state) => state.repository);
   const scrollRef = useRef<HTMLDivElement>(null);
   const contentKey = readingPaneContentKey(paneState);
   const restoredScrollTop = paneState.scrollPositions[contentKey] ?? 0;
@@ -202,11 +222,43 @@ export function ReadingPane({
       blocks={section.contentBlocks}
       onCreateAnnotation={handleCreateAnnotation}
       onDeleteAnnotation={(id) => void removeAnnotation(id)}
+      onSaveVocabulary={(selection: VocabularyTextSelection) => repository.saveVocabularyItem({
+        term: selection.term,
+        normalizedTerm: selection.normalizedTerm,
+        sentence: selection.sentence,
+        contextBefore: selection.contextBefore,
+        contextAfter: selection.contextAfter,
+        sourcePackId: vocabularySource.packId,
+        sourceTestId: vocabularySource.testId,
+        sourceModule: "reading",
+        sourceBlockId: selection.blockId,
+        sourceBookTitle: vocabularySource.bookTitle,
+        sourceTestTitle: vocabularySource.testTitle,
+        sourceSectionId: section.id,
+        sourceSectionTitle: section.title,
+        ...(vocabularySource.currentQuestion ? {
+          sourceQuestionId: vocabularySource.currentQuestion.id,
+          sourceQuestionNumber: vocabularySource.currentQuestion.number,
+        } : {}),
+        note: "",
+        learningState: "new",
+      }).then(() => undefined)}
     />
   );
 
   const handleScroll = (event: UIEvent<HTMLDivElement>) => {
     onScrollPositionChange(contentKey, event.currentTarget.scrollTop);
+    if (!paneShowsQuestions(paneState.view) || !onActiveQuestionChange) return;
+    const containerRect = event.currentTarget.getBoundingClientRect();
+    const candidates = [...event.currentTarget.querySelectorAll<HTMLElement>("[data-question-id]")];
+    const active = candidates
+      .map((element) => ({
+        id: element.dataset.questionId,
+        distance: Math.abs(element.getBoundingClientRect().top - containerRect.top - 72),
+      }))
+      .filter((candidate): candidate is { id: string; distance: number } => Boolean(candidate.id))
+      .sort((left, right) => left.distance - right.distance)[0];
+    if (active) onActiveQuestionChange(active.id);
   };
 
   return (

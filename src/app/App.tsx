@@ -4,13 +4,14 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./AppShell/AppShell";
 import { ImportCenterPage } from "../features/import-center/ImportCenterPage";
 import { PdfImportPage } from "../features/pdf-import/PdfImportPage";
-import { LibraryPage } from "../features/library/LibraryPage";
+import { LibraryShelfPage } from "../features/library/LibraryShelfPage";
 import { OnboardingPage } from "../features/onboarding/OnboardingPage";
 import { ListeningPage } from "../features/practice/listening/ListeningPage";
 import { ReadingPage } from "../features/practice/reading/ReadingPage";
 import { WritingPage } from "../features/practice/writing/WritingPage";
 import { ReviewPage } from "../features/review/ReviewPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
+import { VocabularyPage } from "../features/vocabulary/VocabularyPage";
 import { useWorkbenchStore } from "../stores/workbenchStore";
 
 function AppearanceHydrator() {
@@ -75,13 +76,14 @@ export function App() {
       <Routes>
         <Route element={<OnboardingPage />} path="/onboarding" />
         <Route element={<WorkspaceGate />}>
-          <Route element={<LibraryPage />} path="/library" />
+          <Route element={<LibraryShelfPage />} path="/library" />
           <Route element={<ImportCenterPage />} path="/import" />
           <Route element={<PdfImportPage />} path="/import/pdf" />
           <Route element={<ReadingPage />} path="/practice/reading" />
           <Route element={<ListeningPage />} path="/practice/listening" />
           <Route element={<WritingPage />} path="/practice/writing" />
           <Route element={<ReviewPage />} path="/review" />
+          <Route element={<VocabularyPage />} path="/vocabulary" />
           <Route element={<SettingsPage />} path="/settings" />
         </Route>
         <Route element={<DefaultRoute />} path="/" />

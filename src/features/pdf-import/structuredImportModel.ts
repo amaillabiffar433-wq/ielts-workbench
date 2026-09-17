@@ -23,7 +23,7 @@ import {
   type ExtractedPdfPage,
 } from "./pdfImportModel";
 
-export const STRUCTURED_IMPORT_DRAFT_VERSION = 4 as const;
+export const STRUCTURED_IMPORT_DRAFT_VERSION = 5 as const;
 export const STRUCTURED_IMPORT_PARSER_VERSION = `${PDF_IMPORT_PARSER_VERSION}-structured-3`;
 export const STRUCTURED_IMPORT_DRAFT_INDEX_SETTING = "pdfImport.structuredDraftIndex.v1";
 export const MAX_STRUCTURED_IMPORT_DRAFT_SETTING_BYTES = 240 * 1024;
@@ -186,6 +186,7 @@ const DraftPassageSchema = z.object({
 
 const StructuredImportDraftV2Schema = z.object({
   imageAssets: z.array(ImportImageSchema).max(100).default([]),
+  coverAssetId: StableIdSchema.nullable(),
   schemaVersion: z.literal(STRUCTURED_IMPORT_DRAFT_VERSION),
   id: StableIdSchema,
   packId: StableIdSchema,
@@ -219,10 +220,11 @@ const StructuredImportDraftV2Schema = z.object({
 function migrateLegacyStructuredDraft(input: unknown): unknown {
   if (typeof input !== "object" || input === null || Array.isArray(input)) return input;
   const record = input as Record<string, unknown>;
-  if (![1, 2, 3].includes(record.schemaVersion as number) || !Array.isArray(record.passages)) return input;
+  if (![1, 2, 3, 4].includes(record.schemaVersion as number) || !Array.isArray(record.passages)) return input;
   return {
     ...record,
     schemaVersion: STRUCTURED_IMPORT_DRAFT_VERSION,
+    coverAssetId: record.coverAssetId ?? null,
     passages: record.passages.map((passage) => {
       if (typeof passage !== "object" || passage === null || Array.isArray(passage)) return passage;
       const passageRecord = passage as Record<string, unknown>;
@@ -501,6 +503,7 @@ export function createStructuredImportDraft(
   const firstPassage = createStructuredPassage(1, idFactory);
   return StructuredImportDraftSchema.parse({
     schemaVersion: STRUCTURED_IMPORT_DRAFT_VERSION,
+    coverAssetId: null,
     id: identity,
     packId,
     testId: `${packId}-test`,
@@ -1218,6 +1221,7 @@ export async function buildStructuredReadingPack(
     ...passage.contentBlocks.flatMap((block) => block.visual ? [block.visual.assetId] : []),
     ...passage.questionGroups.flatMap((group) => group.contextBlocks.flatMap((block) => "assetId" in block ? [block.assetId] : [])),
   ]));
+  if (draft.coverAssetId) visualIds.add(draft.coverAssetId);
   const sourceRange = { start: Math.min(...sourcePages), end: Math.max(...sourcePages) };
   return parseIeltsPack({
     manifest: {
@@ -1230,6 +1234,7 @@ export async function buildStructuredReadingPack(
       createdAt: importedAt,
       tests: [{ id: draft.testId, title: `Test ${draft.testNumber.trim()}`, moduleIds: [draft.moduleId] }],
       mediaAssets: draft.imageAssets.filter((asset) => visualIds.has(asset.id)).map((asset) => ({ id: asset.id, relativePath: asset.relativePath, sha256: asset.sha256, width: asset.width, height: asset.height, type: "image", mimeType: "image/png", alt: "Manually selected PDF region" })),
+      ...(draft.coverAssetId ? { coverImageAssetId: draft.coverAssetId } : {}),
       importMetadata: {
         sourceFileName: draft.source.fileName,
         sourceFileSize: draft.source.fileSize,

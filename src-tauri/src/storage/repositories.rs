@@ -11,6 +11,7 @@ use crate::{
         AnnotationRecord, AnswerRecord, CreateSessionInput, CreateWritingVersionInput,
         InstalledPackRecord, PackManifest, PracticeSessionRecord, SaveAnnotationInput,
         SaveAnswerInput, SaveWritingDraftInput, SessionSnapshot, SettingRecord, TextAnchor,
+        SaveVocabularyItemInput, UpdateVocabularyItemInput, VocabularyItemRecord,
         WritingDraftRecord, WritingVersionRecord,
     },
 };
@@ -18,6 +19,9 @@ use crate::{
 const MAX_JSON_BYTES: usize = 256 * 1024;
 const MAX_WRITING_BYTES: usize = 2 * 1024 * 1024;
 const MAX_NOTE_BYTES: usize = 16 * 1024;
+const MAX_VOCABULARY_TERM_CHARS: usize = 160;
+const MAX_VOCABULARY_SENTENCE_CHARS: usize = 4_000;
+const MAX_VOCABULARY_CONTEXT_CHARS: usize = 1_000;
 
 pub fn create_session(
     connection: &Connection,
@@ -490,6 +494,178 @@ pub fn list_writing_versions(
     rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
 }
 
+pub fn list_vocabulary_items(connection: &Connection) -> Result<Vec<VocabularyItemRecord>> {
+    let mut statement = connection.prepare(
+        "SELECT id, term, normalized_term, sentence, context_before, context_after,
+                source_pack_id, source_test_id, source_module, source_block_id,
+                source_book_title, source_test_title, source_section_id, source_section_title,
+                source_question_id, source_question_number, note, learning_state, created_at, updated_at
+         FROM vocabulary_items
+         ORDER BY created_at DESC, id DESC",
+    )?;
+    let rows = statement.query_map([], vocabulary_item_from_row)?;
+    rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+pub fn save_vocabulary_item(
+    connection: &Connection,
+    input: SaveVocabularyItemInput,
+) -> Result<VocabularyItemRecord> {
+    validate_vocabulary_input(&input)?;
+    let existing_id: Option<String> = connection.query_row(
+        "SELECT id FROM vocabulary_items
+         WHERE normalized_term = ?1
+           AND COALESCE(source_pack_id, '') = COALESCE(?2, '')
+           AND COALESCE(source_test_id, '') = COALESCE(?3, '')
+           AND COALESCE(source_block_id, '') = COALESCE(?4, '')
+           AND sentence = ?5
+         ORDER BY created_at ASC LIMIT 1",
+        params![
+            input.normalized_term,
+            input.source_pack_id,
+            input.source_test_id,
+            input.source_block_id,
+            input.sentence,
+        ],
+        |row| row.get(0),
+    ).optional()?;
+    let id = existing_id.or(input.id).unwrap_or_else(|| Uuid::new_v4().to_string());
+    validate_stable_id(&id, "vocabulary item ID")?;
+    let timestamp = now_iso();
+    connection.execute(
+        "INSERT INTO vocabulary_items(
+            id, term, normalized_term, source_pack_id, source_test_id, source_module,
+            source_block_id, context, learning_state, created_at, updated_at,
+            source_book_title, source_test_title, source_section_id, source_section_title,
+            source_question_id, source_question_number, sentence, context_before, context_after, note
+         ) VALUES (
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10,
+            ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
+         )
+         ON CONFLICT(id) DO UPDATE SET
+            term = excluded.term,
+            normalized_term = excluded.normalized_term,
+            source_pack_id = excluded.source_pack_id,
+            source_test_id = excluded.source_test_id,
+            source_module = excluded.source_module,
+            source_block_id = excluded.source_block_id,
+            context = excluded.context,
+            source_book_title = excluded.source_book_title,
+            source_test_title = excluded.source_test_title,
+            source_section_id = excluded.source_section_id,
+            source_section_title = excluded.source_section_title,
+            source_question_id = excluded.source_question_id,
+            source_question_number = excluded.source_question_number,
+            sentence = excluded.sentence,
+            context_before = excluded.context_before,
+            context_after = excluded.context_after,
+            note = CASE WHEN vocabulary_items.note = '' THEN excluded.note ELSE vocabulary_items.note END,
+            updated_at = excluded.updated_at",
+        params![
+            id,
+            input.term,
+            input.normalized_term,
+            input.source_pack_id,
+            input.source_test_id,
+            input.source_module,
+            input.source_block_id,
+            format!("{}{}{}", input.context_before, input.term, input.context_after),
+            input.learning_state,
+            timestamp,
+            input.source_book_title,
+            input.source_test_title,
+            input.source_section_id,
+            input.source_section_title,
+            input.source_question_id,
+            input.source_question_number.map(i64::from),
+            input.sentence,
+            input.context_before,
+            input.context_after,
+            input.note,
+        ],
+    )?;
+    get_vocabulary_item(connection, &id)?.ok_or_else(|| {
+        BackendError::NotFound("The saved vocabulary item could not be read back.".to_string())
+    })
+}
+
+pub fn update_vocabulary_item(
+    connection: &Connection,
+    input: UpdateVocabularyItemInput,
+) -> Result<VocabularyItemRecord> {
+    validate_stable_id(&input.id, "vocabulary item ID")?;
+    validate_vocabulary_state(&input.learning_state)?;
+    if input.note.chars().count() > 2_000 {
+        return Err(BackendError::InvalidInput("Vocabulary note is too long.".to_string()));
+    }
+    let changed = connection.execute(
+        "UPDATE vocabulary_items SET note = ?2, learning_state = ?3, updated_at = ?4 WHERE id = ?1",
+        params![input.id, input.note, input.learning_state, now_iso()],
+    )?;
+    if changed == 0 {
+        return Err(BackendError::NotFound("The vocabulary item does not exist.".to_string()));
+    }
+    get_vocabulary_item(connection, &input.id)?.ok_or_else(|| {
+        BackendError::NotFound("The vocabulary item does not exist.".to_string())
+    })
+}
+
+pub fn delete_vocabulary_item(connection: &Connection, item_id: &str) -> Result<bool> {
+    validate_stable_id(item_id, "vocabulary item ID")?;
+    Ok(connection.execute("DELETE FROM vocabulary_items WHERE id = ?1", [item_id])? > 0)
+}
+
+fn get_vocabulary_item(connection: &Connection, item_id: &str) -> Result<Option<VocabularyItemRecord>> {
+    connection.query_row(
+        "SELECT id, term, normalized_term, sentence, context_before, context_after,
+                source_pack_id, source_test_id, source_module, source_block_id,
+                source_book_title, source_test_title, source_section_id, source_section_title,
+                source_question_id, source_question_number, note, learning_state, created_at, updated_at
+         FROM vocabulary_items WHERE id = ?1",
+        [item_id],
+        vocabulary_item_from_row,
+    ).optional().map_err(Into::into)
+}
+
+fn validate_vocabulary_input(input: &SaveVocabularyItemInput) -> Result<()> {
+    let term = input.term.trim();
+    if term.is_empty() || term.chars().count() > MAX_VOCABULARY_TERM_CHARS {
+        return Err(BackendError::InvalidInput("Vocabulary term is empty or too long.".to_string()));
+    }
+    if input.normalized_term.trim().is_empty() || input.normalized_term.chars().count() > MAX_VOCABULARY_TERM_CHARS {
+        return Err(BackendError::InvalidInput("Normalized vocabulary term is empty or too long.".to_string()));
+    }
+    if input.sentence.chars().count() > MAX_VOCABULARY_SENTENCE_CHARS
+        || input.context_before.chars().count() > MAX_VOCABULARY_CONTEXT_CHARS
+        || input.context_after.chars().count() > MAX_VOCABULARY_CONTEXT_CHARS
+        || input.note.chars().count() > 2_000
+    {
+        return Err(BackendError::InvalidInput("Vocabulary context is too long.".to_string()));
+    }
+    validate_vocabulary_state(&input.learning_state)?;
+    for (value, label) in [
+        (&input.source_pack_id, "source pack ID"),
+        (&input.source_test_id, "source test ID"),
+        (&input.source_block_id, "source block ID"),
+        (&input.source_section_id, "source section ID"),
+        (&input.source_question_id, "source question ID"),
+    ] {
+        if let Some(value) = value { validate_stable_id(value, label)?; }
+    }
+    if input.source_module.as_deref().is_some_and(|value| value != "reading") {
+        return Err(BackendError::InvalidInput("Vocabulary source module must be Reading.".to_string()));
+    }
+    Ok(())
+}
+
+fn validate_vocabulary_state(value: &str) -> Result<()> {
+    if matches!(value, "new" | "learning" | "familiar" | "mastered") {
+        Ok(())
+    } else {
+        Err(BackendError::InvalidInput("Unsupported vocabulary learning state.".to_string()))
+    }
+}
+
 pub fn list_installed_packs(connection: &Connection) -> Result<Vec<InstalledPackRecord>> {
     let mut statement = connection.prepare(
         "SELECT id, title, source_label, edition, schema_version, install_path,
@@ -815,6 +991,31 @@ fn writing_version_from_row(row: &Row<'_>) -> rusqlite::Result<WritingVersionRec
     })
 }
 
+fn vocabulary_item_from_row(row: &Row<'_>) -> rusqlite::Result<VocabularyItemRecord> {
+    Ok(VocabularyItemRecord {
+        id: row.get(0)?,
+        term: row.get(1)?,
+        normalized_term: row.get(2)?,
+        sentence: row.get(3)?,
+        context_before: row.get(4)?,
+        context_after: row.get(5)?,
+        source_pack_id: row.get(6)?,
+        source_test_id: row.get(7)?,
+        source_module: row.get(8)?,
+        source_block_id: row.get(9)?,
+        source_book_title: row.get(10)?,
+        source_test_title: row.get(11)?,
+        source_section_id: row.get(12)?,
+        source_section_title: row.get(13)?,
+        source_question_id: row.get(14)?,
+        source_question_number: row.get::<_, Option<i64>>(15)?.map(|value| value.max(0) as u32),
+        note: row.get(16)?,
+        learning_state: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
+    })
+}
+
 fn installed_pack_from_row(row: &Row<'_>) -> rusqlite::Result<InstalledPackRecord> {
     let raw_manifest: String = row.get(6)?;
     Ok(InstalledPackRecord {
@@ -976,6 +1177,42 @@ mod tests {
             },
         )
         .is_err());
+    }
+
+    #[test]
+    fn vocabulary_context_round_trip_updates_without_duplicate_rows() {
+        let connection = database();
+        let input = SaveVocabularyItemInput {
+            id: Some("vocabulary-1".into()),
+            term: "Scrolls".into(),
+            normalized_term: "scrolls".into(),
+            sentence: "The scrolls remained in Jerusalem.".into(),
+            context_before: "The ".into(),
+            context_after: " remained".into(),
+            source_pack_id: Some("pack-1".into()),
+            source_test_id: Some("test-2".into()),
+            source_module: Some("reading".into()),
+            source_block_id: Some("block-1".into()),
+            source_book_title: Some("Cambridge IELTS 17 Academic".into()),
+            source_test_title: Some("Test 2".into()),
+            source_section_id: Some("passage-1".into()),
+            source_section_title: Some("The Dead Sea Scrolls".into()),
+            source_question_id: Some("question-3".into()),
+            source_question_number: Some(3),
+            note: String::new(),
+            learning_state: "new".into(),
+        };
+        let created = save_vocabulary_item(&connection, input.clone()).unwrap();
+        let duplicate = save_vocabulary_item(&connection, SaveVocabularyItemInput { id: None, ..input }).unwrap();
+        assert_eq!(created.id, duplicate.id);
+        assert_eq!(list_vocabulary_items(&connection).unwrap().len(), 1);
+        let updated = update_vocabulary_item(&connection, UpdateVocabularyItemInput {
+            id: created.id.clone(), note: "Review the original sentence.".into(), learning_state: "learning".into(),
+        }).unwrap();
+        assert_eq!(updated.learning_state, "learning");
+        assert_eq!(updated.source_question_number, Some(3));
+        assert!(delete_vocabulary_item(&connection, &created.id).unwrap());
+        assert!(list_vocabulary_items(&connection).unwrap().is_empty());
     }
 
     #[test]
