@@ -101,6 +101,39 @@ describe("InMemoryLearningRepository", () => {
     await expect(repository.listVocabularyItems()).resolves.toEqual([]);
   });
 
+  it("persists a review queue and advances its explicit fixed-interval schedule", async () => {
+    let now = new Date("2026-09-17T08:00:00.000Z");
+    const repository = InMemoryLearningRepository.withOriginalDemo({
+      now: () => new Date(now),
+      idFactory: deterministicIds(),
+    });
+    const first = await repository.saveReviewItem({
+      sourceKind: "mistake",
+      packId: "original-demo-pack",
+      testId: "demo-test-01",
+      moduleType: "reading",
+      questionId: "demo-reading-q01",
+    });
+    const duplicate = await repository.saveReviewItem({
+      sourceKind: "mistake",
+      packId: "original-demo-pack",
+      testId: "demo-test-01",
+      moduleType: "reading",
+      questionId: "demo-reading-q01",
+    });
+    expect(duplicate.id).toBe(first.id);
+    await expect(repository.listReviewItems()).resolves.toHaveLength(1);
+
+    const good = await repository.gradeReviewItem(first.id, "good");
+    expect(good).toMatchObject({ intervalDays: 1, repetitions: 1, dueAt: "2026-09-18T08:00:00.000Z" });
+    now = new Date("2026-09-18T08:00:00.000Z");
+    const easy = await repository.gradeReviewItem(first.id, "easy");
+    expect(easy).toMatchObject({ intervalDays: 7, repetitions: 2, dueAt: "2026-09-25T08:00:00.000Z" });
+    now = new Date("2026-09-25T08:00:00.000Z");
+    const again = await repository.gradeReviewItem(first.id, "again");
+    expect(again).toMatchObject({ intervalDays: 1, repetitions: 0, dueAt: "2026-09-26T08:00:00.000Z" });
+  });
+
   it("validates the registered demo folder and returns detached media bytes", async () => {
     const repository = InMemoryLearningRepository.withOriginalDemo();
 

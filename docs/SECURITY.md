@@ -102,7 +102,7 @@ Phase 0–1 不实现真实 AI Provider，也不需要常驻网络：
 
 ## 5. Tauri capability 最小授权
 
-Phase 0–1 的 renderer 只需要基础窗口/事件能力和系统目录选择器。建议 capability 仅包含实际调用的 `core` 权限与 `dialog:allow-open`，并按窗口限定；不授予：
+Renderer 只保留基础窗口/事件能力、系统目录选择器、状态消息与提交确认对话框。Capability 仅包含实际调用的 `core` 权限、`dialog:allow-open` 与 `dialog:allow-message`，并按主窗口限定。破坏性操作的确认统一通过对话框插件的 message/OkCancel API 实现，不依赖已废弃的 legacy confirm 命令权限；不授予：
 
 - 通用 filesystem read/write；
 - shell/process execution；
@@ -241,6 +241,13 @@ form-action 'none'
 - 源文件身份使用 SHA-256 和有限元数据；不保存绝对路径、百度网盘 token、分享口令或访问凭据。
 - Web/Vite 开发回退把状态放入当前 origin 的 IndexedDB，不使用 `localStorage`。它只用于 renderer 开发与测试，不代替桌面工作区的 SQLite 安全边界。
 - Tauri 的 `install_generated_pack` 只接受完整且经双端校验的 `manifest + modules` 对象，序列化大小上限为 64 MiB，只允许 Reading/Listening/Writing 固定模块名，并只在已校验工作区下创建应用自有暂存目录。安装仍复用现有防覆盖、路径边界和原子安装检查。
+
+## Review, Listening and Obsidian boundaries
+
+- Review items retain stable pack/test/module/question identities; renderer pane position, DOM nodes and pixels never become review identity. Listening timestamps are non-negative hints consumed only by Study mode.
+- Exam mode does not render or consume transcript cues, waveform, arbitrary seek, rate controls, saved Study position, or review deep-link timestamps.
+- Obsidian export requires an explicitly selected existing absolute vault. It rejects filesystem roots, links/reparse points, oversized/non-UTF-8 notes and path escape; it writes only `IELTS/YYYY-MM-DD.md`.
+- The managed block is marker-delimited. Unmanaged note content is preserved; a changed existing note is backed up inside the IELTS Workbench workspace before atomic replacement, and the result is re-read and SHA-256 verified.
 - 真实或私人 PDF、提取文本、页面渲染、数据库和解析缓存由 `.gitignore` 排除；提交前必须同时检查暂存区与已跟踪文件，不能仅依赖扩展名规则。
 
 ## 13. 本地备份与恢复边界

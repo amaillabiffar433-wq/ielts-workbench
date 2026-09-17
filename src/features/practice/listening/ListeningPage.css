@@ -19,7 +19,7 @@
 
 .listening-transport__player {
   display: flex;
-  min-width: 260px;
+  min-width: 420px;
   flex: 1;
   align-items: center;
   justify-content: center;
@@ -33,6 +33,47 @@
 .listening-transport audio:not([controls]) {
   display: none;
 }
+
+.study-audio {
+  display: grid;
+  width: min(720px, 100%);
+  grid-template-columns: minmax(180px, 1fr);
+  gap: 3px;
+}
+
+.study-audio__waveform {
+  display: flex;
+  height: 24px;
+  align-items: center;
+  gap: 2px;
+  color: var(--text-muted);
+  overflow: hidden;
+}
+
+.study-audio__waveform i {
+  width: 2px;
+  min-height: 2px;
+  flex: 1;
+  border-radius: 2px;
+  background: var(--border-strong);
+}
+
+.study-audio__waveform i.is-played { background: var(--accent); }
+.study-audio__waveform span { font-size: 10px; }
+.study-audio > input[type="range"] { width: 100%; height: 8px; accent-color: var(--accent); }
+
+.study-audio__controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.study-audio__play { min-width: 78px; justify-content: center; }
+.study-audio__time { min-width: 78px; color: var(--text-secondary); font-size: 11px; font-variant-numeric: tabular-nums; }
+.study-audio__rate { display: flex; align-items: center; gap: 5px; color: var(--text-muted); font-size: 10px; }
+.study-audio__rate select { height: 28px; border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); background: var(--surface-panel); color: var(--text-primary); }
+.study-audio__volume { display: flex; align-items: center; gap: 4px; }
+.study-audio__volume input { width: 62px; accent-color: var(--accent); }
 
 .exam-audio {
   display: flex;
@@ -81,6 +122,16 @@
   display: grid;
   min-height: 0;
   grid-template-rows: auto minmax(0, 1fr);
+}
+
+.listening-content {
+  display: grid;
+  min-height: 0;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.listening-content.has-transcript {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 26vw);
 }
 
 .listening-sections {
@@ -168,6 +219,47 @@
   overflow-y: auto;
 }
 
+.listening-transcript {
+  min-height: 0;
+  border-left: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+  overflow-y: auto;
+}
+
+.listening-transcript > header {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  min-height: 60px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--surface-raised);
+}
+
+.listening-transcript > header > div { display: flex; align-items: center; gap: 9px; }
+.listening-transcript > header strong,
+.listening-transcript > header span { display: block; }
+.listening-transcript > header span { margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+
+.listening-transcript__empty {
+  padding: 34px 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.listening-transcript__empty p { font-size: 12px; line-height: 1.6; }
+.listening-transcript__cues { padding: 8px; }
+.listening-transcript__cues article { display: grid; grid-template-columns: 46px 1fr; gap: 9px; padding: 10px 8px; border-left: 2px solid transparent; border-radius: var(--radius-sm); }
+.listening-transcript__cues article.is-active { border-left-color: var(--accent); background: var(--surface-selected); }
+.listening-transcript__cues p { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.6; }
+.listening-transcript__cues p strong { color: var(--text-primary); }
+.listening-transcript__time { align-self: start; padding: 2px 0; border: 0; background: transparent; color: var(--accent-strong); font-size: 10px; font-variant-numeric: tabular-nums; }
+.transcript-cloze { padding: 0 4px; border: 0; border-bottom: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent-strong); font: inherit; }
+
 .listening-questions > header {
   padding-bottom: 18px;
   border-bottom: 2px solid var(--text-primary);
@@ -203,4 +295,17 @@
     display: none;
   }
 
+  .listening-transport__player { min-width: 340px; }
+  .study-audio__volume { display: none; }
+
+  .listening-content.has-transcript { grid-template-columns: minmax(0, 1fr) 300px; }
+
+}
+
+@media (max-width: 900px) {
+  .listening-transport { flex-wrap: wrap; }
+  .listening-transport__player { order: 3; width: 100%; min-width: 0; }
+  .listening-content.has-transcript { grid-template-columns: 1fr; overflow-y: auto; }
+  .listening-questions { overflow-y: visible; }
+  .listening-transcript { max-height: 360px; border-top: 1px solid var(--border-subtle); border-left: 0; }
 }

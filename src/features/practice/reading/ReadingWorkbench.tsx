@@ -7,8 +7,10 @@ import { SplitWorkspace, type SplitLayout } from "../../../components/SplitWorks
 import { SaveStatus } from "../../../components/common/SaveStatus";
 import { SegmentedControl } from "../../../components/common/SegmentedControl";
 import type { ReadingModule } from "../../../domain";
+import { scoreQuestion } from "../../../domain/questionScoring";
 import type { SessionSnapshot } from "../../../infrastructure/repositories/LearningRepository";
 import { answerKey, useWorkbenchStore } from "../../../stores/workbenchStore";
+import { confirmAction } from "../../../infrastructure/window/windowClose";
 import { usePracticeRoutePack } from "../usePracticeRoutePack";
 import { derivePracticeElapsed, formatPracticeTime } from "../practiceTimer";
 import { ReadingPane } from "./ReadingPane";
@@ -35,6 +37,8 @@ type QuestionNavigationTarget = {
   readonly side: PaneSide;
   readonly questionId: string;
 };
+
+const READING_DEFAULT_SPLIT: SplitLayout = { left: 54, right: 46 };
 
 function usePracticeTimer(
   mode: PracticeMode,
@@ -84,7 +88,7 @@ export function ReadingWorkbench() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const mode: PracticeMode = searchParams.get("mode") === "exam" ? "exam" : "study";
-  const [layout, setLayout] = useState<SplitLayout>(() => window.innerWidth < 1440 ? { left: 60, right: 40 } : { left: 65, right: 35 });
+  const [layout, setLayout] = useState<SplitLayout>(READING_DEFAULT_SPLIT);
   const [visiblePane, setVisiblePane] = useState<PaneSide | null>(null);
   const [viewState, setViewState] = useState<ReadingViewState | null>(null);
   const [hydratedSessionId, setHydratedSessionId] = useState<string | null>(null);
@@ -112,6 +116,7 @@ export function ReadingWorkbench() {
   const questionFlags = useWorkbenchStore((state) => state.questionFlags);
   const toggleQuestionFlag = useWorkbenchStore((state) => state.toggleQuestionFlag);
   const flushPendingSaves = useWorkbenchStore((state) => state.flushPendingSaves);
+  const repository = useWorkbenchStore((state) => state.repository);
   const timer = usePracticeTimer(mode, session, updateSessionElapsed);
 
   const module = useMemo(
@@ -163,7 +168,7 @@ export function ReadingWorkbench() {
       if (!active || !value) return;
       try {
         const parsed = JSON.parse(value) as SplitLayout;
-        if (parsed.left >= 28 && parsed.right >= 28) setLayout(parsed);
+        if (Number.isFinite(parsed.left) && Number.isFinite(parsed.right) && parsed.left >= 28 && parsed.right >= 28 && Math.abs(parsed.left + parsed.right - 100) < 0.5) setLayout(parsed);
       } catch {
         // Keep the documented default for corrupted view-only settings.
       }
@@ -202,13 +207,13 @@ export function ReadingWorkbench() {
       setViewState(restored.state);
       setHydratedSessionId(sessionId);
       if (restored.recovered) {
-        setViewStateNotice("上次的 Pane 选择引用了已变更内容，已安全回退到有效范围。");
+        setViewStateNotice("The saved pane selection referenced changed content and was safely reset to a valid range.");
       }
     }).catch((error: unknown) => {
       if (!active) return;
       setViewState(createDefaultReadingViewState(module));
       setHydratedSessionId(sessionId);
-      setViewStateNotice(`无法恢复 Pane 选择，已使用默认视图：${error instanceof Error ? error.message : String(error)}`);
+      setViewStateNotice(`Unable to restore pane selection; using the default view: ${error instanceof Error ? error.message : String(error)}`);
     });
     return () => { active = false; };
   }, [loadSetting, module, practiceSessionId, sessionMatchesRoute]);
@@ -258,8 +263,10 @@ export function ReadingWorkbench() {
     if (!module || !viewState || !session || hydratedSessionId !== session.sessionId) return;
     const sectionId = searchParams.get("sourceSectionId");
     const blockId = searchParams.get("sourceBlockId");
-    const questionNumber = Number(searchParams.get("sourceQuestionNumber"));
-    const key = `${session.sessionId}:${sectionId ?? ""}:${blockId ?? ""}:${questionNumber || ""}`;
+    const sourceQuestionId = searchParams.get("sourceQuestionId");
+    const questionEntry = questionEntries.find((entry) => entry.question.id === sourceQuestionId);
+    const questionNumber = questionEntry?.displayNumber ?? Number(searchParams.get("sourceQuestionNumber"));
+    const key = `${session.sessionId}:${sectionId ?? ""}:${blockId ?? ""}:${sourceQuestionId ?? ""}:${questionNumber || ""}`;
     if ((!sectionId && !blockId && !questionNumber) || sourceNavigationApplied.current === key) return;
     const section = module.sections.find((candidate) => candidate.id === sectionId) ?? module.sections[0];
     setViewState((current) => current ? {
@@ -269,12 +276,16 @@ export function ReadingWorkbench() {
         right: { ...current.right, view: "questions", questionScope: "single", singleNumber: questionNumber },
       } : {}),
     } : current);
+    if (questionEntry) {
+      setActiveQuestionId(questionEntry.question.id);
+      setQuestionNavigationTarget({ side: "right", questionId: questionEntry.question.id });
+    }
     sourceNavigationApplied.current = key;
     window.setTimeout(() => {
       const target = blockId ? document.querySelector<HTMLElement>(`[data-pane-scroll="left"] [data-content-block-id="${CSS.escape(blockId)}"]`) : null;
       target?.scrollIntoView({ block: "center", behavior: "smooth" });
     }, 120);
-  }, [hydratedSessionId, module, searchParams, session, viewState]);
+  }, [hydratedSessionId, module, questionEntries, searchParams, session, viewState]);
 
   const updatePane = useCallback((side: PaneSide, next: ReadingPaneState) => {
     setViewState((current) => current ? { ...current, [side]: next } : current);
@@ -316,27 +327,27 @@ export function ReadingWorkbench() {
   };
 
   if (routePack.status === "loading") {
-    return <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>正在读取链接指定的 Reading 题包…</span></div></div>;
+    return <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>Loading the linked Reading pack…</span></div></div>;
   }
   if (routePack.status === "error") {
     return <div className="error-banner reading-empty" role="alert">{routePack.error}</div>;
   }
   if (!activePack || !module || !test) {
-    return <div className="empty-state reading-empty">没有可用的 Reading 模块。请先在题库或导入中心安装有效题包。</div>;
+    return <div className="empty-state reading-empty">No Reading module is available. Install a valid pack from Library or Import.</div>;
   }
   if (sessionError) {
     return (
       <div className="error-banner reading-empty" role="alert">
-        <span>无法恢复阅读 Session：{sessionError}</span>
-        <button className="button" onClick={() => setSessionRetryRevision((value) => value + 1)} type="button">重试</button>
+        <span>Unable to restore the Reading session: {sessionError}</span>
+        <button className="button" onClick={() => setSessionRetryRevision((value) => value + 1)} type="button">Retry</button>
       </div>
     );
   }
   if (sessionLoading || !sessionMatchesRoute || !session) {
-    return <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>正在恢复阅读 Session…</span></div></div>;
+    return <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>Restoring the Reading session…</span></div></div>;
   }
   if (!viewState || hydratedSessionId !== session.sessionId) {
-    return <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>正在恢复 Reading Pane 选择…</span></div></div>;
+    return <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>Restoring Reading pane selection…</span></div></div>;
   }
 
   return (
@@ -349,7 +360,7 @@ export function ReadingWorkbench() {
           <div><strong>{module.title}</strong><span title={`${activePack.manifest.title} / ${test.title}`}>{activePack.manifest.title} / {test.title}</span></div>
         </div>
         <SegmentedControl
-          label="练习模式"
+          label="Practice mode"
           onChange={(nextMode) => {
             const nextSearch = new URLSearchParams(searchParams);
             nextSearch.set("mode", nextMode);
@@ -361,7 +372,7 @@ export function ReadingWorkbench() {
         {(viewStateNotice || timer.warning) && <span className="reading-view-notice" role="status">{viewStateNotice ?? timer.warning}</span>}
         <div className="practice-toolbar__spacer" />
         <SaveStatus state={saveState} />
-        <span aria-label={mode === "exam" ? `考试剩余时间 ${timer.label}` : `练习用时 ${timer.label}`} className="practice-timer" role="timer">
+        <span aria-label={mode === "exam" ? `Exam time remaining ${timer.label}` : `Practice time ${timer.label}`} className="practice-timer" role="timer">
           <Clock3 aria-hidden="true" size={16} />{timer.label}
         </span>
         <button
@@ -369,12 +380,28 @@ export function ReadingWorkbench() {
           disabled={submitting}
           onClick={async () => {
             const unanswered = questionEntries.length - answeredCount;
-            if (!window.confirm(`提交后进入复盘页面。当前未答 ${unanswered} 题、标记待检查 ${questionFlags.size} 题；确定提交吗？`)) return;
+            if (!(await confirmAction(`Submit and open Results? ${unanswered} unanswered and ${questionFlags.size} flagged question(s) remain.`))) return;
             setSubmitting(true);
             try {
               await flushPendingSaves();
               await updateSessionElapsed(session.sessionId, timer.elapsedSeconds);
               await submitSession(session.sessionId);
+              const reviewCandidates = questionEntries.flatMap((entry) => {
+                const value = answers[answerKey(session.sessionId, entry.question.id)]?.value;
+                const score = scoreQuestion(entry.question, value);
+                const sourceKind = score.status === "incorrect" || score.status === "unanswered"
+                  ? "mistake" as const
+                  : questionFlags.has(entry.question.id) ? "marked" as const : null;
+                return sourceKind ? [{
+                  sourceKind,
+                  packId: activePack.manifest.id,
+                  testId: test.id,
+                  moduleType: "reading" as const,
+                  questionId: entry.question.id,
+                  sourceSessionId: session.sessionId,
+                }] : [];
+              });
+              await Promise.all(reviewCandidates.map((candidate) => repository.saveReviewItem(candidate)));
               navigate("/review");
             } catch {
               // The store exposes the persistence error through the global error banner.
@@ -385,12 +412,13 @@ export function ReadingWorkbench() {
           type="button"
         >
           <CheckCircle2 aria-hidden="true" size={16} />
-          {submitting ? "提交中…" : "提交"}
+          {submitting ? "Submitting…" : "Submit"}
         </button>
       </header>}
       panes={
         <SplitWorkspace
           defaultLayout={layout}
+          resetLayout={READING_DEFAULT_SPLIT}
           visiblePane={visiblePane}
           left={<ReadingPane entries={questionEntries} module={module} onActiveQuestionChange={setActiveQuestionId} onPaneStateChange={(next) => updatePane("left", next)} onScrollPositionChange={(key, top) => updateScrollPosition("left", key, top)} paneState={viewState.left} side="left" vocabularySource={{ packId: activePack.manifest.id, testId: test.id, bookTitle: activePack.manifest.title, testTitle: test.title, ...(currentQuestion ? { currentQuestion } : {}) }} />}
           onLayoutChanged={(nextLayout) => {
@@ -400,11 +428,11 @@ export function ReadingWorkbench() {
           right={<ReadingPane entries={questionEntries} module={module} onActiveQuestionChange={setActiveQuestionId} onPaneStateChange={(next) => updatePane("right", next)} onScrollPositionChange={(key, top) => updateScrollPosition("right", key, top)} paneState={viewState.right} side="right" vocabularySource={{ packId: activePack.manifest.id, testId: test.id, bookTitle: activePack.manifest.title, testTitle: test.title, ...(currentQuestion ? { currentQuestion } : {}) }} />}
         />}
       navigator={
-      <footer className="question-navigator" aria-label="题号导航">
-        <div className="question-navigator__summary"><ListChecks aria-hidden="true" size={17} />已答 {answeredCount}/{questionEntries.length} · 未答 {questionEntries.length - answeredCount} · 标记 {questionFlags.size}</div>
+      <footer className="question-navigator" aria-label="Question navigator">
+        <div className="question-navigator__summary"><ListChecks aria-hidden="true" size={17} />Answered {answeredCount}/{questionEntries.length} · Unanswered {questionEntries.length - answeredCount} · Flagged {questionFlags.size}</div>
         <div className="question-navigator__tools">
-          <div aria-label="题号筛选" className="question-navigator__filters" role="group">
-            {([['all', '全部'], ['unanswered', '未答'], ['flagged', '已标记']] as const).map(([value, label]) => (
+          <div aria-label="Question filter" className="question-navigator__filters" role="group">
+            {([['all', 'All'], ['unanswered', 'Unanswered'], ['flagged', 'Flagged']] as const).map(([value, label]) => (
               <button aria-pressed={navigatorFilter === value} key={value} onClick={() => setNavigatorFilter(value)} type="button">{label}</button>
             ))}
           </div>
@@ -413,7 +441,7 @@ export function ReadingWorkbench() {
             if (flaggedEntries.length === 0) return;
             const activeIndex = flaggedEntries.findIndex((entry) => entry.question.id === activeQuestionId);
             navigateToQuestion(flaggedEntries[(activeIndex + 1) % flaggedEntries.length]);
-          }} type="button"><Flag aria-hidden="true" size={12} />下一标记</button>
+          }} type="button"><Flag aria-hidden="true" size={12} />Next flagged</button>
         </div>
         <div className="question-navigator__numbers">
           {visibleNavigationEntries.map((entry) => {
@@ -425,18 +453,18 @@ export function ReadingWorkbench() {
               <span className="question-navigator__item" key={entry.question.id}>
               <button
                 aria-controls={questionContainerId(paneInstanceId(targetSide), entry.question.id)}
-                aria-label={`跳到第 ${entry.displayNumber} 题，${answered ? "已答" : "未答"}${flagged ? "，已标记" : ""}，${targetSide === "right" ? "右" : "左"}窗格`}
+                aria-label={`Go to question ${entry.displayNumber}, ${answered ? "answered" : "unanswered"}${flagged ? ", flagged" : ""}, ${targetSide} pane`}
                 className={`${answered ? "is-answered" : ""}${activeQuestionId === entry.question.id ? " is-current" : ""}`.trim() || undefined}
                 onClick={() => navigateToQuestion(entry)}
                 type="button"
               >
-                {entry.displayNumber}<span className="sr-only">{answered ? "已答" : "未答"}</span>
+                {entry.displayNumber}<span className="sr-only">{answered ? "answered" : "unanswered"}</span>
               </button>
-              <button aria-label={`${flagged ? "取消" : "添加"}第 ${entry.displayNumber} 题待检查标记`} className={flagged ? "is-flagged" : "question-navigator__flag"} onClick={() => void toggleQuestionFlag(session.sessionId, entry.question.id)} type="button"><Flag aria-hidden="true" size={11} /></button>
+              <button aria-label={`${flagged ? "Remove" : "Add"} review flag for question ${entry.displayNumber}`} className={flagged ? "is-flagged" : "question-navigator__flag"} onClick={() => void toggleQuestionFlag(session.sessionId, entry.question.id)} type="button"><Flag aria-hidden="true" size={11} /></button>
               </span>
             );
           })}
-          {visibleNavigationEntries.length === 0 && <span className="question-navigator__empty">当前筛选没有题目</span>}
+          {visibleNavigationEntries.length === 0 && <span className="question-navigator__empty">No questions match this filter</span>}
         </div>
       </footer>}
     />

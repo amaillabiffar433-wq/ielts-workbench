@@ -195,15 +195,15 @@ describe("ReadingPage multi-passage selection", () => {
     const rightPane = screen.getByRole("region", { name: "右窗格" });
     expect(within(rightPane).getByRole("table")).toHaveTextContent("First count");
     expect(within(rightPane).getByRole("table")).toHaveTextContent("Evening count");
-    expect(within(rightPane).getByLabelText("第 18 题答案")).toBeEnabled();
-    expect(within(rightPane).queryByLabelText("第 17 题答案")).not.toBeInTheDocument();
-    expect(within(rightPane).getByText("Question 17 · 当前筛选中只读")).toBeInTheDocument();
+    expect(within(rightPane).getByLabelText("Answer for question 18")).toBeEnabled();
+    expect(within(rightPane).queryByLabelText("Answer for question 17")).not.toBeInTheDocument();
+    expect(within(rightPane).getByText("Question 17 · read-only in this filter")).toBeInTheDocument();
     expect(rightPane.querySelectorAll('[data-question-id="northbridge-q18"]')).toHaveLength(1);
 
     fireEvent.change(screen.getByLabelText("左窗格内容"), { target: { value: "questions" } });
     fireEvent.change(screen.getByLabelText("左窗格题目范围类型"), { target: { value: "single" } });
     fireEvent.change(screen.getByLabelText("左窗格单题题号"), { target: { value: "18" } });
-    const answers = await screen.findAllByLabelText("第 18 题答案");
+    const answers = await screen.findAllByLabelText("Answer for question 18");
     expect(answers).toHaveLength(2);
     fireEvent.change(answers[0], { target: { value: "west desk" } });
     await waitFor(() => answers.forEach((answer) => expect(answer).toHaveValue("west desk")));
@@ -267,7 +267,7 @@ describe("ReadingPage multi-passage selection", () => {
     fireEvent.change(rightGroup, { target: { value: "northbridge-p3-group-01" } });
     expect(within(document.getElementById(leftId) as HTMLElement).getByRole("radio", { name: "False" })).toBeChecked();
     expect(within(document.getElementById(rightId) as HTMLElement).getByRole("radio", { name: "False" })).toBeChecked();
-    expect(screen.getByText(/已答 1\/21 · 未答 20 · 标记 0/)).toBeInTheDocument();
+    expect(screen.getByText(/Answered 1\/21 · Unanswered 20 · Flagged 0/)).toBeInTheDocument();
   });
 
   it("keeps Pane selections independent and synchronizes one logical answer in two Q18 views", async () => {
@@ -320,12 +320,12 @@ describe("ReadingPage multi-passage selection", () => {
     workbenchStore.setState({ annotations: [annotation] });
     renderReading();
     await screen.findByTestId("reading-split-workspace");
-    expect(screen.getByRole("button", { name: new RegExp(`标记文字“${repeated}`) })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: new RegExp(`Annotated text “${repeated}`) })).toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("左窗格 Passage"), { target: { value: "northbridge-passage-03" } });
     const leftPane = screen.getByRole("region", { name: "左窗格" });
     expect(within(leftPane).getByText("Passage 3 · Listening Posts for Urban Moths")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: new RegExp(`标记文字“${repeated}`) })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: new RegExp(`Annotated text “${repeated}`) })).not.toBeInTheDocument();
   });
 
   it("uses the target Pane only for question navigation and retains full answer totals", async () => {
@@ -334,7 +334,7 @@ describe("ReadingPage multi-passage selection", () => {
     workbenchStore.setState({ answers: { [answerKey(session.sessionId, q01.questionId)]: q01, [answerKey(session.sessionId, q18.questionId)]: q18 } });
     renderReading();
     await screen.findByTestId("reading-split-workspace");
-    expect(screen.getByText(/已答 2\/21 · 未答 19 · 标记 0/)).toBeInTheDocument();
+    expect(screen.getByText(/Answered 2\/21 · Unanswered 19 · Flagged 0/)).toBeInTheDocument();
     const leftScroll = document.querySelector<HTMLElement>('[data-pane-scroll="left"]');
     const rightScroll = document.querySelector<HTMLElement>('[data-pane-scroll="right"]');
     const leftScrollTo = vi.fn();
@@ -342,11 +342,11 @@ describe("ReadingPage multi-passage selection", () => {
     if (leftScroll) leftScroll.scrollTo = leftScrollTo;
     if (rightScroll) rightScroll.scrollTo = rightScrollTo;
 
-    fireEvent.click(screen.getByRole("button", { name: "跳到第 18 题，已答，右窗格" }));
+    fireEvent.click(screen.getByRole("button", { name: "Go to question 18, answered, right pane" }));
     await waitFor(() => expect(document.activeElement).toBe(document.getElementById(questionContainerId("right-pane", "northbridge-q18"))));
     expect(rightScrollTo).toHaveBeenCalledTimes(1);
     expect(leftScrollTo).not.toHaveBeenCalled();
-    expect(screen.getByText(/已答 2\/21 · 未答 19 · 标记 0/)).toBeInTheDocument();
+    expect(screen.getByText(/Answered 2\/21 · Unanswered 19 · Flagged 0/)).toBeInTheDocument();
     expect(document.querySelectorAll('[data-question-id^="northbridge-q"]')).toHaveLength(1);
   });
 
@@ -367,7 +367,7 @@ describe("ReadingPage multi-passage selection", () => {
     workbenchStore.setState({ loadSetting, saveSetting });
     renderReading();
 
-    expect(await screen.findByText("正在恢复 Reading Pane 选择…")).toBeInTheDocument();
+    expect(await screen.findByText("Restoring Reading pane selection…")).toBeInTheDocument();
     expect(saveSetting.mock.calls.some(([key]) => key === readingViewStateSettingKey(session.sessionId))).toBe(false);
     resolveView?.(JSON.stringify(saved));
 
@@ -387,7 +387,7 @@ describe("ReadingPage multi-passage selection", () => {
     fireEvent.change(screen.getByLabelText("右窗格题目范围类型"), { target: { value: "range" } });
     fireEvent.change(screen.getByLabelText("右窗格起始题号"), { target: { value: "14" } });
     fireEvent.change(screen.getByLabelText("右窗格结束题号"), { target: { value: "40" } });
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Question 22 不存在"));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Question 22 does not exist"));
     expect(document.querySelectorAll('[data-question-id^="northbridge-q"]')).toHaveLength(0);
   });
 

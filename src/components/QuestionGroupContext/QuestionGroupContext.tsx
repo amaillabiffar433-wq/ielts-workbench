@@ -12,6 +12,7 @@ import type {
   CreateAnnotationInput,
   DisplayAnnotation,
 } from "../TextDocument/TextDocument";
+import { confirmAction } from "../../infrastructure/window/windowClose";
 import "./QuestionGroupContext.css";
 import { VisualBlock } from "../VisualBlock/VisualBlock";
 
@@ -80,8 +81,8 @@ function ContextText({
             aria-label={`标记文字“${segment.text}”；点击删除`}
             className={["text-annotation", ...new Set(active.map((annotation) => `text-annotation--${annotation.style}`))].join(" ")}
             key={`${segment.startOffset}-${segment.endOffset}-${segment.annotationIds.join("-")}`}
-            onClick={() => {
-              if (primary && onDeleteAnnotation && window.confirm(`删除标记“${primary.anchor.quote}”？`)) {
+            onClick={async () => {
+              if (primary && onDeleteAnnotation && await confirmAction(`删除标记“${primary.anchor.quote}”？`)) {
                 onDeleteAnnotation(primary.id);
               }
             }}

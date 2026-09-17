@@ -78,13 +78,13 @@ describe("Reading question selection", () => {
 
   it("reports reversed, missing, out-of-range, duplicate, and empty selections", () => {
     const entries = buildReadingQuestionEntries(multiPassageModule());
-    expect(selectReadingQuestions(entries, { kind: "range", start: 5, end: 2 }).error).toContain("起始题号");
+    expect(selectReadingQuestions(entries, { kind: "range", start: 5, end: 2 }).error).toContain("start question");
     expect(selectReadingQuestions(entries, { kind: "range", start: 2, end: 9 }).error).toContain("Question 7");
-    expect(selectReadingQuestions(entries, { kind: "single", number: 18 }).error).toContain("不存在");
-    expect(selectReadingQuestions(entries, { kind: "passage", sectionId: "missing" }).error).toContain("不存在");
-    expect(selectReadingQuestions([], { kind: "all" }).error).toContain("没有可用题目");
+    expect(selectReadingQuestions(entries, { kind: "single", number: 18 }).error).toContain("does not exist");
+    expect(selectReadingQuestions(entries, { kind: "passage", sectionId: "missing" }).error).toContain("no longer exists");
+    expect(selectReadingQuestions([], { kind: "all" }).error).toContain("no available questions");
     const duplicate = [...entries, { ...entries[0], question: { ...entries[0].question, id: "duplicate" } }];
-    expect(selectReadingQuestions(duplicate, { kind: "single", number: 1 }).error).toContain("不唯一");
+    expect(selectReadingQuestions(duplicate, { kind: "single", number: 1 }).error).toContain("not unique");
   });
 
   it("derives a missing display number from the stable full-module order", () => {
@@ -130,7 +130,7 @@ describe("Reading question selection", () => {
     ]);
     expect(options[0].label).toBe("Passage 1 · One · Questions 14, 18 · Matching Headings");
     expect(selectReadingQuestions(entries, { kind: "group", questionGroupId: "removed-group" }).error)
-      .toContain("题组已不存在");
+      .toContain("question group no longer exists");
   });
 
   it("keeps the existing single-Passage pack selectable by its stored group ID", () => {

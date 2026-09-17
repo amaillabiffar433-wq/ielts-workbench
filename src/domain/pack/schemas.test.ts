@@ -29,6 +29,47 @@ describe("IELTSPackSchema", () => {
     expect(Object.isFrozen(parsed.modules[0].sections)).toBe(true);
   });
 
+  it("accepts ordered, section-bounded transcript cues with explicit cloze answers", () => {
+    const input = structuredClone(originalDemoInput) as unknown as {
+      manifest: typeof manifest;
+      modules: Array<Record<string, unknown> & { type: string; sections: Array<Record<string, unknown>> }>;
+    };
+    const listeningModule = input.modules.find((module) => module.type === "listening")!;
+    const section = listeningModule.sections[0];
+    section.endMs = 4_000;
+    section.transcriptCues = [{
+      id: "transcript-cue-1",
+      startMs: 0,
+      endMs: 1_500,
+      speaker: "Host",
+      text: "Welcome to the Alderwick workshop.",
+      clozeAnswers: ["Alderwick workshop"],
+    }];
+
+    const parsed = parseIeltsPack(input);
+    const parsedListening = parsed.modules.find((module) => module.type === "listening");
+    expect(parsedListening?.type).toBe("listening");
+    if (parsedListening?.type !== "listening") throw new Error("Listening module missing");
+    expect(parsedListening.sections[0].transcriptCues[0].speaker).toBe("Host");
+  });
+
+  it("rejects transcript cues outside their section and cloze answers absent from the source", () => {
+    const input = structuredClone(originalDemoInput) as unknown as {
+      modules: Array<Record<string, unknown> & { type: string; sections: Array<Record<string, unknown>> }>;
+    };
+    const listeningModule = input.modules.find((module) => module.type === "listening")!;
+    const section = listeningModule.sections[0];
+    section.endMs = 4_000;
+    section.transcriptCues = [{
+      id: "transcript-cue-invalid",
+      startMs: 5_000,
+      text: "Verified source text.",
+      clozeAnswers: ["invented"],
+    }];
+
+    expect(IELTSPackSchema.safeParse(input).success).toBe(false);
+  });
+
   it("accepts the original three-Passage Reading sample through the pack schema", () => {
     const parsed = parseIeltsPack({ manifest: multiPassageManifest, modules: [multiPassageReading] });
     const readingModule = parsed.modules[0];

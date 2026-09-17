@@ -60,9 +60,9 @@ export function buildReadingQuestionEntries(module: ReadingModule): ReadingQuest
 }
 
 function availableNumberSummary(entries: readonly ReadingQuestionEntry[]): string {
-  if (entries.length === 0) return "当前 Reading 模块没有可用题目。";
+  if (entries.length === 0) return "This Reading module has no available questions.";
   const numbers = entries.map((entry) => entry.displayNumber);
-  return `当前可用题号为 Question ${Math.min(...numbers)}–${Math.max(...numbers)}。`;
+  return `Available question numbers are ${Math.min(...numbers)}–${Math.max(...numbers)}.`;
 }
 
 function validateUniqueNumber(
@@ -70,8 +70,8 @@ function validateUniqueNumber(
   number: number,
 ): string | null {
   const matches = entries.filter((entry) => entry.displayNumber === number);
-  if (matches.length === 0) return `Question ${number} 不存在于当前 Reading 模块。`;
-  if (matches.length > 1) return `Question ${number} 在题包中不唯一，无法安全选择。`;
+  if (matches.length === 0) return `Question ${number} does not exist in this Reading module.`;
+  if (matches.length > 1) return `Question ${number} is not unique in this pack and cannot be selected safely.`;
   return null;
 }
 
@@ -80,7 +80,7 @@ export function selectReadingQuestions(
   selection: ReadingQuestionSelection,
 ): ReadingQuestionSelectionResult {
   if (entries.length === 0) {
-    return { entries: [], error: "当前 Reading 模块没有可用题目。" };
+    return { entries: [], error: "This Reading module has no available questions." };
   }
 
   if (selection.kind === "all") return { entries, error: null };
@@ -89,23 +89,23 @@ export function selectReadingQuestions(
     const selected = entries.filter((entry) => entry.section.id === selection.sectionId);
     return selected.length > 0
       ? { entries: selected, error: null }
-      : { entries: [], error: "所选 Passage 已不存在或不包含题目。" };
+      : { entries: [], error: "The selected passage no longer exists or contains no questions." };
   }
 
   if (selection.kind === "group") {
     const selected = entries.filter((entry) => entry.group.id === selection.questionGroupId);
     return selected.length > 0
       ? { entries: selected, error: null }
-      : { entries: [], error: "所选题组已不存在或不包含题目。" };
+      : { entries: [], error: "The selected question group no longer exists or contains no questions." };
   }
 
   if (selection.kind === "single") {
     if (!Number.isInteger(selection.number) || selection.number < 1) {
-      return { entries: [], error: "请输入有效的单题题号。" };
+      return { entries: [], error: "Enter a valid question number." };
     }
     const error = validateUniqueNumber(entries, selection.number);
     return error
-      ? { entries: [], error: `${error}${error.includes("不存在") ? ` ${availableNumberSummary(entries)}` : ""}` }
+      ? { entries: [], error: `${error}${error.includes("does not exist") ? ` ${availableNumberSummary(entries)}` : ""}` }
       : {
           entries: entries.filter((entry) => entry.displayNumber === selection.number),
           error: null,
@@ -114,10 +114,10 @@ export function selectReadingQuestions(
 
   if (!Number.isInteger(selection.start) || !Number.isInteger(selection.end)
       || selection.start < 1 || selection.end < 1) {
-    return { entries: [], error: "请输入有效的起止题号。" };
+    return { entries: [], error: "Enter a valid start and end question number." };
   }
   if (selection.start > selection.end) {
-    return { entries: [], error: "起始题号不能大于结束题号。" };
+    return { entries: [], error: "The start question cannot be greater than the end question." };
   }
 
   for (let number = selection.start; number <= selection.end; number += 1) {
@@ -206,18 +206,18 @@ export function questionSelectionLabel(
   module: ReadingModule,
 ): string {
   if (selection.kind === "all") {
-    if (entries.length === 0) return "全部题目";
-    return `全部题目 · Question ${entries[0].displayNumber}–${entries.at(-1)?.displayNumber}`;
+    if (entries.length === 0) return "All questions";
+    return `All questions · Question ${entries[0].displayNumber}–${entries.at(-1)?.displayNumber}`;
   }
   if (selection.kind === "passage") {
     const sectionIndex = module.sections.findIndex((section) => section.id === selection.sectionId);
     const section = module.sections[sectionIndex];
-    return section ? `${passageLabel(section, sectionIndex)} 的题目` : "所选 Passage 的题目";
+    return section ? `${passageLabel(section, sectionIndex)} questions` : "Selected passage questions";
   }
   if (selection.kind === "group") {
     return buildReadingQuestionGroupOptions(entries).find(
       (option) => option.questionGroupId === selection.questionGroupId,
-    )?.label ?? "所选题组";
+    )?.label ?? "Selected question group";
   }
   if (selection.kind === "single") return `Question ${selection.number}`;
   return `Question ${selection.start}–${selection.end}`;

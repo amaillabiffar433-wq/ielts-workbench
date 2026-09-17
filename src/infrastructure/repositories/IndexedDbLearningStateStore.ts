@@ -3,6 +3,8 @@ import { z } from "zod";
 import { IELTSPackSchema, IsoUtcDateTimeSchema } from "../../domain";
 import {
   SessionSnapshotSchema,
+  ReviewItemSchema,
+  VocabularyItemSchema,
   WritingDraftSchema,
   WritingVersionSchema,
 } from "./LearningRepository";
@@ -19,6 +21,8 @@ const BrowserRepositorySnapshotSchema = z
     settings: z.record(z.string(), z.string()),
     drafts: z.array(WritingDraftSchema),
     writingVersions: z.array(WritingVersionSchema),
+    vocabularyItems: z.array(VocabularyItemSchema).optional(),
+    reviewItems: z.array(ReviewItemSchema).optional(),
   })
   .strict();
 

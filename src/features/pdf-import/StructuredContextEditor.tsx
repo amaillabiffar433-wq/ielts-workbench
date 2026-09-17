@@ -1,6 +1,7 @@
 import { ArrowDown, ArrowUp, List, Plus, Table2, Text, TextQuote, Trash2 } from "lucide-react";
 
 import { QuestionGroupContext } from "../../components/QuestionGroupContext/QuestionGroupContext";
+import { confirmAction } from "../../infrastructure/window/windowClose";
 import {
   MAX_QUESTION_CONTEXT_BLOCKS,
   MAX_QUESTION_CONTEXT_LIST_ITEMS,
@@ -54,14 +55,14 @@ export function StructuredContextEditor({
       contextBlocks: group.contextBlocks.map((block) => block.id === blockId ? update(block) : block),
     });
   };
-  const removeBlock = (block: StructuredContextBlockDraft) => {
+  const removeBlock = async (block: StructuredContextBlockDraft) => {
     const bindings = blockBindingCount(block);
-    if (bindings > 0 && !window.confirm(`删除此上下文块会解除 ${bindings} 个作答位置，但不会删除题目或已有答案。确定继续吗？`)) return;
+    if (bindings > 0 && !(await confirmAction(`删除此上下文块会解除 ${bindings} 个作答位置，但不会删除题目或已有答案。确定继续吗？`))) return;
     onChange({ ...group, contextBlocks: group.contextBlocks.filter((candidate) => candidate.id !== block.id) });
   };
-  const resizeTable = (table: StructuredContextTableDraft, rows: number, columns: number) => {
+  const resizeTable = async (table: StructuredContextTableDraft, rows: number, columns: number) => {
     const dropped = droppedBindings(table, rows, columns);
-    if (dropped.length > 0 && !window.confirm(`缩小表格会解除 ${dropped.length} 个题目绑定，但不会删除题目或答案。确定继续吗？`)) return;
+    if (dropped.length > 0 && !(await confirmAction(`缩小表格会解除 ${dropped.length} 个题目绑定，但不会删除题目或答案。确定继续吗？`))) return;
     updateBlock(table.id, () => resizeStructuredContextTable(table, rows, columns));
   };
 
@@ -92,7 +93,7 @@ export function StructuredContextEditor({
             <div>
               <button aria-label="上移上下文块" className="button button--ghost" disabled={blockIndex === 0} onClick={() => onChange({ ...group, contextBlocks: moveArrayItem(group.contextBlocks, blockIndex, blockIndex - 1) })} type="button"><ArrowUp size={13} /></button>
               <button aria-label="下移上下文块" className="button button--ghost" disabled={blockIndex === group.contextBlocks.length - 1} onClick={() => onChange({ ...group, contextBlocks: moveArrayItem(group.contextBlocks, blockIndex, blockIndex + 1) })} type="button"><ArrowDown size={13} /></button>
-              <button aria-label="删除上下文块" className="button button--ghost" onClick={() => removeBlock(block)} type="button"><Trash2 size={13} /></button>
+              <button aria-label="删除上下文块" className="button button--ghost" onClick={() => void removeBlock(block)} type="button"><Trash2 size={13} /></button>
             </div>
           </header>
 
@@ -126,13 +127,13 @@ export function StructuredContextEditor({
           {block.type === "table" && (
             <div className="structured-context-table-editor">
               <div className="structured-context-table-editor__controls">
-                <label>行数<input max={MAX_QUESTION_CONTEXT_TABLE_ROWS} min={1} onChange={(event) => resizeTable(block, Number(event.target.value), block.rows[0].cells.length)} type="number" value={block.rows.length} /></label>
-                <label>列数<input max={MAX_QUESTION_CONTEXT_TABLE_COLUMNS} min={1} onChange={(event) => resizeTable(block, block.rows.length, Number(event.target.value))} type="number" value={block.rows[0].cells.length} /></label>
+                <label>行数<input max={MAX_QUESTION_CONTEXT_TABLE_ROWS} min={1} onChange={(event) => void resizeTable(block, Number(event.target.value), block.rows[0].cells.length)} type="number" value={block.rows.length} /></label>
+                <label>列数<input max={MAX_QUESTION_CONTEXT_TABLE_COLUMNS} min={1} onChange={(event) => void resizeTable(block, block.rows.length, Number(event.target.value))} type="number" value={block.rows[0].cells.length} /></label>
                 <div aria-label="表格行列操作" className="structured-context-table-editor__resize-actions" role="group">
-                  <button aria-label="新增表格行" className="button button--ghost" disabled={block.rows.length >= MAX_QUESTION_CONTEXT_TABLE_ROWS} onClick={() => resizeTable(block, block.rows.length + 1, block.rows[0].cells.length)} type="button"><Plus size={13} />行</button>
-                  <button aria-label="删除最后一行" className="button button--ghost" disabled={block.rows.length <= 1} onClick={() => resizeTable(block, block.rows.length - 1, block.rows[0].cells.length)} type="button"><Trash2 size={13} />行</button>
-                  <button aria-label="新增表格列" className="button button--ghost" disabled={block.rows[0].cells.length >= MAX_QUESTION_CONTEXT_TABLE_COLUMNS} onClick={() => resizeTable(block, block.rows.length, block.rows[0].cells.length + 1)} type="button"><Plus size={13} />列</button>
-                  <button aria-label="删除最后一列" className="button button--ghost" disabled={block.rows[0].cells.length <= 1} onClick={() => resizeTable(block, block.rows.length, block.rows[0].cells.length - 1)} type="button"><Trash2 size={13} />列</button>
+                  <button aria-label="新增表格行" className="button button--ghost" disabled={block.rows.length >= MAX_QUESTION_CONTEXT_TABLE_ROWS} onClick={() => void resizeTable(block, block.rows.length + 1, block.rows[0].cells.length)} type="button"><Plus size={13} />行</button>
+                  <button aria-label="删除最后一行" className="button button--ghost" disabled={block.rows.length <= 1} onClick={() => void resizeTable(block, block.rows.length - 1, block.rows[0].cells.length)} type="button"><Trash2 size={13} />行</button>
+                  <button aria-label="新增表格列" className="button button--ghost" disabled={block.rows[0].cells.length >= MAX_QUESTION_CONTEXT_TABLE_COLUMNS} onClick={() => void resizeTable(block, block.rows.length, block.rows[0].cells.length + 1)} type="button"><Plus size={13} />列</button>
+                  <button aria-label="删除最后一列" className="button button--ghost" disabled={block.rows[0].cells.length <= 1} onClick={() => void resizeTable(block, block.rows.length, block.rows[0].cells.length - 1)} type="button"><Trash2 size={13} />列</button>
                 </div>
                 <label><input checked={block.hasHeaderRow} onChange={(event) => updateBlock(block.id, () => ({ ...block, hasHeaderRow: event.target.checked }))} type="checkbox" />首行为表头</label>
                 <label><input checked={block.hasRowHeaders} onChange={(event) => updateBlock(block.id, () => ({ ...block, hasRowHeaders: event.target.checked }))} type="checkbox" />首列为行标题</label>
@@ -182,8 +183,8 @@ export function StructuredContextEditor({
                     <code>{part.id}</code>
                     <button aria-label={`上移摘要片段 ${partIndex + 1}`} className="button button--ghost" disabled={partIndex === 0} onClick={() => updateBlock(block.id, () => ({ ...block, parts: moveArrayItem(block.parts, partIndex, partIndex - 1) }))} type="button"><ArrowUp size={13} /></button>
                     <button aria-label={`下移摘要片段 ${partIndex + 1}`} className="button button--ghost" disabled={partIndex === block.parts.length - 1} onClick={() => updateBlock(block.id, () => ({ ...block, parts: moveArrayItem(block.parts, partIndex, partIndex + 1) }))} type="button"><ArrowDown size={13} /></button>
-                    <button aria-label={`删除摘要片段 ${partIndex + 1}`} className="button button--ghost" disabled={block.parts.length <= 2} onClick={() => {
-                      if (part.kind === "answer" && !window.confirm("删除此摘要空位会解除题目绑定，但不会删除题目或答案。确定继续吗？")) return;
+                    <button aria-label={`删除摘要片段 ${partIndex + 1}`} className="button button--ghost" disabled={block.parts.length <= 2} onClick={async () => {
+                      if (part.kind === "answer" && !(await confirmAction("删除此摘要空位会解除题目绑定，但不会删除题目或答案。确定继续吗？"))) return;
                       updateBlock(block.id, () => ({ ...block, parts: block.parts.filter((candidate) => candidate.id !== part.id) }));
                     }} type="button"><Trash2 size={13} /></button>
                   </div>

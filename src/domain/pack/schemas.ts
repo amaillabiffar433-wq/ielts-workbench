@@ -537,6 +537,32 @@ export const ReadingModuleSchema = z
     }
   });
 
+export const TranscriptCueSchema = z
+  .object({
+    id: StableIdSchema,
+    startMs: z.number().int().nonnegative(),
+    endMs: z.number().int().positive().optional(),
+    speaker: z.string().trim().min(1).max(80).optional(),
+    text: z.string().trim().min(1),
+    clozeAnswers: z.array(z.string().trim().min(1).max(120)).max(12).default([]),
+  })
+  .strict()
+  .superRefine((cue, context) => {
+    if (cue.endMs !== undefined && cue.endMs <= cue.startMs) {
+      context.addIssue({ code: "custom", path: ["endMs"], message: "Transcript cue endMs must be greater than startMs" });
+    }
+    const normalizedText = cue.text.toLocaleLowerCase("en-US");
+    cue.clozeAnswers.forEach((answer, index) => {
+      if (!normalizedText.includes(answer.toLocaleLowerCase("en-US"))) {
+        context.addIssue({
+          code: "custom",
+          path: ["clozeAnswers", index],
+          message: "Each cloze answer must occur in the transcript cue text",
+        });
+      }
+    });
+  });
+
 export const ListeningSectionSchema = z
   .object({
     id: StableIdSchema,
@@ -544,6 +570,7 @@ export const ListeningSectionSchema = z
     startMs: z.number().int().nonnegative(),
     endMs: z.number().int().positive().optional(),
     contentBlocks: z.array(ContentBlockSchema).default([]),
+    transcriptCues: z.array(TranscriptCueSchema).default([]),
     questionGroups: z.array(QuestionGroupSchema).min(1),
   })
   .strict()
@@ -558,6 +585,29 @@ export const ListeningSectionSchema = z
         message: "endMs must be greater than startMs",
       });
     }
+    section.transcriptCues.forEach((cue, cueIndex) => {
+      if (cue.startMs < section.startMs || (section.endMs !== undefined && cue.startMs >= section.endMs)) {
+        context.addIssue({
+          code: "custom",
+          path: ["transcriptCues", cueIndex, "startMs"],
+          message: "Transcript cue startMs must fall inside its Listening section",
+        });
+      }
+      if (section.endMs !== undefined && cue.endMs !== undefined && cue.endMs > section.endMs) {
+        context.addIssue({
+          code: "custom",
+          path: ["transcriptCues", cueIndex, "endMs"],
+          message: "Transcript cue endMs must not exceed its Listening section",
+        });
+      }
+      if (cueIndex > 0 && cue.startMs < section.transcriptCues[cueIndex - 1].startMs) {
+        context.addIssue({
+          code: "custom",
+          path: ["transcriptCues", cueIndex, "startMs"],
+          message: "Transcript cues must be ordered by startMs",
+        });
+      }
+    });
   });
 
 export const ListeningModuleSchema = z
@@ -933,6 +983,14 @@ const IELTSPackStrictSchema = z
             ["modules", moduleIndex, "sections", sectionIndex, "contentBlocks", blockIndex, "id"],
           ),
         );
+        if (module.type === "listening") {
+          module.sections[sectionIndex].transcriptCues.forEach((cue, cueIndex) =>
+            recordId(
+              cue.id,
+              ["modules", moduleIndex, "sections", sectionIndex, "transcriptCues", cueIndex, "id"],
+            ),
+          );
+        }
         section.questionGroups.forEach((group, groupIndex) => {
           recordId(
             group.id,
@@ -1001,6 +1059,7 @@ export type PackManifest = DeepReadonly<MutablePackManifest>;
 export type PackModule = DeepReadonly<MutablePackModule>;
 export type ReadingModule = DeepReadonly<z.infer<typeof ReadingModuleSchema>>;
 export type ListeningModule = DeepReadonly<z.infer<typeof ListeningModuleSchema>>;
+export type TranscriptCue = DeepReadonly<z.infer<typeof TranscriptCueSchema>>;
 export type WritingModule = DeepReadonly<z.infer<typeof WritingModuleSchema>>;
 export type ContentBlock = DeepReadonly<z.infer<typeof ContentBlockSchema>>;
 export type QuestionContextBlock = DeepReadonly<z.infer<typeof QuestionContextBlockSchema>>;

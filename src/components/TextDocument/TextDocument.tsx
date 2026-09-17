@@ -13,6 +13,7 @@ import {
   vocabularySelectionFromAnchor,
   type VocabularyTextSelection,
 } from "./vocabularySelection";
+import { confirmAction } from "../../infrastructure/window/windowClose";
 
 export type DisplayAnnotation = {
   id: string;
@@ -28,11 +29,11 @@ export type CreateAnnotationInput = {
 };
 
 const styleOptions: Array<{ style: AnnotationStyle; label: string }> = [
-  { style: "highlight-yellow", label: "黄色" },
-  { style: "highlight-green", label: "绿色" },
-  { style: "highlight-blue", label: "蓝色" },
-  { style: "highlight-pink", label: "粉色" },
-  { style: "underline", label: "下划线" },
+  { style: "highlight-yellow", label: "Yellow" },
+  { style: "highlight-green", label: "Green" },
+  { style: "highlight-blue", label: "Blue" },
+  { style: "highlight-pink", label: "Pink" },
+  { style: "underline", label: "Underline" },
 ];
 
 function offsetInside(root: HTMLElement, node: Node, offset: number): number {
@@ -91,15 +92,15 @@ function AnnotatedBlock({
           const notes = active.map((annotation) => annotation.note).filter(Boolean).join(" · ");
           return (
             <button
-              aria-label={`标记文字“${segment.text}”；点击删除${notes ? `；备注：${notes}` : ""}`}
+              aria-label={`Annotated text “${segment.text}”; click to delete${notes ? `; note: ${notes}` : ""}`}
               className={classes.join(" ")}
               key={`${segment.startOffset}-${segment.endOffset}-${segment.annotationIds.join("-")}`}
-              onClick={() => {
-                if (primary && window.confirm(`删除标记“${primary.anchor.quote}”？`)) {
+              onClick={async () => {
+                if (primary && await confirmAction(`Delete the annotation “${primary.anchor.quote}”?`)) {
                   onDelete(primary.id);
                 }
               }}
-              title={notes || "点击删除标记"}
+              title={notes || "Click to delete annotation"}
               type="button"
             >
               {segment.text}
@@ -109,7 +110,7 @@ function AnnotatedBlock({
       </BlockElement>
       {unresolvedAnnotationIds.length > 0 && (
         <p className="text-anchor-warning" role="status">
-          {unresolvedAnnotationIds.length} 个旧标记无法安全定位，未自动显示。
+          {unresolvedAnnotationIds.length} older annotation{unresolvedAnnotationIds.length === 1 ? "" : "s"} could not be located safely and are hidden.
         </p>
       )}
     </>
@@ -133,7 +134,7 @@ export function TextDocument({
 }) {
   const [pendingAnchor, setPendingAnchor] = useState<TextAnchor | null>(null);
   const [note, setNote] = useState("");
-  const [message, setMessage] = useState("选中同一段落中的文字以添加标记。");
+  const [message, setMessage] = useState("Select text within one paragraph to add an annotation.");
   const [selectionPoint, setSelectionPoint] = useState<{ readonly x: number; readonly y: number } | null>(null);
   const [vocabularySaveState, setVocabularySaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
@@ -146,7 +147,7 @@ export function TextDocument({
     if (!startBlock || !endBlock || startBlock !== endBlock) {
       setPendingAnchor(null);
       setSelectionPoint(null);
-      setMessage("一次标记只能位于同一个稳定内容块内，请重新选择。");
+      setMessage("One annotation must stay within a single stable content block. Select again.");
       return;
     }
 
@@ -163,7 +164,7 @@ export function TextDocument({
       if (!/[A-Za-z]/u.test(term) || term.length > 160) {
         setPendingAnchor(null);
         setSelectionPoint(null);
-        setMessage("请选择不超过 160 个字符的英文单词或短语。");
+        setMessage("Select an English word or phrase no longer than 160 characters.");
         return;
       }
       setPendingAnchor(anchor);
@@ -172,21 +173,21 @@ export function TextDocument({
         y: Math.min(window.innerHeight - 56, Math.max(12, event.clientY + 10)),
       });
       setVocabularySaveState("idle");
-      setMessage(`已选中“${anchor.quote}”。请选择标记样式。`);
+      setMessage(`Selected “${anchor.quote}”. Choose an annotation style.`);
     } catch {
       setPendingAnchor(null);
       setSelectionPoint(null);
-      setMessage("没有捕获到可保存的文字选择。");
+      setMessage("No savable text selection was captured.");
     }
   };
 
   const createAnnotation = (style: AnnotationStyle) => {
     if (!pendingAnchor) {
-      setMessage("请先选中同一段落中的文字。");
+      setMessage("First select text within one paragraph.");
       return;
     }
     onCreateAnnotation({ anchor: pendingAnchor, style, note: note.trim() || undefined });
-    setMessage(`已保存“${pendingAnchor.quote}”的标记，两侧相同内容会同步显示。`);
+    setMessage(`Saved the annotation for “${pendingAnchor.quote}”; matching content in both panes updates together.`);
     setPendingAnchor(null);
     setSelectionPoint(null);
     setNote("");
@@ -201,7 +202,7 @@ export function TextDocument({
     try {
       await onSaveVocabulary(vocabularySelectionFromAnchor(block.text, pendingAnchor));
       setVocabularySaveState("saved");
-      setMessage(`已将“${pendingAnchor.quote.trim()}”加入生词本。`);
+      setMessage(`Added “${pendingAnchor.quote.trim()}” to Vocabulary.`);
       window.getSelection()?.removeAllRanges();
       window.setTimeout(() => {
         setPendingAnchor(null);
@@ -210,7 +211,7 @@ export function TextDocument({
       }, 900);
     } catch {
       setVocabularySaveState("error");
-      setMessage("加入生词本失败，请重试。");
+      setMessage("Could not add the selection to Vocabulary. Try again.");
     }
   };
 
@@ -230,10 +231,10 @@ export function TextDocument({
             type="button"
           >
             <BookPlus aria-hidden="true" size={14} />
-            {vocabularySaveState === "saving" ? "保存中…" : vocabularySaveState === "saved" ? "已加入" : "加入生词本"}
+            {vocabularySaveState === "saving" ? "Saving…" : vocabularySaveState === "saved" ? "Added" : "Add to Vocabulary"}
           </button>
           <button
-            aria-label="关闭选词操作"
+            aria-label="Close selection actions"
             className="selection-popover__close"
             onClick={() => { setPendingAnchor(null); setSelectionPoint(null); window.getSelection()?.removeAllRanges(); }}
             type="button"
@@ -242,10 +243,10 @@ export function TextDocument({
       )}
       {!readOnly && (
         <div className="annotation-toolbar" onMouseUp={(event) => event.stopPropagation()}>
-          <div className="annotation-toolbar__styles" aria-label="文字标记样式" role="group">
+          <div className="annotation-toolbar__styles" aria-label="Text annotation styles" role="group">
             {styleOptions.map(({ style, label }) => (
               <button
-                aria-label={`添加${label}${style === "underline" ? "标记" : "高亮"}`}
+                aria-label={`Add ${label.toLowerCase()} ${style === "underline" ? "annotation" : "highlight"}`}
                 className={`annotation-style annotation-style--${style}`}
                 key={style}
                 onClick={() => createAnnotation(style)}
@@ -259,13 +260,13 @@ export function TextDocument({
           </div>
           <label className="annotation-note">
             <MessageSquareText aria-hidden="true" size={15} />
-            <span className="sr-only">标记备注（可选）</span>
+            <span className="sr-only">Annotation note (optional)</span>
             <input
-              aria-label="标记备注（可选）"
+              aria-label="Annotation note (optional)"
               maxLength={160}
               onChange={(event) => setNote(event.target.value)}
               onMouseUp={(event) => event.stopPropagation()}
-              placeholder="可选备注"
+              placeholder="Optional note"
               type="text"
               value={note}
             />

@@ -390,7 +390,21 @@ struct ListeningSectionV1 {
     end_ms: Option<u64>,
     #[serde(default)]
     content_blocks: Vec<ContentBlockV1>,
+    #[serde(default)]
+    transcript_cues: Vec<TranscriptCueV1>,
     question_groups: Vec<QuestionGroupV1>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct TranscriptCueV1 {
+    id: String,
+    start_ms: u64,
+    end_ms: Option<u64>,
+    speaker: Option<String>,
+    text: String,
+    #[serde(default)]
+    cloze_answers: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -2227,6 +2241,37 @@ fn validate_listening_section(
             stable_ids,
             errors,
         );
+    }
+    for (cue_index, cue) in section.transcript_cues.iter().enumerate() {
+        let cue_path = format!("{path}.transcriptCues[{cue_index}]");
+        stable_ids.record(&cue.id, &format!("{cue_path}.id"), errors);
+        if cue.text.trim().is_empty() {
+            errors.push(issue("INVALID_TRANSCRIPT_CUE", "Transcript cue text cannot be empty.", Some(&format!("{cue_path}.text"))));
+        }
+        if cue.speaker.as_ref().is_some_and(|speaker| speaker.trim().is_empty() || speaker.chars().count() > 80) {
+            errors.push(issue("INVALID_TRANSCRIPT_CUE", "Transcript speaker must contain 1 to 80 characters.", Some(&format!("{cue_path}.speaker"))));
+        }
+        if cue.start_ms > MAX_SAFE_JSON_INTEGER || cue.end_ms.is_some_and(|end_ms| end_ms > MAX_SAFE_JSON_INTEGER) {
+            errors.push(issue("INVALID_TRANSCRIPT_CUE", "Transcript timestamps must be JavaScript-safe integers.", Some(&cue_path)));
+        }
+        if cue.start_ms < section.start_ms || section.end_ms.is_some_and(|end_ms| cue.start_ms >= end_ms) {
+            errors.push(issue("INVALID_TRANSCRIPT_CUE", "Transcript cue startMs must fall inside its Listening section.", Some(&format!("{cue_path}.startMs"))));
+        }
+        if cue.end_ms.is_some_and(|end_ms| end_ms <= cue.start_ms || section.end_ms.is_some_and(|section_end| end_ms > section_end)) {
+            errors.push(issue("INVALID_TRANSCRIPT_CUE", "Transcript cue endMs must be after startMs and inside its Listening section.", Some(&format!("{cue_path}.endMs"))));
+        }
+        if cue_index > 0 && cue.start_ms < section.transcript_cues[cue_index - 1].start_ms {
+            errors.push(issue("INVALID_TRANSCRIPT_CUE", "Transcript cues must be ordered by startMs.", Some(&format!("{cue_path}.startMs"))));
+        }
+        if cue.cloze_answers.len() > 12 {
+            errors.push(issue("INVALID_TRANSCRIPT_CUE", "A transcript cue can contain at most 12 cloze answers.", Some(&format!("{cue_path}.clozeAnswers"))));
+        }
+        let normalized_text = cue.text.to_lowercase();
+        for (answer_index, answer) in cue.cloze_answers.iter().enumerate() {
+            if answer.trim().is_empty() || answer.chars().count() > 120 || !normalized_text.contains(&answer.to_lowercase()) {
+                errors.push(issue("INVALID_TRANSCRIPT_CUE", "Each cloze answer must contain 1 to 120 characters and occur in the cue text.", Some(&format!("{cue_path}.clozeAnswers[{answer_index}]"))));
+            }
+        }
     }
     validate_question_groups(
         &section.question_groups,

@@ -8,6 +8,7 @@ import { SegmentedControl } from "../../../components/common/SegmentedControl";
 import { useWorkbenchStore } from "../../../stores/workbenchStore";
 import {
   closeCurrentWindow,
+  confirmAction,
   confirmDiscardAfterSaveFailure,
   listenForCloseRequested,
 } from "../../../infrastructure/window/windowClose";
@@ -371,8 +372,8 @@ export function WritingPage() {
         <button
           className="button button--primary"
           disabled={saveState === "saving"}
-          onClick={() => {
-            if (window.confirm("提交会创建一个不可变快照，仍保留当前草稿。确认提交？")) void createVersion("submitted");
+          onClick={async () => {
+            if (await confirmAction("提交会创建一个不可变快照，仍保留当前草稿。确认提交？")) void createVersion("submitted");
           }}
           type="button"
         ><CheckCircle2 aria-hidden="true" size={15} /> 提交快照</button>

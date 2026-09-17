@@ -47,9 +47,9 @@ describe("QuestionRenderer Reading v3 controls", () => {
       options: [{ id: "person-a", label: "A", text: "Mina" }, { id: "person-b", label: "B", text: "Tomas" }], correctOptionId: "person-b",
     })} />);
 
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "第 20 题匹配选项" }), "person-b");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Matching option for question 20" }), "person-b");
     expect(onAnswer).toHaveBeenCalledWith("matching-q", "person-b");
-    expect(screen.getByText("该题组允许重复使用选项")).toBeInTheDocument();
+    expect(screen.getByText("Options may be reused in this group")).toBeInTheDocument();
   });
 
   it("renders a completion-bound text answer as a compact inline control", async () => {
@@ -69,7 +69,7 @@ describe("QuestionRenderer Reading v3 controls", () => {
     expect(inlineQuestion?.querySelector(".question__prompt")).toBeNull();
     expect(inlineQuestion?.querySelector(".question__limit")).toBeNull();
 
-    const input = screen.getByRole("textbox", { name: "第 1 题答案" });
+    const input = screen.getByRole("textbox", { name: "Answer for question 1" });
     await userEvent.type(input, "s");
     expect(onAnswer).toHaveBeenCalledWith("completion-q", "s");
   });
@@ -87,12 +87,12 @@ describe("QuestionRenderer Reading v3 controls", () => {
       question={item}
     />);
 
-    const flag = screen.getByRole("button", { name: "标记第 7 题稍后复查" });
+    const flag = screen.getByRole("button", { name: "Flag question 7 for review" });
     expect(flag).toHaveAttribute("aria-pressed", "false");
     await userEvent.click(flag);
     expect(onToggleFlag).toHaveBeenCalledOnce();
 
     rerender(<QuestionRenderer flagged instanceId="right" onAnswer={vi.fn()} onToggleFlag={onToggleFlag} question={item} />);
-    expect(screen.getByRole("button", { name: "取消第 7 题稍后复查" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Remove review flag from question 7 for review" })).toHaveAttribute("aria-pressed", "true");
   });
 });

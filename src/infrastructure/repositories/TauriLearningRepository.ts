@@ -28,8 +28,12 @@ import {
   SaveVocabularyItemInputSchema,
   UpdateVocabularyItemInputSchema,
   VocabularyItemSchema,
+  ReviewItemSchema,
+  ReviewRatingSchema,
+  SaveReviewItemInputSchema,
   WorkspaceSummarySchema,
   WorkspaceBackupSummarySchema,
+  ObsidianExportResultSchema,
   WritingDraftSchema,
   WritingVersionSchema,
   deriveRecentSessionId,
@@ -50,9 +54,13 @@ import {
   type SaveVocabularyItemInput,
   type UpdateVocabularyItemInput,
   type VocabularyItem,
+  type ReviewItem,
+  type ReviewRating,
+  type SaveReviewItemInput,
   type WritingDraft,
   type WritingVersion,
   type WorkspaceBackupSummary,
+  type ObsidianExportResult,
 } from "./LearningRepository";
 
 export type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
@@ -359,6 +367,15 @@ export class TauriLearningRepository implements LearningRepository {
     return this.getBootstrapState();
   }
 
+  async exportObsidianDailyBrief(vaultPath: string, date: string, markdown: string): Promise<ObsidianExportResult> {
+    const input = z.object({
+      vaultPath: z.string().trim().min(1),
+      date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/u),
+      markdown: z.string().trim().min(1).max(128 * 1024),
+    }).parse({ vaultPath, date, markdown });
+    return ObsidianExportResultSchema.parse(await this.invokeCommand("export_obsidian_daily_brief", input));
+  }
+
   async listInstalledPacks(): Promise<InstalledPackSummary[]> {
     const records = z.array(z.unknown()).parse(await this.invokeCommand("list_installed_packs"));
     return records.map(mapInstalledPack);
@@ -563,6 +580,28 @@ export class TauriLearningRepository implements LearningRepository {
     await this.invokeCommand("delete_vocabulary_item", {
       itemId: StableIdSchema.parse(itemId),
     });
+  }
+
+  async listReviewItems(): Promise<ReviewItem[]> {
+    return z.array(ReviewItemSchema).parse(
+      await this.invokeCommand("list_review_items"),
+    );
+  }
+
+  async saveReviewItem(input: SaveReviewItemInput): Promise<ReviewItem> {
+    const validated = SaveReviewItemInputSchema.parse(input);
+    return ReviewItemSchema.parse(
+      await this.invokeCommand("save_review_item", { input: validated }),
+    );
+  }
+
+  async gradeReviewItem(itemId: string, rating: ReviewRating): Promise<ReviewItem> {
+    return ReviewItemSchema.parse(
+      await this.invokeCommand("grade_review_item", {
+        itemId: StableIdSchema.parse(itemId),
+        rating: ReviewRatingSchema.parse(rating),
+      }),
+    );
   }
 
   async getSetting(key: string): Promise<string | null> {

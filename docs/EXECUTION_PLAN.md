@@ -1,5 +1,24 @@
 # IELTS Workbench 执行计划
 
+## 2026-09-17：IELTS Personal Operating System 产品级重构
+
+本轮唯一源码工作副本为 `D:\Projects\雅思or算法软件项目`，分支 `codex/product-os-rebuild`。开始实现前已创建完整 Git bundle、工作树 patch 与逐文件副本备份：`D:\IELTS-Workbench-Backups\20260917-090322-pre-product-os-rebuild-complete`；原有 2026-09-16 P0 工作先通过 242 项前端测试、lint、Vite build 与 38 项 Rust 测试，再以 `f085806` 建立可回退检查点。`D:\downloads\雅思`、DDDD 安装器、用户工作区与 Obsidian 库均按只读源处理，任何学习记录写入必须经过独立实现与定点验证。
+
+| 阶段 | 内容 | 状态 |
+| --- | --- | --- |
+| R0 | 审计 Git/工作树/历史成果，备份未提交修改并建立重构分支 | 已完成 |
+| R1 | 只读扫描 `D:\downloads\雅思`，生成 SHA-256 清单、重复项统计与 Cambridge 4–20 可导入性报告 | 已完成；889 个文件、14.228 GiB，未发现 Cambridge 21，扫描版 PDF 需 OCR + 人工确认 |
+| R2 | 对 DDDD 安装器做合法静态审计，记录可借鉴产品行为与明确拒绝移植的在线/账号设计 | 已完成静态解包；未运行程序、未登录、未访问私有接口；证据写入 `docs/rebuild/02-dddd-analysis.md` |
+| R3 | 建立 `docs/rebuild/00`–`10` 的现状、数据、IA、设计、体验、迁移和验收基线 | 已完成；包含用户要求的精确文件名与最终证据 |
+| R4 | 重建 English-first 顶层 IA：Home / Library / Review / Progress / Settings，并保留稳定领域 ID 与现有仓储层 | 已完成；Home/Progress 使用真实 repository 聚合 |
+| R5 | 完成 Reading 54/46 工作台、双击复位、键盘/标记/生词/自动保存与三层结果体验 | 已完成并通过原生提交/回源验收 |
+| R6 | 完成 Listening Exam/Study、位置恢复、±5 秒、波形/转写/精听能力的数据与 UI 边界 | 已完成；Exam 泄漏边界与 Study 开关均有测试 |
+| R7 | 建立 Review 调度、Progress 真实统计、Obsidian 日报导出和对应 SQLite migration | 已完成；migration 0005、Review 事件、真实统计与 Obsidian 写后 hash 均已验收 |
+| R8 | 构建 Cambridge 私有导入管线，先以 C20 Test 1 做 OCR/人工校核闭环，再按可验证范围扩展 | 现有统一 IELTSPack/PDF/OCR 管线已保留并补全证据边界；C17 已验证，C20 因缺可靠 Answer Key/Transcript 不作伪评分导入 |
+| R9 | 全量测试、Release 构建、隔离工作区原生验收、1366/1920 截图与 SQLite/文件审计 | 已完成；47/47 前端文件、258/258 测试、41/41 Rust、Release EXE、18 张双尺寸页面截图 + 1 张原生窗口证据 |
+
+验收硬边界：不运行或逆向绕过 DDDD 的认证/加密；不复制其源码、资源或视觉资产；不提交 Cambridge 内容；不把 Vite 预览当桌面验收；不使用假进度、假统计或模拟原生证据；每次 schema 变化均以新 migration、旧库升级测试和回滚备份为前提。
+
 ## 2026-09-16：日常使用前 P0 收尾（题目标记、词汇、Cambridge 书架）
 
 工作副本为 `D:\Projects\雅思or算法软件项目`；`D:\IELTS-Workbench*` 是工作区/验收数据，不作为源码目录。开始前保留现有 4 个未提交的 completion inline 修复，并建立只读 Git 快照引用 `refs/codex-snapshots/20260916-pre-daily-use`（`0f5e01f62898ba7fe23aabf673c77eb3f1bee540`）。正式学习工作区 `D:\IELTS-Workbench` 仅用于修改前只读复现，数据库 SHA-256 在启动前后均为 `49FEC6255B349AA022D086CAF53E3B1A4A6E6C0E12FD1DCDA88FEA8F83AB0CFF`；后续写入验收一律使用隔离副本。
@@ -264,3 +283,15 @@
 | A | Reproduce the completion-layout defect in the native Reading workbench and identify the invalid block-in-inline rendering path | Complete |
 | B | Render completion-bound text answers as compact inline controls without repeating prompts or word-limit text | Complete |
 | C | Add focused component coverage, run lint/tests/build, rebuild the Tauri Release, and repeat native visual acceptance | Complete: lint passed; 235/235 full tests and 16/16 focused tests passed; production and Tauri Release builds passed; native Q1-Q5 visual check passed |
+
+# Current slice: product operating-system rebuild (2026-09-17)
+
+| Step | Work | Status |
+| --- | --- | --- |
+| A | Preserve the live tree, audit the active checkout, local IELTS source library and DDDD installer, and record the evidence boundary | Complete: full Git/worktree backup, SHA-256 material inventory, Cambridge 4–20 coverage audit and static-only DDDD audit recorded under `docs/rebuild/` |
+| B | Replace the shell with Home/Library/Review/Progress/Settings, preserve stable practice routes, and make Home/Progress derive from real repository data | Complete; automated and native acceptance passed |
+| C | Upgrade Reading/Listening/Review with persisted layout/audio state, verified transcript cues, review scheduling and source audio links while preserving Exam restrictions | Complete; focused and full frontend/Rust gates passed |
+| D | Add explicit, scoped Obsidian daily-brief export with backup and hash verification | Complete; native first write and idempotent second export verified |
+| E | Back up the live learning workspace, apply migration 0005, run full frontend/Rust/build/no-bundle gates, exercise restart/persistence, and capture native screenshots at 1366×768 and 1920×1080 | Complete; evidence and remaining limitations are recorded in `docs/rebuild/10-acceptance-report.md` |
+
+Safety boundary: the verified Cambridge 17 workspace packs remain private user data outside Git. Cambridge 20 source PDFs/audio were inventoried, but no graded C20 pack will be claimed or installed until OCR text and an authoritative answer key are manually verified.

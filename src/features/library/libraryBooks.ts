@@ -38,7 +38,7 @@ export function groupLibraryBooks(packs: readonly IELTSPack[]): BookEntry[] {
   return [...groups.entries()]
     .map(([key, value]) => ({ key, ...value }))
     .sort((left, right) => {
-      if (left.cambridgeNumber && right.cambridgeNumber) return left.cambridgeNumber - right.cambridgeNumber;
+      if (left.cambridgeNumber && right.cambridgeNumber) return right.cambridgeNumber - left.cambridgeNumber;
       if (left.cambridgeNumber) return -1;
       if (right.cambridgeNumber) return 1;
       return left.title.localeCompare(right.title);

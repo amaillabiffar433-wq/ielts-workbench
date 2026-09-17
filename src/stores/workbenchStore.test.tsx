@@ -167,11 +167,11 @@ describe("canonical shared-pane state", () => {
 
     vi.spyOn(window, "confirm").mockReturnValue(true);
     render(<MirrorText />);
-    expect(screen.getAllByRole("button", { name: /标记文字/ })).toHaveLength(2);
-    const secondRenderedAnnotation = screen.getAllByRole("button", { name: /标记文字/ })[1];
+    expect(screen.getAllByRole("button", { name: /Annotated text/ })).toHaveLength(2);
+    const secondRenderedAnnotation = screen.getAllByRole("button", { name: /Annotated text/ })[1];
     if (!secondRenderedAnnotation) throw new Error("Second annotation mirror is missing");
     await userEvent.click(secondRenderedAnnotation);
-    await waitFor(() => expect(screen.queryAllByRole("button", { name: /标记文字/ })).toHaveLength(0));
+    await waitFor(() => expect(screen.queryAllByRole("button", { name: /Annotated text/ })).toHaveLength(0));
     expect((await store.getState().repository.loadSession(session.sessionId))?.annotations).toHaveLength(0);
   });
 

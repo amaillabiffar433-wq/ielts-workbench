@@ -4,12 +4,14 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./AppShell/AppShell";
 import { ImportCenterPage } from "../features/import-center/ImportCenterPage";
 import { PdfImportPage } from "../features/pdf-import/PdfImportPage";
+import { HomePage } from "../features/home/HomePage";
 import { LibraryShelfPage } from "../features/library/LibraryShelfPage";
 import { OnboardingPage } from "../features/onboarding/OnboardingPage";
 import { ListeningPage } from "../features/practice/listening/ListeningPage";
 import { ReadingPage } from "../features/practice/reading/ReadingPage";
 import { WritingPage } from "../features/practice/writing/WritingPage";
 import { ReviewPage } from "../features/review/ReviewPage";
+import { ProgressPage } from "../features/progress/ProgressPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { VocabularyPage } from "../features/vocabulary/VocabularyPage";
 import { useWorkbenchStore } from "../stores/workbenchStore";
@@ -41,16 +43,16 @@ function WorkspaceGate() {
   const initialize = useWorkbenchStore((state) => state.initialize);
 
   if (phase === "idle" || phase === "loading") {
-    return <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>正在读取本地工作区…</span></div></div>;
+    return <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>Loading the local workspace…</span></div></div>;
   }
   if (phase === "error" && !bootstrap?.workspace) {
     return (
       <div className="app-loading">
         <div className="app-loading__panel">
           <AlertTriangle aria-hidden="true" color="var(--danger)" size={28} />
-          <strong>无法读取工作区状态</strong>
-          <span>{error ?? "未知错误"}</span>
-          <button className="button" onClick={() => void initialize()} type="button"><RefreshCw aria-hidden="true" size={15} /> 重试</button>
+          <strong>Unable to read workspace state</strong>
+          <span>{error ?? "Unknown error"}</span>
+          <button className="button" onClick={() => void initialize()} type="button"><RefreshCw aria-hidden="true" size={15} /> Retry</button>
         </div>
       </div>
     );
@@ -63,7 +65,7 @@ function DefaultRoute() {
   const phase = useWorkbenchStore((state) => state.bootstrapPhase);
   const workspace = useWorkbenchStore((state) => state.bootstrap?.workspace);
   if (phase === "idle" || phase === "loading") return <div className="app-loading"><span className="spinner" /></div>;
-  return <Navigate replace to={workspace ? "/library" : "/onboarding"} />;
+  return <Navigate replace to={workspace ? "/home" : "/onboarding"} />;
 }
 
 export function App() {
@@ -76,6 +78,7 @@ export function App() {
       <Routes>
         <Route element={<OnboardingPage />} path="/onboarding" />
         <Route element={<WorkspaceGate />}>
+          <Route element={<HomePage />} path="/home" />
           <Route element={<LibraryShelfPage />} path="/library" />
           <Route element={<ImportCenterPage />} path="/import" />
           <Route element={<PdfImportPage />} path="/import/pdf" />
@@ -83,6 +86,7 @@ export function App() {
           <Route element={<ListeningPage />} path="/practice/listening" />
           <Route element={<WritingPage />} path="/practice/writing" />
           <Route element={<ReviewPage />} path="/review" />
+          <Route element={<ProgressPage />} path="/progress" />
           <Route element={<VocabularyPage />} path="/vocabulary" />
           <Route element={<SettingsPage />} path="/settings" />
         </Route>

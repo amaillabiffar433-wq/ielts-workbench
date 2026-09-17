@@ -4,10 +4,10 @@ import "./common.css";
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
 const labels: Record<SaveState, string> = {
-  idle: "尚无更改",
-  saving: "正在保存",
-  saved: "已自动保存",
-  error: "保存失败",
+  idle: "No changes",
+  saving: "Saving",
+  saved: "Autosaved",
+  error: "Save failed",
 };
 
 export function SaveStatus({ state, detail }: { state: SaveState; detail?: string }) {

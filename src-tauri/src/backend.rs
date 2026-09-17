@@ -4,8 +4,8 @@ use rusqlite::Connection;
 
 use crate::{
     error::{BackendError, Result},
-    models::{BootstrapState, WorkspaceBackupSummary, WorkspaceInfo},
-    backup, packs, storage,
+    models::{BootstrapState, ObsidianExportResult, WorkspaceBackupSummary, WorkspaceInfo},
+    backup, obsidian, packs, storage,
     workspace::{BootstrapStore, Workspace},
 };
 
@@ -89,6 +89,12 @@ impl AppBackend {
         let workspace = backup::restore_workspace_backup(backup_path, destination_parent)?;
         self.bootstrap.save(&workspace)?;
         workspace.info()
+    }
+
+    pub fn export_obsidian_daily_brief(&self, vault_path: &str, date: &str, markdown: &str) -> Result<ObsidianExportResult> {
+        let _guard = self.lock_mutation()?;
+        let (workspace, _) = self.workspace_and_database()?;
+        obsidian::export_daily_brief(workspace.root(), vault_path, date, markdown)
     }
 
     pub fn lock_mutation(&self) -> Result<std::sync::MutexGuard<'_, ()>> {

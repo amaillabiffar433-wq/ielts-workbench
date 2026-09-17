@@ -14,7 +14,7 @@ use crate::{
         CreateWritingVersionInput, InstalledPackRecord, LoadedPack, PackMediaPayload,
         PackValidationReport, PracticeSessionRecord, SaveAnnotationInput, SaveAnswerInput,
         SaveWritingDraftInput, SelectedPdfPayload, SessionSnapshot, SettingRecord, WorkspaceInfo,
-        WritingDraftRecord, WritingVersionRecord,
+        ObsidianExportResult, WritingDraftRecord, WritingVersionRecord,
     },
     packs,
     storage::repositories,
@@ -23,6 +23,16 @@ use crate::{
 type CommandResult<T> = std::result::Result<T, CommandError>;
 
 const MAX_SELECTED_PDF_BYTES: u64 = 64 * 1024 * 1024;
+
+#[tauri::command]
+pub fn export_obsidian_daily_brief(
+    state: State<'_, AppBackend>,
+    vault_path: String,
+    date: String,
+    markdown: String,
+) -> CommandResult<ObsidianExportResult> {
+    state.export_obsidian_daily_brief(&vault_path, &date, &markdown).map_err(Into::into)
+}
 
 #[tauri::command]
 pub async fn select_pdf_file(app: AppHandle) -> CommandResult<Option<SelectedPdfPayload>> {
@@ -294,6 +304,55 @@ pub fn delete_vocabulary_item(
 ) -> CommandResult<bool> {
     let (_, connection) = state.workspace_and_database().map_err(CommandError::from)?;
     repositories::delete_vocabulary_item(&connection, &item_id).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn list_review_items(
+    state: State<'_, AppBackend>,
+) -> CommandResult<Vec<crate::models::ReviewItemRecord>> {
+    let (_, connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    repositories::list_review_items(&connection).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn save_review_item(
+    state: State<'_, AppBackend>,
+    input: crate::models::SaveReviewItemInput,
+) -> CommandResult<crate::models::ReviewItemRecord> {
+    let (workspace, connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    if input.source_kind != "vocabulary" {
+        let pack_id = input.pack_id.as_deref().ok_or_else(|| CommandError::from(
+            BackendError::InvalidInput("Question review requires a pack ID.".to_string())
+        ))?;
+        let test_id = input.test_id.as_deref().ok_or_else(|| CommandError::from(
+            BackendError::InvalidInput("Question review requires a test ID.".to_string())
+        ))?;
+        let module_type = input.module_type.as_deref().ok_or_else(|| CommandError::from(
+            BackendError::InvalidInput("Question review requires a module type.".to_string())
+        ))?;
+        let question_id = input.question_id.as_deref().ok_or_else(|| CommandError::from(
+            BackendError::InvalidInput("Question review requires a question ID.".to_string())
+        ))?;
+        packs::ensure_installed_question_id(
+            &workspace,
+            &connection,
+            pack_id,
+            test_id,
+            module_type,
+            question_id,
+        ).map_err(CommandError::from)?;
+    }
+    repositories::save_review_item(&connection, input).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn grade_review_item(
+    state: State<'_, AppBackend>,
+    item_id: String,
+    rating: String,
+) -> CommandResult<crate::models::ReviewItemRecord> {
+    let (_, mut connection) = state.workspace_and_database().map_err(CommandError::from)?;
+    repositories::grade_review_item(&mut connection, &item_id, &rating).map_err(Into::into)
 }
 
 #[tauri::command]

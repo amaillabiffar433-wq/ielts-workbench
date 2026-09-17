@@ -5,6 +5,7 @@ import { Link } from "react-router-dom";
 import { PageHeader } from "../../components/common/PageHeader";
 import type { VocabularyItem, VocabularyLearningState } from "../../infrastructure/repositories/LearningRepository";
 import { useWorkbenchStore } from "../../stores/workbenchStore";
+import { confirmAction } from "../../infrastructure/window/windowClose";
 import { buildPracticeRoute } from "../practice/practiceRoute";
 import { saveVocabularyExport, type VocabularyExportFormat } from "./vocabularyExport";
 import "./vocabulary.css";
@@ -128,7 +129,7 @@ export function VocabularyPage() {
               {expanded && <div className="vocabulary-row__detail">
                 <dl><div><dt>原句</dt><dd>{item.sentence || "未保存"}</dd></div><div><dt>前后文</dt><dd>{item.contextBefore}<mark>{item.term}</mark>{item.contextAfter}</dd></div><div><dt>来源</dt><dd>{sourceLabel(item)}{item.sourceQuestionNumber ? ` · Question ${item.sourceQuestionNumber}` : ""}</dd></div></dl>
                 <label>我的备注<textarea defaultValue={item.note} maxLength={2000} onBlur={(event) => { if (event.target.value !== item.note) void update(item, { note: event.target.value }).catch((nextError: unknown) => setError(nextError instanceof Error ? nextError.message : String(nextError))); }} placeholder="补充搭配、用法或复习提示" /></label>
-                <div className="vocabulary-row__actions">{route && <Link className="button" to={route}>回到原文</Link>}<button className="button button--ghost" onClick={() => { if (!window.confirm(`删除生词“${item.term}”？`)) return; void repository.deleteVocabularyItem(item.id).then(() => { setItems((current) => current.filter((candidate) => candidate.id !== item.id)); setSelectedIds((current) => { const next = new Set(current); next.delete(item.id); return next; }); }).catch((nextError: unknown) => setError(nextError instanceof Error ? nextError.message : String(nextError))); }} type="button"><Trash2 aria-hidden="true" size={14} />删除</button></div>
+                <div className="vocabulary-row__actions">{route && <Link className="button" to={route}>回到原文</Link>}<button className="button button--ghost" onClick={async () => { if (!(await confirmAction(`删除生词“${item.term}”？`))) return; void repository.deleteVocabularyItem(item.id).then(() => { setItems((current) => current.filter((candidate) => candidate.id !== item.id)); setSelectedIds((current) => { const next = new Set(current); next.delete(item.id); return next; }); }).catch((nextError: unknown) => setError(nextError instanceof Error ? nextError.message : String(nextError))); }} type="button"><Trash2 aria-hidden="true" size={14} />删除</button></div>
               </div>}
             </article>;
           })}

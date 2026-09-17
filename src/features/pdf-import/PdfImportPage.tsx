@@ -16,7 +16,7 @@ import { PageHeader } from "../../components/common/PageHeader";
 import type { SaveState } from "../../components/common/SaveStatus";
 import { buildPracticeRoute } from "../practice/practiceRoute";
 import { useWorkbenchStore } from "../../stores/workbenchStore";
-import { closeCurrentWindow, listenForCloseRequested } from "../../infrastructure/window/windowClose";
+import { closeCurrentWindow, confirmAction, listenForCloseRequested } from "../../infrastructure/window/windowClose";
 import { BrowserPdfSourceAdapter } from "./BrowserPdfSourceAdapter";
 import { TauriPdfSourceAdapter } from "./TauriPdfSourceAdapter";
 import { isTauriRuntime } from "../../infrastructure/repositories/runtime";
@@ -238,11 +238,11 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
       void flushStructuredDraft().then(async () => {
         allowCloseRef.current = true;
         await closeCurrentWindow();
-      }).catch((nextError: unknown) => {
+      }).catch(async (nextError: unknown) => {
         if (!active) return;
         setDraftSaveState("error");
         setError(`关闭前保存草稿失败：${errorMessage(nextError)}`);
-        if (window.confirm("结构化导入草稿保存失败。是否放弃本次未保存的更改并退出？")) {
+        if (await confirmAction("结构化导入草稿保存失败。是否放弃本次未保存的更改并退出？")) {
           allowCloseRef.current = true;
           void closeCurrentWindow();
         }
@@ -554,7 +554,7 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
 
   const discardCurrentStructuredDraft = async () => {
     if (!structuredDraft) return;
-    if (!window.confirm("只删除这份未安装的结构化导入草稿？来源 PDF、已安装题包和学习数据都不会删除。")) return;
+    if (!(await confirmAction("只删除这份未安装的结构化导入草稿？来源 PDF、已安装题包和学习数据都不会删除。"))) return;
     setBusy(true);
     setError(null);
     try {

@@ -5,6 +5,7 @@ import type { SaveState } from "../../components/common/SaveStatus";
 import { SaveStatus } from "../../components/common/SaveStatus";
 import { QuestionGroupContext } from "../../components/QuestionGroupContext/QuestionGroupContext";
 import { boundQuestionIdsFromContext } from "../../components/QuestionGroupContext/questionGroupContextModel";
+import { confirmAction } from "../../infrastructure/window/windowClose";
 import { StructuredContextEditor } from "./StructuredContextEditor";
 import { StructuredBatchPanel } from "./StructuredBatchPanel";
 import { PdfRegionEditor } from "./PdfRegionEditor";
@@ -207,10 +208,10 @@ export function StructuredImportEditor({
     setActiveQuestionId("");
   };
 
-  const removePassage = (passage: StructuredPassageDraft) => {
+  const removePassage = async (passage: StructuredPassageDraft) => {
     const hasContent = passage.contentBlocks.some((block) => block.text.trim())
       || passage.questionGroups.some((group) => group.questions.length > 0);
-    if (hasContent && !window.confirm(`删除“${passage.title}”会同时移除 ${impactDescription(passage)}。来源快照不会删除，相关片段会在校验中要求重新分配。确定继续吗？`)) return;
+    if (hasContent && !(await confirmAction(`删除“${passage.title}”会同时移除 ${impactDescription(passage)}。来源快照不会删除，相关片段会在校验中要求重新分配。确定继续吗？`))) return;
     onChange(touchStructuredDraft(draft, {
       passages: draft.passages.filter((item) => item.id !== passage.id),
       editorState: { ...draft.editorState, activePassageId: null, activeGroupId: null, activeQuestionId: null },
@@ -220,8 +221,8 @@ export function StructuredImportEditor({
     setActiveQuestionId("");
   };
 
-  const removeGroup = (passageId: string, group: StructuredGroupDraft) => {
-    if (group.questions.length > 0 && !window.confirm(`删除题组“${group.title || group.id}”会同时移除 ${group.questions.length} 道题。确定继续吗？`)) return;
+  const removeGroup = async (passageId: string, group: StructuredGroupDraft) => {
+    if (group.questions.length > 0 && !(await confirmAction(`删除题组“${group.title || group.id}”会同时移除 ${group.questions.length} 道题。确定继续吗？`))) return;
     const updated = updatePassage(draft, passageId, (passage) => ({
       ...passage,
       questionGroups: passage.questionGroups.filter((item) => item.id !== group.id),
@@ -233,11 +234,11 @@ export function StructuredImportEditor({
     setActiveQuestionId("");
   };
 
-  const removeQuestion = (group: StructuredGroupDraft, question: StructuredQuestionDraft) => {
+  const removeQuestion = async (group: StructuredGroupDraft, question: StructuredQuestionDraft) => {
     const isBound = group.contextBlocks.some((block) => block.type === "table"
       ? block.rows.some((row) => row.cells.some((cell) => cell.questionId === question.id))
       : block.type === "completion" && block.parts.some((part) => part.kind === "answer" && part.questionId === question.id));
-    if (isBound && !window.confirm(`Question ${question.number} 已绑定到结构化作答位置。删除题目会同时解除该位置，但不会删除已安装题包或历史 Session。确定继续吗？`)) return;
+    if (isBound && !(await confirmAction(`Question ${question.number} 已绑定到结构化作答位置。删除题目会同时解除该位置，但不会删除已安装题包或历史 Session。确定继续吗？`))) return;
     onChange(updateGroup(draft, group.id, (item) => ({
       ...item,
       contextBlocks: item.contextBlocks.map((block) => block.type === "table"
@@ -342,7 +343,7 @@ export function StructuredImportEditor({
                   <div className="pdf-actions">
                     <button aria-label={`上移 ${passage.title}`} className="button button--ghost" disabled={passageIndex === 0} onClick={(event) => { event.stopPropagation(); onChange(touchStructuredDraft(draft, { passages: moveArrayItem(draft.passages, passageIndex, passageIndex - 1) })); }} type="button"><ArrowUp size={14} /></button>
                     <button aria-label={`下移 ${passage.title}`} className="button button--ghost" disabled={passageIndex === draft.passages.length - 1} onClick={(event) => { event.stopPropagation(); onChange(touchStructuredDraft(draft, { passages: moveArrayItem(draft.passages, passageIndex, passageIndex + 1) })); }} type="button"><ArrowDown size={14} /></button>
-                    <button aria-label={`删除 ${passage.title}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); removePassage(passage); }} type="button"><Trash2 size={14} /></button>
+                    <button aria-label={`删除 ${passage.title}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); void removePassage(passage); }} type="button"><Trash2 size={14} /></button>
                   </div>
                 </header>
                 <label>Passage title<input onFocus={() => setActivePassageId(passage.id)} onChange={(event) => onChange(updatePassage(draft, passage.id, (item) => ({ ...item, title: event.target.value })))} value={passage.title} /></label>
@@ -356,7 +357,7 @@ export function StructuredImportEditor({
                       <div className="pdf-actions">
                         <button aria-label={`上移题组 ${groupIndex + 1}`} className="button button--ghost" disabled={groupIndex === 0} onClick={(event) => { event.stopPropagation(); onChange(updatePassage(draft, passage.id, (item) => ({ ...item, questionGroups: moveArrayItem(item.questionGroups, groupIndex, groupIndex - 1) }))); }} type="button"><ArrowUp size={14} /></button>
                         <button aria-label={`下移题组 ${groupIndex + 1}`} className="button button--ghost" disabled={groupIndex === passage.questionGroups.length - 1} onClick={(event) => { event.stopPropagation(); onChange(updatePassage(draft, passage.id, (item) => ({ ...item, questionGroups: moveArrayItem(item.questionGroups, groupIndex, groupIndex + 1) }))); }} type="button"><ArrowDown size={14} /></button>
-                        <button aria-label={`删除题组 ${groupIndex + 1}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); removeGroup(passage.id, group); }} type="button"><Trash2 size={14} /></button>
+                        <button aria-label={`删除题组 ${groupIndex + 1}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); void removeGroup(passage.id, group); }} type="button"><Trash2 size={14} /></button>
                       </div>
                     </header>
                     <label>题组名称<input onFocus={() => setActiveGroupId(group.id)} onChange={(event) => onChange(updateGroup(draft, group.id, (item) => ({ ...item, title: event.target.value })))} value={group.title} /></label>
@@ -379,16 +380,16 @@ export function StructuredImportEditor({
 
                     {group.questions.map((question, questionIndex) => (
                       <article className={`pdf-structured-question${activeQuestionId === question.id ? " is-active" : ""}`} data-question-id={question.id} key={question.id} onClick={(event) => { event.stopPropagation(); activate(passage.id, group.id, question.id); }}>
-                        <header><strong>Question {question.number}</strong><code>{question.id}</code><div className="pdf-actions"><button aria-label={`上移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === 0} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex - 1) }))); }} type="button"><ArrowUp size={14} /></button><button aria-label={`下移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === group.questions.length - 1} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex + 1) }))); }} type="button"><ArrowDown size={14} /></button><button aria-label={`删除 Question ${question.number}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); removeQuestion(group, question); }} type="button"><Trash2 size={14} /></button></div></header>
+                        <header><strong>Question {question.number}</strong><code>{question.id}</code><div className="pdf-actions"><button aria-label={`上移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === 0} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex - 1) }))); }} type="button"><ArrowUp size={14} /></button><button aria-label={`下移 Question ${question.number}`} className="button button--ghost" disabled={questionIndex === group.questions.length - 1} onClick={(event) => { event.stopPropagation(); onChange(updateGroup(draft, group.id, (item) => ({ ...item, questions: moveArrayItem(item.questions, questionIndex, questionIndex + 1) }))); }} type="button"><ArrowDown size={14} /></button><button aria-label={`删除 Question ${question.number}`} className="button button--ghost" onClick={(event) => { event.stopPropagation(); void removeQuestion(group, question); }} type="button"><Trash2 size={14} /></button></div></header>
                         <div className="pdf-question-editor__head">
                           <label>题号<input min={1} onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, number: Number(event.target.value) })))} type="number" value={question.number} /></label>
                           <label>题型<select onChange={(event) => onChange(updateQuestion(draft, question.id, (item) => ({ ...item, type: event.target.value as StructuredQuestionDraft["type"], needsReview: true })))} value={question.type}>
                             {supportedQuestionTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                             {(question.type === "matching-headings" || question.type === "unsupported") && <option value={question.type}>{question.type}（需改为支持题型）</option>}
                           </select></label>
-                          <label>移动到题组<select aria-label={`Question ${question.number} 所属题组`} onChange={(event) => {
+                          <label>移动到题组<select aria-label={`Question ${question.number} 所属题组`} onChange={async (event) => {
                             const isBound = group.contextBlocks.some((block) => block.type === "table" ? block.rows.some((row) => row.cells.some((cell) => cell.questionId === question.id)) : block.type === "completion" && block.parts.some((part) => part.kind === "answer" && part.questionId === question.id));
-                            if (isBound && !window.confirm(`移动 Question ${question.number} 会解除它在当前题组结构化上下文中的作答位置。题目和已有答案不会删除。确定继续吗？`)) return;
+                            if (isBound && !(await confirmAction(`移动 Question ${question.number} 会解除它在当前题组结构化上下文中的作答位置。题目和已有答案不会删除。确定继续吗？`))) return;
                             onChange(moveQuestionBetweenGroups(draft, question.id, event.target.value));
                           }} value={group.id}>{groups.map((entry) => <option key={entry.group.id} value={entry.group.id}>{entry.passage.title} / {entry.group.title}</option>)}</select></label>
                         </div>

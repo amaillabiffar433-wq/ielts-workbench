@@ -24,23 +24,23 @@ describe("Reading presentation notes", () => {
     renderWorkspace();
     expect(screen.getByText("My existing note")).toBeInTheDocument();
     expect(screen.queryByText("Other session private note")).not.toBeInTheDocument();
-    expect(screen.getByText("1 条标记笔记")).toBeInTheDocument();
-    expect(screen.getByRole("progressbar", { name: "作答进度" })).toHaveAttribute("max", "40");
+    expect(screen.getByText("1 annotation note")).toBeInTheDocument();
+    expect(screen.getByRole("progressbar", { name: "Answer progress" })).toHaveAttribute("max", "40");
     expect(saveSetting).not.toHaveBeenCalled();
   });
   it("shows useful empty notes guidance without a fake editor", () => {
     workbenchStore.setState({ annotations: [] });
     renderWorkspace();
-    expect(screen.getByText(/填写高亮工具栏中的笔记/u)).toBeInTheDocument();
+    expect(screen.getByText(/optional note in the annotation toolbar/u)).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
   it("shows native fullscreen errors instead of implying that the action succeeded", async () => {
     fullscreen.mockRejectedValueOnce(new Error("native permission denied"));
     renderWorkspace();
-    fireEvent.click(screen.getByRole("button", { name: "全屏" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("无法切换全屏：native permission denied");
+    fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to toggle fullscreen: native permission denied");
     fullscreen.mockResolvedValueOnce(undefined);
-    fireEvent.click(screen.getByRole("button", { name: "全屏" }));
+    fireEvent.click(screen.getByRole("button", { name: "Fullscreen" }));
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 });

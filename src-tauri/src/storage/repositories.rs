@@ -1,4 +1,4 @@
-use chrono::{SecondsFormat, Utc};
+use chrono::{Duration, SecondsFormat, Utc};
 use rusqlite::{
     params, types::Type, Connection, OptionalExtension, Row, TransactionBehavior,
 };
@@ -12,6 +12,7 @@ use crate::{
         InstalledPackRecord, PackManifest, PracticeSessionRecord, SaveAnnotationInput,
         SaveAnswerInput, SaveWritingDraftInput, SessionSnapshot, SettingRecord, TextAnchor,
         SaveVocabularyItemInput, UpdateVocabularyItemInput, VocabularyItemRecord,
+        ReviewItemRecord, SaveReviewItemInput,
         WritingDraftRecord, WritingVersionRecord,
     },
 };
@@ -529,6 +530,15 @@ pub fn save_vocabulary_item(
         ],
         |row| row.get(0),
     ).optional()?;
+    if let Some(requested_id) = input.id.as_deref() {
+        if get_vocabulary_item(connection, requested_id)?.is_some()
+            && existing_id.as_deref() != Some(requested_id)
+        {
+            return Err(BackendError::Conflict(
+                "A vocabulary item ID cannot overwrite a different source selection; use the update command.".to_string(),
+            ));
+        }
+    }
     let id = existing_id.or(input.id).unwrap_or_else(|| Uuid::new_v4().to_string());
     validate_stable_id(&id, "vocabulary item ID")?;
     let timestamp = now_iso();
@@ -615,6 +625,171 @@ pub fn delete_vocabulary_item(connection: &Connection, item_id: &str) -> Result<
     Ok(connection.execute("DELETE FROM vocabulary_items WHERE id = ?1", [item_id])? > 0)
 }
 
+pub fn list_review_items(connection: &Connection) -> Result<Vec<ReviewItemRecord>> {
+    let mut statement = connection.prepare(
+        "SELECT id, source_kind, pack_id, test_id, module, question_id, vocabulary_id,
+                source_session_id, source_start_ms, interval_days, repetitions, due_at, last_reviewed_at,
+                created_at, updated_at
+         FROM review_items
+         ORDER BY due_at ASC, created_at ASC, id ASC",
+    )?;
+    let rows = statement.query_map([], review_item_from_row)?;
+    rows.collect::<std::result::Result<Vec<_>, _>>().map_err(Into::into)
+}
+
+pub fn save_review_item(
+    connection: &Connection,
+    input: SaveReviewItemInput,
+) -> Result<ReviewItemRecord> {
+    validate_review_input(&input)?;
+    let existing_id: Option<String> = if input.source_kind == "vocabulary" {
+        connection.query_row(
+            "SELECT id FROM review_items WHERE vocabulary_id = ?1 LIMIT 1",
+            params![input.vocabulary_id.as_deref()],
+            |row| row.get(0),
+        ).optional()?
+    } else {
+        connection.query_row(
+            "SELECT id FROM review_items
+             WHERE source_kind = ?1 AND pack_id = ?2 AND test_id = ?3
+               AND module = ?4 AND question_id = ?5 LIMIT 1",
+            params![
+                &input.source_kind,
+                input.pack_id.as_deref(),
+                input.test_id.as_deref(),
+                input.module_type.as_deref(),
+                input.question_id.as_deref(),
+            ],
+            |row| row.get(0),
+        ).optional()?
+    };
+    let id = existing_id.or(input.id.clone()).unwrap_or_else(|| Uuid::new_v4().to_string());
+    validate_stable_id(&id, "review item ID")?;
+    let timestamp = now_iso();
+    connection.execute(
+        "INSERT INTO review_items(
+            id, source_kind, pack_id, test_id, module, question_id, vocabulary_id,
+            source_session_id, source_start_ms, interval_days, repetitions, due_at, last_reviewed_at,
+            created_at, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 0, 0, ?10, NULL, ?10, ?10)
+         ON CONFLICT(id) DO UPDATE SET
+            source_session_id = excluded.source_session_id,
+            source_start_ms = COALESCE(excluded.source_start_ms, review_items.source_start_ms),
+            due_at = MIN(review_items.due_at, excluded.due_at),
+            updated_at = excluded.updated_at",
+        params![
+            id,
+            input.source_kind,
+            input.pack_id,
+            input.test_id,
+            input.module_type,
+            input.question_id,
+            input.vocabulary_id,
+            input.source_session_id,
+            input.source_start_ms,
+            timestamp,
+        ],
+    )?;
+    get_review_item(connection, &id)?.ok_or_else(|| {
+        BackendError::NotFound("The saved review item could not be read back.".to_string())
+    })
+}
+
+pub fn grade_review_item(
+    connection: &mut Connection,
+    item_id: &str,
+    rating: &str,
+) -> Result<ReviewItemRecord> {
+    validate_stable_id(item_id, "review item ID")?;
+    if !matches!(rating, "again" | "hard" | "good" | "easy") {
+        return Err(BackendError::InvalidInput("Unsupported review rating.".to_string()));
+    }
+    let current = get_review_item(connection, item_id)?.ok_or_else(|| {
+        BackendError::NotFound("The review item does not exist.".to_string())
+    })?;
+    let interval_days = match rating {
+        "again" | "hard" => 1,
+        "good" => match current.repetitions { 0 => 1, 1 => 3, 2 => 7, _ => 14 },
+        "easy" => match current.repetitions { 0 => 3, 1 => 7, _ => 14 },
+        _ => unreachable!(),
+    };
+    let repetitions = if rating == "again" { 0 } else { current.repetitions.saturating_add(1) };
+    let reviewed_at = Utc::now();
+    let due_at = reviewed_at + Duration::days(i64::from(interval_days));
+    let reviewed_at_iso = reviewed_at.to_rfc3339_opts(SecondsFormat::Millis, true);
+    let due_at_iso = due_at.to_rfc3339_opts(SecondsFormat::Millis, true);
+    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    transaction.execute(
+        "UPDATE review_items
+         SET interval_days = ?2, repetitions = ?3, due_at = ?4,
+             last_reviewed_at = ?5, updated_at = ?5
+         WHERE id = ?1",
+        params![item_id, i64::from(interval_days), i64::from(repetitions), due_at_iso, reviewed_at_iso],
+    )?;
+    transaction.execute(
+        "INSERT INTO review_events(
+            id, review_item_id, rating, previous_interval_days,
+            next_interval_days, reviewed_at, next_due_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            Uuid::new_v4().to_string(),
+            item_id,
+            rating,
+            i64::from(current.interval_days),
+            i64::from(interval_days),
+            reviewed_at_iso,
+            due_at_iso,
+        ],
+    )?;
+    transaction.commit()?;
+    get_review_item(connection, item_id)?.ok_or_else(|| {
+        BackendError::NotFound("The graded review item could not be read back.".to_string())
+    })
+}
+
+fn get_review_item(connection: &Connection, item_id: &str) -> Result<Option<ReviewItemRecord>> {
+    connection.query_row(
+        "SELECT id, source_kind, pack_id, test_id, module, question_id, vocabulary_id,
+                source_session_id, source_start_ms, interval_days, repetitions, due_at, last_reviewed_at,
+                created_at, updated_at
+         FROM review_items WHERE id = ?1",
+        [item_id],
+        review_item_from_row,
+    ).optional().map_err(Into::into)
+}
+
+fn validate_review_input(input: &SaveReviewItemInput) -> Result<()> {
+    if !matches!(input.source_kind.as_str(), "mistake" | "marked" | "vocabulary" | "manual") {
+        return Err(BackendError::InvalidInput("Unsupported review source kind.".to_string()));
+    }
+    if let Some(id) = &input.id { validate_stable_id(id, "review item ID")?; }
+    if let Some(id) = &input.source_session_id { validate_stable_id(id, "source session ID")?; }
+    if input.source_start_ms.is_some_and(|value| value > 9_007_199_254_740_991) {
+        return Err(BackendError::InvalidInput("Review audio timestamp must be a JavaScript-safe integer.".to_string()));
+    }
+    if input.source_kind == "vocabulary" {
+        let vocabulary_id = input.vocabulary_id.as_deref().ok_or_else(|| {
+            BackendError::InvalidInput("Vocabulary review requires a vocabulary ID.".to_string())
+        })?;
+        validate_stable_id(vocabulary_id, "vocabulary item ID")?;
+        return Ok(());
+    }
+    for (value, label) in [
+        (input.pack_id.as_deref(), "pack ID"),
+        (input.test_id.as_deref(), "test ID"),
+        (input.question_id.as_deref(), "question ID"),
+    ] {
+        validate_stable_id(value.ok_or_else(|| BackendError::InvalidInput(format!("Question review requires {label}.")))?, label)?;
+    }
+    let module = input.module_type.as_deref().ok_or_else(|| {
+        BackendError::InvalidInput("Question review requires a module type.".to_string())
+    })?;
+    if !matches!(module, "reading" | "listening" | "writing") {
+        return Err(BackendError::InvalidInput("Unsupported review module type.".to_string()));
+    }
+    Ok(())
+}
+
 fn get_vocabulary_item(connection: &Connection, item_id: &str) -> Result<Option<VocabularyItemRecord>> {
     connection.query_row(
         "SELECT id, term, normalized_term, sentence, context_before, context_after,
@@ -643,6 +818,17 @@ fn validate_vocabulary_input(input: &SaveVocabularyItemInput) -> Result<()> {
         return Err(BackendError::InvalidInput("Vocabulary context is too long.".to_string()));
     }
     validate_vocabulary_state(&input.learning_state)?;
+    let source_identity_count = [
+        input.source_pack_id.is_some(),
+        input.source_test_id.is_some(),
+        input.source_module.is_some(),
+        input.source_block_id.is_some(),
+    ].into_iter().filter(|present| *present).count();
+    if source_identity_count != 0 && source_identity_count != 4 {
+        return Err(BackendError::InvalidInput(
+            "Vocabulary source identity must include pack, test, module, and block together.".to_string(),
+        ));
+    }
     for (value, label) in [
         (&input.source_pack_id, "source pack ID"),
         (&input.source_test_id, "source test ID"),
@@ -1016,6 +1202,26 @@ fn vocabulary_item_from_row(row: &Row<'_>) -> rusqlite::Result<VocabularyItemRec
     })
 }
 
+fn review_item_from_row(row: &Row<'_>) -> rusqlite::Result<ReviewItemRecord> {
+    Ok(ReviewItemRecord {
+        id: row.get(0)?,
+        source_kind: row.get(1)?,
+        pack_id: row.get(2)?,
+        test_id: row.get(3)?,
+        module_type: row.get(4)?,
+        question_id: row.get(5)?,
+        vocabulary_id: row.get(6)?,
+        source_session_id: row.get(7)?,
+        source_start_ms: row.get::<_, Option<i64>>(8)?.map(|value| value.max(0) as u64),
+        interval_days: row.get::<_, i64>(9)?.max(0) as u32,
+        repetitions: row.get::<_, i64>(10)?.max(0) as u32,
+        due_at: row.get(11)?,
+        last_reviewed_at: row.get(12)?,
+        created_at: row.get(13)?,
+        updated_at: row.get(14)?,
+    })
+}
+
 fn installed_pack_from_row(row: &Row<'_>) -> rusqlite::Result<InstalledPackRecord> {
     let raw_manifest: String = row.get(6)?;
     Ok(InstalledPackRecord {
@@ -1213,6 +1419,57 @@ mod tests {
         assert_eq!(updated.source_question_number, Some(3));
         assert!(delete_vocabulary_item(&connection, &created.id).unwrap());
         assert!(list_vocabulary_items(&connection).unwrap().is_empty());
+    }
+
+    #[test]
+    fn review_schedule_round_trip_is_deduplicated_and_audited() {
+        let mut connection = database();
+        let vocabulary = save_vocabulary_item(&connection, SaveVocabularyItemInput {
+            id: Some("review-vocabulary".into()),
+            term: "interval".into(),
+            normalized_term: "interval".into(),
+            sentence: "The interval is explicit.".into(),
+            context_before: "The ".into(),
+            context_after: " is explicit.".into(),
+            source_pack_id: None,
+            source_test_id: None,
+            source_module: None,
+            source_block_id: None,
+            source_book_title: None,
+            source_test_title: None,
+            source_section_id: None,
+            source_section_title: None,
+            source_question_id: None,
+            source_question_number: None,
+            note: String::new(),
+            learning_state: "new".into(),
+        }).unwrap();
+        let input = SaveReviewItemInput {
+            id: Some("review-item-1".into()),
+            source_kind: "vocabulary".into(),
+            pack_id: None,
+            test_id: None,
+            module_type: None,
+            question_id: None,
+            vocabulary_id: Some(vocabulary.id),
+            source_session_id: None,
+            source_start_ms: None,
+        };
+        let created = save_review_item(&connection, input.clone()).unwrap();
+        let duplicate = save_review_item(&connection, SaveReviewItemInput { id: None, ..input }).unwrap();
+        assert_eq!(created.id, duplicate.id);
+        assert_eq!(list_review_items(&connection).unwrap().len(), 1);
+
+        let graded = grade_review_item(&mut connection, &created.id, "good").unwrap();
+        assert_eq!(graded.interval_days, 1);
+        assert_eq!(graded.repetitions, 1);
+        assert!(graded.last_reviewed_at.is_some());
+        let event_count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM review_events WHERE review_item_id = ?1",
+            [&created.id],
+            |row| row.get(0),
+        ).unwrap();
+        assert_eq!(event_count, 1);
     }
 
     #[test]

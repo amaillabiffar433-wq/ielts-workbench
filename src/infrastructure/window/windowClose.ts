@@ -20,9 +20,13 @@ export async function closeCurrentWindow(): Promise<void> {
   await getCurrentWindow().destroy();
 }
 
+export async function confirmAction(message: string): Promise<boolean> {
+  if (!isTauri()) return window.confirm(message);
+  return confirm(message, { title: "IELTS Workbench", kind: "warning" });
+}
+
 export async function confirmDiscardAfterSaveFailure(message: string): Promise<boolean> {
-  return confirm(
+  return confirmAction(
     `最后的作文内容保存失败：${message}\n\n是否放弃这次未保存的修改并退出？`,
-    { title: "IELTS Workbench", kind: "warning" },
   );
 }

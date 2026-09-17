@@ -60,8 +60,14 @@ describe("ListeningPage Exam playback policy", () => {
       answers: {},
       annotations: [],
       saveState: "idle",
+      questionFlags: new Set(),
       ensureSession,
       submitSession,
+      flushPendingSaves: vi.fn(async () => undefined),
+      updateSessionElapsed: vi.fn(async () => undefined),
+      loadSetting: vi.fn(async () => null),
+      saveSetting: vi.fn(async () => undefined),
+      toggleQuestionFlag: vi.fn(async () => undefined),
       readPackMedia: vi.fn(async () => new Uint8Array([82, 73, 70, 70])),
     });
   });
@@ -74,8 +80,14 @@ describe("ListeningPage Exam playback policy", () => {
       answers: originalState.answers,
       annotations: originalState.annotations,
       saveState: originalState.saveState,
+      questionFlags: originalState.questionFlags,
       ensureSession: originalState.ensureSession,
       submitSession: originalState.submitSession,
+      flushPendingSaves: originalState.flushPendingSaves,
+      updateSessionElapsed: originalState.updateSessionElapsed,
+      loadSetting: originalState.loadSetting,
+      saveSetting: originalState.saveSetting,
+      toggleQuestionFlag: originalState.toggleQuestionFlag,
       readPackMedia: originalState.readPackMedia,
     });
     vi.restoreAllMocks();
@@ -83,7 +95,7 @@ describe("ListeningPage Exam playback policy", () => {
 
   it("resets position and rate when entering Exam mode", async () => {
     renderListening("/practice/listening?mode=study");
-    const studyAudio = await screen.findByLabelText("原创示例听力音频") as HTMLAudioElement;
+    const studyAudio = await screen.findByLabelText("Original local listening audio") as HTMLAudioElement;
     expect(workbenchStore.getState().readPackMedia).toHaveBeenCalledWith(
       "original-demo-pack",
       "media/audio/original-demo-tones.wav",
@@ -93,12 +105,43 @@ describe("ListeningPage Exam playback policy", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Exam" }));
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "播放音频" })).toBeEnabled());
-    const examAudio = screen.getByLabelText("原创示例听力音频") as HTMLAudioElement;
+    await waitFor(() => expect(screen.getByRole("button", { name: "Play audio" })).toBeEnabled());
+    const examAudio = screen.getByLabelText("Original local listening audio") as HTMLAudioElement;
     expect(examAudio.currentTime).toBe(0);
     expect(examAudio.playbackRate).toBe(1);
     expect(examAudio.controls).toBe(false);
-    expect(screen.getByText("仅可顺序播放 · 禁止拖动、倍速与重播")).toBeInTheDocument();
+    expect(screen.getByText("Sequential playback only · seeking, speed changes, and replay disabled")).toBeInTheDocument();
+  });
+
+  it("restores and persists the Study playback position with custom transport controls", async () => {
+    const loadSetting = vi.fn(async () => "1.25");
+    const saveSetting = vi.fn(async () => undefined);
+    workbenchStore.setState({ loadSetting, saveSetting });
+    renderListening("/practice/listening?mode=study");
+
+    const audio = await screen.findByLabelText("Original local listening audio") as HTMLAudioElement;
+    await waitFor(() => expect(audio.currentTime).toBe(1.25));
+    expect(loadSetting).toHaveBeenCalledWith(expect.stringContaining("listening.playbackPosition.study-listening-session"));
+    expect(screen.getByRole("button", { name: "Back 5 seconds" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Forward 5 seconds" })).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "Playback speed" })).toHaveValue("1");
+    expect(screen.getByText(/No verified transcript was supplied/)).toBeInTheDocument();
+
+    audio.currentTime = 5;
+    fireEvent.timeUpdate(audio);
+    await waitFor(() => expect(saveSetting).toHaveBeenCalledWith(expect.any(String), "5"));
+  });
+
+  it("prefers a review deep-link timestamp over the saved Study playback position", async () => {
+    const loadSetting = vi.fn(async (key: string) => (
+      key.includes("listening.playbackPosition") ? "1.25" : null
+    ));
+    workbenchStore.setState({ loadSetting });
+
+    renderListening("/practice/listening?mode=study&tMs=2500");
+
+    const audio = await screen.findByLabelText("Original local listening audio") as HTMLAudioElement;
+    await waitFor(() => expect(audio.currentTime).toBe(2.5));
   });
 
   it("keeps a persisted in-progress Listening exam locked even on a Study URL", async () => {
@@ -106,8 +149,8 @@ describe("ListeningPage Exam playback policy", () => {
 
     renderListening("/practice/listening?mode=study");
 
-    const audio = await screen.findByLabelText("原创示例听力音频") as HTMLAudioElement;
-    await waitFor(() => expect(screen.getByRole("button", { name: "播放音频" })).toBeEnabled());
+    const audio = await screen.findByLabelText("Original local listening audio") as HTMLAudioElement;
+    await waitFor(() => expect(screen.getByRole("button", { name: "Play audio" })).toBeEnabled());
     expect(audio.controls).toBe(false);
     expect(screen.getByRole("button", { name: "Study" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Exam" })).toBeDisabled();
@@ -116,8 +159,8 @@ describe("ListeningPage Exam playback policy", () => {
 
   it("restores the last sequential position when a seek is attempted", async () => {
     renderListening("/practice/listening?mode=exam");
-    const audio = await screen.findByLabelText("原创示例听力音频") as HTMLAudioElement;
-    await waitFor(() => expect(screen.getByRole("button", { name: "播放音频" })).toBeEnabled());
+    const audio = await screen.findByLabelText("Original local listening audio") as HTMLAudioElement;
+    await waitFor(() => expect(screen.getByRole("button", { name: "Play audio" })).toBeEnabled());
 
     audio.currentTime = 12;
     fireEvent.timeUpdate(audio);
@@ -130,21 +173,21 @@ describe("ListeningPage Exam playback policy", () => {
 
   it("disables playback after the Exam audio ends so it cannot replay", async () => {
     renderListening("/practice/listening?mode=exam");
-    const audio = await screen.findByLabelText("原创示例听力音频") as HTMLAudioElement;
+    const audio = await screen.findByLabelText("Original local listening audio") as HTMLAudioElement;
     const play = vi.mocked(HTMLMediaElement.prototype.play);
     const pause = vi.mocked(HTMLMediaElement.prototype.pause);
-    const playButton = await screen.findByRole("button", { name: "播放音频" });
+    const playButton = await screen.findByRole("button", { name: "Play audio" });
     await waitFor(() => expect(pause).toHaveBeenCalled());
 
     fireEvent.click(playButton);
     expect(play).toHaveBeenCalledTimes(1);
     fireEvent.ended(audio);
 
-    const endedButton = await screen.findByRole("button", { name: "音频已播放完毕" });
+    const endedButton = await screen.findByRole("button", { name: "Audio finished" });
     expect(endedButton).toBeDisabled();
     fireEvent.click(endedButton);
     expect(play).toHaveBeenCalledTimes(1);
-    expect(screen.getByText("播放已结束 · 禁止重播")).toBeInTheDocument();
+    expect(screen.getByText("Playback finished · replay disabled")).toBeInTheDocument();
   });
 
   it("initializes Exam audio when the matching session arrives before its load promise settles", async () => {
@@ -158,11 +201,11 @@ describe("ListeningPage Exam playback policy", () => {
     renderListening("/practice/listening?mode=exam");
     await waitFor(() => expect(ensureSession).toHaveBeenCalled());
     act(() => workbenchStore.setState({ session: examSession }));
-    expect(screen.queryByLabelText("原创示例听力音频")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Original local listening audio")).not.toBeInTheDocument();
 
     await act(async () => resolveSession?.(examSession));
 
-    const audio = await screen.findByLabelText("原创示例听力音频") as HTMLAudioElement;
+    const audio = await screen.findByLabelText("Original local listening audio") as HTMLAudioElement;
     await waitFor(() => expect(HTMLMediaElement.prototype.pause).toHaveBeenCalled());
     expect(audio.currentTime).toBe(0);
     expect(audio.playbackRate).toBe(1);
@@ -181,18 +224,18 @@ describe("ListeningPage Exam playback policy", () => {
     renderListening("/practice/listening?mode=study");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "无法恢复听力 Session：session database is locked",
+      "Unable to restore the Listening session: session database is locked",
     );
-    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
-    expect(await screen.findByLabelText("原创示例听力音频")).toBeInTheDocument();
+    expect(await screen.findByLabelText("Original local listening audio")).toBeInTheDocument();
     expect(ensureSession).toHaveBeenCalledTimes(2);
   });
 
   it("persists the Listening session before leaving the locked Exam", async () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
     renderListening("/practice/listening?mode=exam");
-    const submitButton = await screen.findByRole("button", { name: "提交本次听力" });
+    const submitButton = await screen.findByRole("button", { name: "Submit Listening" });
     await waitFor(() => expect(submitButton).toBeEnabled());
 
     fireEvent.click(submitButton);

@@ -510,3 +510,11 @@ Group contexts add `{ id, type: "snapshot" | "image" | "figure", assetId, altTex
 `assetId` must resolve to a manifest image media asset; missing/wrong-kind media is invalid. Installed PNG relative paths are `media/images/visual-{sha256}.png`, with SHA-256 in the manifest. No blob/data URI or absolute/temporary path is persisted. Drafts store image metadata separately from workspace files. New visual imports use `importMetadata.extractionMode: "pdf-visual"` (including manually reviewed OCR); text-only imports retain `pdf-text-layer`.
 
 Draft versions 1/2/3 migrate to 4 with empty image metadata, retaining IDs and settings keys. No SQLite migration is required. Mixed paragraph/list/table/completion/visual ordering is preserved. Text/TFNG/YNNG/single/multiple/matching primitives cover diagram/map/flow-chart tasks using visual contexts and independent answer controls.
+
+## Listening transcript cues and review schedule
+
+Listening module `schemaVersion: 1` may attach `transcriptCues` to a section. Each cue has a stable ID, non-negative `startMs`, a greater `endMs`, optional speaker, text, and optional cloze answers that must occur in the cue text. Cue time ranges must stay inside the section range and remain ordered. Older v1 packs without this field parse it as an empty array; no transcript is synthesized.
+
+SQLite migration `0005_review_schedule.sql` adds `review_items` and append-only `review_events`. A review item is either vocabulary-backed or question-backed and may retain a source Session and Listening `source_start_ms`. Scheduling uses ratings `again`, `hard`, `good`, and `easy`; every rating records the previous/next interval and next due timestamp. Question/vocabulary identity indexes prevent duplicate queue entries.
+
+Listening playback position and the five Study display preferences are user settings, not immutable pack content. Review deep links may pass `tMs`; a valid explicit timestamp overrides the saved Study position. Exam ignores both Study preferences and review seeking.

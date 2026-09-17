@@ -82,12 +82,12 @@ describe("ReviewPage Exam lock", () => {
 
     render(<MemoryRouter><ReviewPage /></MemoryRouter>);
 
-    expect(screen.getByRole("heading", { name: "复盘已锁定" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "返回考试" })).toHaveAttribute(
+    expect(screen.getByRole("heading", { name: "Results are locked" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Return to exam" })).toHaveAttribute(
       "href",
       "/practice/reading?packId=original-demo-pack&testId=demo-test-01&mode=exam",
     );
-    expect(screen.queryByText("正确答案")).not.toBeInTheDocument();
+    expect(screen.queryByText("Correct answer")).not.toBeInTheDocument();
     expect(screen.queryByText("sentinel-user-answer")).not.toBeInTheDocument();
     expect(screen.queryByText(question.prompt)).not.toBeInTheDocument();
     expect(screen.queryByText(question.explanation!)).not.toBeInTheDocument();
@@ -109,9 +109,9 @@ describe("ReviewPage Exam lock", () => {
 
     render(<MemoryRouter><ReviewPage /></MemoryRouter>);
 
-    expect(screen.getAllByText("正确答案").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("heading", { name: "复盘已锁定" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "重新练习（新 Session）" })).toBeInTheDocument();
+    expect(screen.getAllByText("Correct answer").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("heading", { name: "Results are locked" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry in a new session" })).toBeInTheDocument();
   });
 
   it("loads the submitted Session pack instead of reviewing the current global pack", async () => {
@@ -141,7 +141,7 @@ describe("ReviewPage Exam lock", () => {
 
     render(<MemoryRouter><ReviewPage /></MemoryRouter>);
 
-    expect(screen.getByText("正在读取本次 Session 的题包…")).toBeInTheDocument();
+    expect(screen.getByText("Loading the pack for this session…")).toBeInTheDocument();
     expect(screen.queryByText(otherPrompt)).not.toBeInTheDocument();
     expect(loadPack).toHaveBeenCalledWith(originalDemoPack.manifest.id);
 
@@ -224,6 +224,6 @@ describe("ReviewPage Exam lock", () => {
     expect(screen.getByRole("list")).toHaveTextContent("Check the complete table");
     expect(screen.getAllByText("Which row contains the original review answer?")).toHaveLength(1);
     expect(screen.getAllByText("west desk")).toHaveLength(2);
-    expect(screen.getAllByText("正确").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Correct").length).toBeGreaterThan(0);
   });
 });

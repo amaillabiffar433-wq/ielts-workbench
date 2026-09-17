@@ -13,6 +13,7 @@ import type {
   SaveAnnotationInput,
   SessionSnapshot,
   WorkspaceBackupSummary,
+  ObsidianExportResult,
 } from "../infrastructure/repositories/LearningRepository";
 import { createLearningRepository } from "../infrastructure/repositories/runtime";
 import type { SaveState } from "../components/common/SaveStatus";
@@ -35,6 +36,7 @@ export type WorkbenchState = {
   initializeWorkspace: (path: string) => Promise<void>;
   createWorkspaceBackup: (destinationParent: string) => Promise<WorkspaceBackupSummary>;
   restoreWorkspaceBackup: (backupPath: string, destinationParent: string) => Promise<void>;
+  exportObsidianDailyBrief: (vaultPath: string, date: string, markdown: string) => Promise<ObsidianExportResult>;
   refreshPacks: () => Promise<void>;
   loadPack: (packId: string) => Promise<IELTSPack | null>;
   ensureSession: (input: CreateSessionInput) => Promise<SessionSnapshot>;
@@ -180,6 +182,8 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
         throw error;
       }
     },
+
+    exportObsidianDailyBrief: (vaultPath, date, markdown) => repository.exportObsidianDailyBrief(vaultPath, date, markdown),
 
     refreshPacks: async () => {
       try {

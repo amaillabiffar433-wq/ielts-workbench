@@ -41,6 +41,15 @@ export const WorkspaceBackupSummarySchema = z.object({
 
 export type WorkspaceBackupSummary = z.infer<typeof WorkspaceBackupSummarySchema>;
 
+export const ObsidianExportResultSchema = z.object({
+  path: z.string().min(1),
+  backupPath: z.string().min(1).nullable(),
+  previousSha256: z.string().regex(/^[a-f0-9]{64}$/u).nullable(),
+  sha256: z.string().regex(/^[a-f0-9]{64}$/u),
+  changed: z.boolean(),
+}).strict();
+export type ObsidianExportResult = z.infer<typeof ObsidianExportResultSchema>;
+
 export const InstalledPackSummarySchema = z
   .object({
     id: StableIdSchema,
@@ -153,7 +162,13 @@ export const SaveVocabularyItemInputSchema = VocabularyItemSchema.omit({
   id: true,
   createdAt: true,
   updatedAt: true,
-}).extend({ id: StableIdSchema.optional() }).strict();
+}).extend({ id: StableIdSchema.optional() }).strict().superRefine((item, context) => {
+  const requiredSource = [item.sourcePackId, item.sourceTestId, item.sourceModule, item.sourceBlockId];
+  const provided = requiredSource.filter((value) => value !== undefined).length;
+  if (provided !== 0 && provided !== requiredSource.length) {
+    context.addIssue({ code: "custom", message: "Vocabulary source identity must include pack, test, module, and block together." });
+  }
+});
 export type SaveVocabularyItemInput = z.input<typeof SaveVocabularyItemInputSchema>;
 
 export const UpdateVocabularyItemInputSchema = z.object({
@@ -243,6 +258,55 @@ export const PracticeSessionSummarySchema = z
   .strict();
 
 export type PracticeSessionSummary = z.infer<typeof PracticeSessionSummarySchema>;
+
+export const ReviewSourceKindSchema = z.enum(["mistake", "marked", "vocabulary", "manual"]);
+export const ReviewRatingSchema = z.enum(["again", "hard", "good", "easy"]);
+export type ReviewSourceKind = z.infer<typeof ReviewSourceKindSchema>;
+export type ReviewRating = z.infer<typeof ReviewRatingSchema>;
+
+export const ReviewItemSchema = z.object({
+  id: StableIdSchema,
+  sourceKind: ReviewSourceKindSchema,
+  packId: StableIdSchema.nullish().transform((value) => value ?? undefined),
+  testId: StableIdSchema.nullish().transform((value) => value ?? undefined),
+  moduleType: ModuleTypeSchema.nullish().transform((value) => value ?? undefined),
+  questionId: StableIdSchema.nullish().transform((value) => value ?? undefined),
+  vocabularyId: StableIdSchema.nullish().transform((value) => value ?? undefined),
+  sourceSessionId: StableIdSchema.nullish().transform((value) => value ?? undefined),
+  sourceStartMs: z.number().int().nonnegative().safe().nullish().transform((value) => value ?? undefined),
+  intervalDays: z.number().int().nonnegative().max(3650),
+  repetitions: z.number().int().nonnegative().max(100_000),
+  dueAt: IsoUtcDateTimeSchema,
+  lastReviewedAt: IsoUtcDateTimeSchema.nullish().transform((value) => value ?? undefined),
+  createdAt: IsoUtcDateTimeSchema,
+  updatedAt: IsoUtcDateTimeSchema,
+}).strict().superRefine((item, context) => {
+  if (item.sourceKind === "vocabulary") {
+    if (!item.vocabularyId) context.addIssue({ code: "custom", message: "Vocabulary review requires vocabularyId." });
+  } else if (!item.packId || !item.testId || !item.moduleType || !item.questionId) {
+    context.addIssue({ code: "custom", message: "Question review requires pack, test, module, and question identity." });
+  }
+});
+export type ReviewItem = z.infer<typeof ReviewItemSchema>;
+
+export const SaveReviewItemInputSchema = z.object({
+  id: StableIdSchema.optional(),
+  sourceKind: ReviewSourceKindSchema,
+  packId: StableIdSchema.optional(),
+  testId: StableIdSchema.optional(),
+  moduleType: ModuleTypeSchema.optional(),
+  questionId: StableIdSchema.optional(),
+  vocabularyId: StableIdSchema.optional(),
+  sourceSessionId: StableIdSchema.optional(),
+  sourceStartMs: z.number().int().nonnegative().safe().optional(),
+}).strict().superRefine((item, context) => {
+  if (item.sourceKind === "vocabulary") {
+    if (!item.vocabularyId) context.addIssue({ code: "custom", message: "Vocabulary review requires vocabularyId." });
+  } else if (!item.packId || !item.testId || !item.moduleType || !item.questionId) {
+    context.addIssue({ code: "custom", message: "Question review requires pack, test, module, and question identity." });
+  }
+});
+export type SaveReviewItemInput = z.infer<typeof SaveReviewItemInputSchema>;
 
 export function sortRecentSessionSummaries(
   summaries: readonly PracticeSessionSummary[],
@@ -362,6 +426,7 @@ export interface LearningRepository {
   initializeWorkspace(path: string): Promise<BootstrapState>;
   createWorkspaceBackup(destinationParent: string): Promise<WorkspaceBackupSummary>;
   restoreWorkspaceBackup(backupPath: string, destinationParent: string): Promise<BootstrapState>;
+  exportObsidianDailyBrief(vaultPath: string, date: string, markdown: string): Promise<ObsidianExportResult>;
 
   listInstalledPacks(): Promise<InstalledPackSummary[]>;
   loadPack(packId: string): Promise<IELTSPack | null>;
@@ -385,6 +450,10 @@ export interface LearningRepository {
   saveVocabularyItem(input: SaveVocabularyItemInput): Promise<VocabularyItem>;
   updateVocabularyItem(input: UpdateVocabularyItemInput): Promise<VocabularyItem>;
   deleteVocabularyItem(itemId: string): Promise<void>;
+
+  listReviewItems(): Promise<ReviewItem[]>;
+  saveReviewItem(input: SaveReviewItemInput): Promise<ReviewItem>;
+  gradeReviewItem(itemId: string, rating: ReviewRating): Promise<ReviewItem>;
 
   getSetting(key: string): Promise<string | null>;
   setSetting(key: string, value: string): Promise<void>;

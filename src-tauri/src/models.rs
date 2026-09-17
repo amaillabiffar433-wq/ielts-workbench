@@ -36,6 +36,16 @@ pub struct BootstrapState {
     pub error: Option<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObsidianExportResult {
+    pub path: String,
+    pub backup_path: Option<String>,
+    pub previous_sha256: Option<String>,
+    pub sha256: String,
+    pub changed: bool,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PackManifest {
@@ -235,6 +245,40 @@ pub struct VocabularyItemRecord {
     pub source_question_number: Option<u32>,
     pub note: String,
     pub learning_state: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct SaveReviewItemInput {
+    pub id: Option<String>,
+    pub source_kind: String,
+    pub pack_id: Option<String>,
+    pub test_id: Option<String>,
+    pub module_type: Option<String>,
+    pub question_id: Option<String>,
+    pub vocabulary_id: Option<String>,
+    pub source_session_id: Option<String>,
+    pub source_start_ms: Option<u64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReviewItemRecord {
+    pub id: String,
+    pub source_kind: String,
+    pub pack_id: Option<String>,
+    pub test_id: Option<String>,
+    pub module_type: Option<String>,
+    pub question_id: Option<String>,
+    pub vocabulary_id: Option<String>,
+    pub source_session_id: Option<String>,
+    pub source_start_ms: Option<u64>,
+    pub interval_days: u32,
+    pub repetitions: u32,
+    pub due_at: String,
+    pub last_reviewed_at: Option<String>,
     pub created_at: String,
     pub updated_at: String,
 }

@@ -219,6 +219,57 @@ describe("TauriLearningRepository", () => {
     expect(new TextDecoder().decode(bytes)).toBe("RIFF");
   });
 
+  it("uses validated native contracts for review queue creation and rating", async () => {
+    const calls: Array<{ command: string; args?: Record<string, unknown> }> = [];
+    const base = {
+      id: "review-item-1",
+      sourceKind: "mistake",
+      packId: "original-demo-pack",
+      testId: "demo-test-01",
+      moduleType: "reading",
+      questionId: "demo-reading-q01",
+      vocabularyId: null,
+      sourceSessionId: null,
+      sourceStartMs: null,
+      intervalDays: 0,
+      repetitions: 0,
+      dueAt: "2026-09-17T08:00:00.000Z",
+      lastReviewedAt: null,
+      createdAt: "2026-09-17T08:00:00.000Z",
+      updatedAt: "2026-09-17T08:00:00.000Z",
+    };
+    const repository = new TauriLearningRepository(async <T>(command: string, args?: Record<string, unknown>) => {
+      calls.push({ command, args });
+      if (command === "list_review_items") return [base] as T;
+      if (command === "save_review_item") return base as T;
+      if (command === "grade_review_item") return {
+        ...base,
+        intervalDays: 3,
+        repetitions: 1,
+        dueAt: "2026-09-20T08:00:00.000Z",
+        lastReviewedAt: "2026-09-17T08:00:00.000Z",
+      } as T;
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    const input = {
+      sourceKind: "mistake" as const,
+      packId: "original-demo-pack",
+      testId: "demo-test-01",
+      moduleType: "reading" as const,
+      questionId: "demo-reading-q01",
+    };
+    await expect(repository.listReviewItems()).resolves.toEqual([
+      expect.objectContaining({ id: "review-item-1", vocabularyId: undefined, sourceStartMs: undefined }),
+    ]);
+    await expect(repository.saveReviewItem(input)).resolves.toMatchObject({ id: "review-item-1" });
+    await expect(repository.gradeReviewItem("review-item-1", "good")).resolves.toMatchObject({ intervalDays: 3 });
+    expect(calls).toEqual([
+      { command: "list_review_items", args: undefined },
+      { command: "save_review_item", args: { input } },
+      { command: "grade_review_item", args: { itemId: "review-item-1", rating: "good" } },
+    ]);
+  });
+
   it("validates generated packs before invoking the native installer", async () => {
     const pack = parseIeltsPack(originalDemoPack);
     let receivedArgs: Record<string, unknown> | undefined;

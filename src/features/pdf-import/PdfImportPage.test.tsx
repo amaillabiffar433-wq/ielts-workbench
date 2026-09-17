@@ -150,7 +150,7 @@ describe("PdfImportPage", () => {
     await user.click(screen.getByRole("radio", { name: "多 Passage / 多题组（人工确认）" }));
     await user.click(screen.getByRole("button", { name: /提取并整理/ }));
     expect(await screen.findByText("人工确认式结构化草稿")).toBeInTheDocument();
-    expect(await screen.findByText("已自动保存")).toBeInTheDocument();
+    expect(await screen.findByText("Autosaved")).toBeInTheDocument();
 
     firstRender.unmount();
     render(<MemoryRouter><PdfImportPage adapter={adapter} /></MemoryRouter>);

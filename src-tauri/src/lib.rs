@@ -3,6 +3,7 @@ mod backup;
 mod commands;
 mod error;
 mod models;
+mod obsidian;
 mod import_images;
 mod packs;
 mod storage;
@@ -32,6 +33,7 @@ pub fn run() {
             commands::update_session_elapsed,
             commands::create_workspace_backup,
             commands::restore_workspace_backup,
+            commands::export_obsidian_daily_brief,
             commands::save_answer,
             commands::save_annotation,
             commands::delete_annotation,
@@ -39,6 +41,9 @@ pub fn run() {
             commands::save_vocabulary_item,
             commands::update_vocabulary_item,
             commands::delete_vocabulary_item,
+            commands::list_review_items,
+            commands::save_review_item,
+            commands::grade_review_item,
             commands::get_setting,
             commands::set_setting,
             commands::load_writing_draft,

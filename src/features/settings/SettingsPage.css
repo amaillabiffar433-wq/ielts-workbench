@@ -12,6 +12,10 @@
 .workspace-details strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .workspace-details span { color: var(--text-muted); font-size: 10px; }
 .workspace-details strong { margin-top: 5px; font-size: 12px; }
+.workspace-details--obsidian { grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr) auto; align-items: start; }
+.workspace-details--obsidian .obsidian-details__boundary { grid-column: 1 / 3; margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
+.workspace-details--obsidian .pdf-actions { grid-column: 3; grid-row: 1 / 3; align-self: center; }
+.workspace-details--obsidian .workspace-backup-message { grid-column: 1 / -1; margin: 0; }
 .settings-grid { display: grid; }
 .setting-row { display: flex; min-height: 66px; align-items: center; justify-content: space-between; gap: 30px; padding: 12px 18px; border-bottom: 1px solid var(--border-subtle); }
 .setting-row:last-child { border-bottom: 0; }
@@ -19,6 +23,7 @@
 .setting-row span { display: block; }
 .setting-row span { margin-top: 4px; color: var(--text-muted); font-size: 11px; }
 .setting-row input[type="range"] { width: 240px; accent-color: var(--accent); }
+.setting-row input[type="checkbox"] { width: 19px; height: 19px; flex: 0 0 auto; accent-color: var(--accent); }
 .highlight-legend { display: flex; flex-wrap: wrap; gap: 18px; padding: 18px; color: var(--text-secondary); font-size: 12px; }
 .highlight-legend span { display: inline-flex; align-items: center; gap: 7px; }
 .highlight-legend i { width: 22px; height: 11px; border-radius: 2px; }
@@ -31,4 +36,9 @@
 .settings-section--placeholder { margin: 0; }
 .settings-section--placeholder > p { min-height: 62px; padding: 0 17px; color: var(--text-secondary); line-height: 1.55; }
 .settings-section--placeholder > .button { margin: 0 17px 17px; }
-@media (max-width: 1100px) { .workspace-details { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 1100px) {
+  .workspace-details { grid-template-columns: 1fr 1fr; }
+  .workspace-details--obsidian { grid-template-columns: 1fr 1fr; }
+  .workspace-details--obsidian .obsidian-details__boundary,
+  .workspace-details--obsidian .pdf-actions { grid-column: 1 / -1; grid-row: auto; }
+}

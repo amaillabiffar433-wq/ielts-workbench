@@ -41,4 +41,12 @@ describe("IELTS Library book grouping", () => {
     expect(books[0].packs).toHaveLength(2);
     expect(books[1].packs).toHaveLength(1);
   });
+
+  it("orders Cambridge books newest first", () => {
+    const books = groupLibraryBooks([
+      cambridgePack("cambridge-17-reading", 1, "reading"),
+      { ...cambridgePack("cambridge-20-reading", 1, "reading"), manifest: { ...cambridgePack("cambridge-20-reading", 1, "reading").manifest, title: "Cambridge IELTS 20 Academic", edition: "20 Academic" } } as IELTSPack,
+    ]);
+    expect(books.map((book) => book.cambridgeNumber)).toEqual([20, 17]);
+  });
 });

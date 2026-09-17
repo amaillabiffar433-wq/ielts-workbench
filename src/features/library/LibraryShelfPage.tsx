@@ -116,11 +116,11 @@ function scoreSubmittedSession(module: AvailableModule, snapshot: SessionSnapsho
 }
 
 function formatDuration(seconds: number): string {
-  return seconds >= 60 ? `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒` : `${seconds} 秒`;
+  return seconds >= 60 ? `${Math.floor(seconds / 60)}m ${seconds % 60}s` : `${seconds}s`;
 }
 
 function questionRange(questions: readonly Question[]): string {
-  if (questions.length === 0) return "无客观题";
+  if (questions.length === 0) return "No objective questions";
   const numbers = questions.flatMap((question) => (
     question.type === "multiple-choice" ? [question.number, ...question.additionalNumbers] : [question.number]
   ));
@@ -152,9 +152,9 @@ function BookCover({ book, repository }: { readonly book: BookEntry; readonly re
     };
   }, [coverAsset, coverOwner, repository]);
 
-  if (url && !failed) return <img alt={`${book.title} 封面`} className="book-cover__image" src={url} />;
+  if (url && !failed) return <img alt={`${book.title} cover`} className="book-cover__image" src={url} />;
   return (
-    <div aria-label={`${book.title} 备用封面`} className={`book-cover__fallback${book.cambridgeNumber ? "" : " book-cover__fallback--local"}`} role="img">
+    <div aria-label={`${book.title} fallback cover`} className={`book-cover__fallback${book.cambridgeNumber ? "" : " book-cover__fallback--local"}`} role="img">
       <span>{book.cambridgeNumber ? "CAMBRIDGE" : "IELTS WORKBENCH"}</span>
       <strong>{book.cambridgeNumber ?? "PRACTICE"}</strong>
       <small>{book.cambridgeNumber ? (/general/iu.test(book.title) ? "GENERAL TRAINING" : "ACADEMIC") : "LOCAL MATERIAL"}</small>
@@ -163,10 +163,10 @@ function BookCover({ book, repository }: { readonly book: BookEntry; readonly re
 }
 
 function completionCopy(session: PracticeSessionSummary | undefined, score: SessionScore | undefined): string {
-  if (!session) return "未开始";
-  if (session.status !== "submitted") return `进行中 · 已学习 ${formatDuration(session.elapsedSeconds)}`;
-  const accuracy = score ? ` · 正确率 ${Math.round((score.earned / score.total) * 100)}%` : "";
-  return `已完成${accuracy} · ${formatDuration(session.elapsedSeconds)} · ${new Date(session.submittedAt ?? session.updatedAt).toLocaleDateString("zh-CN")}`;
+  if (!session) return "Not started";
+  if (session.status !== "submitted") return `In progress · ${formatDuration(session.elapsedSeconds)}`;
+  const accuracy = score ? ` · ${Math.round((score.earned / score.total) * 100)}%` : "";
+  return `Completed${accuracy} · ${formatDuration(session.elapsedSeconds)} · ${new Date(session.submittedAt ?? session.updatedAt).toLocaleDateString("en-US")}`;
 }
 
 function SectionRows({ candidate, recentSessions, scores, onOpen }: {
@@ -315,40 +315,40 @@ export function LibraryShelfPage() {
 
   return <main className="page library-page">
     <PageHeader actions={<div className="library-header-actions">
-      <button className="button" disabled={refreshing} onClick={refresh} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "is-spinning" : ""} size={16} />{refreshing ? "正在刷新…" : "刷新"}</button>
-      <Link className="button button--primary" to="/import"><FileInput aria-hidden="true" size={16} />导入资料</Link>
-    </div>} description="从书本进入 Test 与练习；题包内容只读，作答、标记和生词单独保存。" title="IELTS Library" />
+      <button className="button" disabled={refreshing} onClick={refresh} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "is-spinning" : ""} size={16} />{refreshing ? "Refreshing…" : "Refresh"}</button>
+      <Link className="button button--primary" to="/import"><FileInput aria-hidden="true" size={16} />Import sources</Link>
+    </div>} description="Choose a book, test, and skill. Source packs remain read-only; answers, marks, and vocabulary are stored separately." title="Library" />
 
-    {(storeError || packsError || recentError) && <div className="error-banner library-error" role="alert"><PackageOpen aria-hidden="true" size={18} /><div><strong>书库读取失败</strong><div>{storeError ?? packsError ?? recentError}</div></div><button className="button button--ghost" onClick={clearError} type="button">关闭</button></div>}
+    {(storeError || packsError || recentError) && <div className="error-banner library-error" role="alert"><PackageOpen aria-hidden="true" size={18} /><div><strong>Library could not be loaded</strong><div>{storeError ?? packsError ?? recentError}</div></div><button className="button button--ghost" onClick={clearError} type="button">Dismiss</button></div>}
 
     <section aria-labelledby="continue-title" className="library-continue">
-      <div className="library-section-heading"><div><h2 id="continue-title">继续学习</h2><p>恢复同一个未提交 Session。</p></div></div>
+      <div className="library-section-heading"><div><h2 id="continue-title">Continue learning</h2><p>Resume the same durable, unsubmitted session.</p></div></div>
       {recentSession && recentCandidate ? <div className="continue-study-row">
         <span className="recent-session-row__icon"><Clock3 aria-hidden="true" size={19} /></span>
         <div className="recent-session-row__copy"><strong>{recentCandidate.pack.manifest.title}</strong><span>{moduleMeta[recentCandidate.module.type].label} · {recentSection?.title ?? recentSession.testId}</span></div>
         {recentQuestions.length > 0 && <span className="continue-study-row__count">{answeredCount} / {recentQuestions.length}</span>}
-        <button className="button button--primary" onClick={() => openCandidate({ pack: recentCandidate.pack, testId: recentSession.testId!, testTitle: recentSession.testId!, module: recentCandidate.module })} type="button"><Play aria-hidden="true" size={15} />继续</button>
-      </div> : <div className="recent-empty"><Clock3 aria-hidden="true" size={18} />暂无未完成练习，从书架选择一本书开始。</div>}
+        <button className="button button--primary" onClick={() => openCandidate({ pack: recentCandidate.pack, testId: recentSession.testId!, testTitle: recentSession.testId!, module: recentCandidate.module })} type="button"><Play aria-hidden="true" size={15} />Resume</button>
+      </div> : <div className="recent-empty"><Clock3 aria-hidden="true" size={18} />No unfinished session. Choose a book from the shelf to begin.</div>}
     </section>
 
-    {bootstrapPhase === "loading" || packsLoading ? <div className="empty-state" role="status">正在读取本地书库…</div>
-      : books.length === 0 ? <div className="empty-state library-empty-state"><div><LibraryBig aria-hidden="true" size={28} /><h3>书库还是空的</h3><p>从导入中心安装本地持有的 IELTS 资料。</p><Link className="button" to="/import">前往导入中心</Link></div></div>
+    {bootstrapPhase === "loading" || packsLoading ? <div className="empty-state" role="status">Loading the local library…</div>
+      : books.length === 0 ? <div className="empty-state library-empty-state"><div><LibraryBig aria-hidden="true" size={28} /><h3>Your library is empty</h3><p>Install IELTS material that you hold locally from Sources &amp; Import.</p><Link className="button" to="/import">Open import tools</Link></div></div>
         : !selectedBook ? <section aria-labelledby="bookshelf-title" className="library-bookshelf">
-          <div className="library-section-heading"><div><h2 id="bookshelf-title">书架</h2><p>{books.length} 本书 · 点击封面查看 Test</p></div></div>
-          <div className="book-grid">{books.map((book) => <button className="book-tile" key={book.key} onClick={() => { setSelectedBookKey(book.key); setSelectedTestKey(null); }} type="button"><span className="book-cover"><BookCover book={book} repository={repository} /></span><span className="book-tile__copy"><strong>{book.title}</strong><small>{testsForBook(book).length} 个 Test</small></span></button>)}</div>
+          <div className="library-section-heading"><div><h2 id="bookshelf-title">Bookshelf</h2><p>{books.length} book{books.length === 1 ? "" : "s"} · Select a cover to browse tests</p></div></div>
+          <div className="book-grid">{books.map((book) => <button className="book-tile" key={book.key} onClick={() => { setSelectedBookKey(book.key); setSelectedTestKey(null); }} type="button"><span className="book-cover"><BookCover book={book} repository={repository} /></span><span className="book-tile__copy"><strong>{book.title}</strong><small>{testsForBook(book).length} test{testsForBook(book).length === 1 ? "" : "s"}</small></span></button>)}</div>
         </section>
           : <section aria-labelledby="book-title" className="library-book-detail">
-            <button className="library-back" onClick={() => { setSelectedBookKey(null); setSelectedTestKey(null); }} type="button"><ArrowLeft aria-hidden="true" size={16} />返回书架</button>
-            <div className="library-book-detail__header"><span className="book-cover book-cover--small"><BookCover book={selectedBook} repository={repository} /></span><div><span className="test-record__eyebrow">BOOK</span><h2 id="book-title">{selectedBook.title}</h2><p>{selectedBook.edition ?? "本地题库"} · {selectedBookTests.length} 个 Test</p></div></div>
-            <div aria-label="选择 Test" className="library-test-tabs" role="tablist">{selectedBookTests.map((test) => <button aria-selected={test.key === selectedTest?.key} className={test.key === selectedTest?.key ? "is-current" : undefined} key={test.key} onClick={() => setSelectedTestKey(test.key)} role="tab" type="button">{test.title}</button>)}</div>
+            <button className="library-back" onClick={() => { setSelectedBookKey(null); setSelectedTestKey(null); }} type="button"><ArrowLeft aria-hidden="true" size={16} />Back to bookshelf</button>
+            <div className="library-book-detail__header"><span className="book-cover book-cover--small"><BookCover book={selectedBook} repository={repository} /></span><div><span className="test-record__eyebrow">BOOK</span><h2 id="book-title">{selectedBook.title}</h2><p>{selectedBook.edition ?? "Local pack"} · {selectedBookTests.length} test{selectedBookTests.length === 1 ? "" : "s"}</p></div></div>
+            <div aria-label="Choose a test" className="library-test-tabs" role="tablist">{selectedBookTests.map((test) => <button aria-selected={test.key === selectedTest?.key} className={test.key === selectedTest?.key ? "is-current" : undefined} key={test.key} onClick={() => setSelectedTestKey(test.key)} role="tab" type="button">{test.title}</button>)}</div>
             {selectedTest && <div className="library-module-grid">{allBookModules.map((moduleType) => {
               const candidates = moduleType === "speaking" ? [] : selectedTest.candidates.filter((candidate) => candidate.module.type === moduleType);
               const meta = moduleType === "speaking" ? { label: "Speaking", icon: Mic2 } : moduleMeta[moduleType];
               const Icon = meta.icon;
-              return <section className={`library-module ${candidates.length === 0 ? "is-unavailable" : ""}`} key={moduleType}><div className="library-module__heading"><Icon aria-hidden="true" size={18} /><h3>{meta.label}</h3>{candidates.length === 0 && <span>资源未安装</span>}</div>{candidates.map((candidate) => <SectionRows candidate={candidate} key={`${candidate.pack.manifest.id}:${candidate.module.id}`} onOpen={openCandidate} recentSessions={recentSessions} scores={scores} />)}</section>;
+              return <section className={`library-module ${candidates.length === 0 ? "is-unavailable" : ""}`} key={moduleType}><div className="library-module__heading"><Icon aria-hidden="true" size={18} /><h3>{meta.label}</h3>{candidates.length === 0 && <span>Not installed</span>}</div>{candidates.map((candidate) => <SectionRows candidate={candidate} key={`${candidate.pack.manifest.id}:${candidate.module.id}`} onOpen={openCandidate} recentSessions={recentSessions} scores={scores} />)}</section>;
             })}</div>}
           </section>}
 
-    {submittedSessions.length > 0 && <details className="library-history"><summary><CheckCircle2 aria-hidden="true" size={16} />练习历史（{submittedSessions.length}）</summary><div>{submittedSessions.slice(0, 20).map((history) => <div className="recent-session-row" key={history.sessionId}><div className="recent-session-row__copy"><strong>{history.moduleType ? moduleMeta[history.moduleType].label : "未知模块"}</strong><span>{new Date(history.submittedAt ?? history.updatedAt).toLocaleString("zh-CN")} · {formatDuration(history.elapsedSeconds)}</span></div><button className="button" onClick={async () => { if (await loadHistoricalSession(history.sessionId)) navigate("/review"); }} type="button">查看复盘</button></div>)}</div></details>}
+    {submittedSessions.length > 0 && <details className="library-history"><summary><CheckCircle2 aria-hidden="true" size={16} />Practice history ({submittedSessions.length})</summary><div>{submittedSessions.slice(0, 20).map((history) => <div className="recent-session-row" key={history.sessionId}><div className="recent-session-row__copy"><strong>{history.moduleType ? moduleMeta[history.moduleType].label : "Unknown module"}</strong><span>{new Date(history.submittedAt ?? history.updatedAt).toLocaleString("en-US")} · {formatDuration(history.elapsedSeconds)}</span></div><button className="button" onClick={async () => { if (await loadHistoricalSession(history.sessionId)) navigate("/review"); }} type="button">Open review</button></div>)}</div></details>}
   </main>;
 }

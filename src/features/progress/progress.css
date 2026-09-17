@@ -1,0 +1,47 @@
+.progress-page { max-width: 1260px; margin: 0 auto; }
+.progress-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 18px; }
+.progress-summary article { display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 4px 10px; min-height: 92px; padding: 17px; border: 1px solid var(--border-subtle); border-radius: 12px; background: var(--surface-panel); }
+.progress-summary svg { grid-row: 1 / 3; color: var(--accent); }
+.progress-summary span { color: var(--text-secondary); font-size: 12px; }
+.progress-summary strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.progress-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, 1fr); gap: 18px; }
+.progress-card { min-height: 330px; overflow: hidden; border: 1px solid var(--border-strong); border-radius: 12px; background: var(--surface-panel); }
+.progress-card > header { display: flex; min-height: 70px; align-items: center; justify-content: space-between; padding: 14px 18px; border-bottom: 1px solid var(--border-subtle); }
+.progress-card header span { color: var(--accent); font-size: 10px; font-weight: 800; letter-spacing: .13em; }
+.progress-card h2 { margin: 4px 0 0; font-size: 16px; }
+.progress-card header > strong { font-size: 18px; }
+.progress-bars { display: flex; height: 250px; align-items: end; gap: 14px; padding: 30px 24px 18px; }
+.progress-bar { position: relative; display: grid; height: 100%; flex: 1; grid-template-rows: 1fr auto; align-items: end; justify-items: center; gap: 8px; }
+.progress-bar i { width: min(42px, 70%); min-height: 3px; border-radius: 6px 6px 2px 2px; background: linear-gradient(180deg, color-mix(in srgb, var(--accent), white 16%), var(--accent)); box-shadow: 0 5px 12px rgb(143 45 45 / 12%); }
+.progress-bar small { color: var(--text-secondary); }
+.progress-bar__value { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.progress-skills { display: grid; padding: 8px 18px 18px; }
+.progress-skills article { display: grid; grid-template-columns: minmax(0, 1fr) 86px; gap: 10px 14px; padding: 16px 0; border-bottom: 1px solid var(--border-subtle); }
+.progress-skills article:last-child { border-bottom: 0; }
+.progress-skills article > div:first-child { display: grid; gap: 3px; }
+.progress-skills span, .progress-skills small { color: var(--text-secondary); font-size: 11px; }
+.progress-skills small { text-align: right; }
+.progress-skill-track { grid-column: 1 / -1; height: 6px; overflow: hidden; border-radius: 999px; background: var(--surface-raised); }
+.progress-skill-track i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+.progress-empty { margin-top: 18px; }
+.progress-empty h2 { margin: 12px 0 5px; color: var(--text-primary); font: 500 24px var(--font-reading); }
+.progress-empty p { max-width: 560px; margin: 0; }
+.progress-grid--detail { grid-template-columns: 1fr 1fr; margin-top: 18px; }
+.progress-grid--detail .progress-card { min-height: 270px; }
+.accuracy-bars { display: flex; height: 195px; align-items: end; gap: 12px; padding: 22px 22px 16px; }
+.accuracy-bars > div { display: grid; height: 100%; flex: 1; grid-template-rows: auto 1fr auto; gap: 7px; color: var(--text-secondary); font-size: 10px; text-align: center; }
+.accuracy-bars i { position: relative; display: block; overflow: hidden; border-radius: 5px; background: var(--surface-raised); }
+.accuracy-bars b { position: absolute; right: 0; bottom: 0; left: 0; min-height: 2px; border-radius: 5px; background: var(--accent); }
+.progress-focus { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; min-height: 198px; background: var(--border-subtle); }
+.progress-focus article { display: flex; flex-direction: column; justify-content: center; gap: 9px; padding: 24px; background: var(--surface-panel); }
+.progress-focus span, .progress-focus small, .progress-card__empty { color: var(--text-secondary); font-size: 11px; }
+.progress-focus strong { font: 500 19px var(--font-reading); }
+.progress-card__empty { padding: 28px 20px; line-height: 1.6; }
+.progress-question-types { min-height: 0; margin-top: 18px; }
+.progress-question-types > div { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0 26px; padding: 8px 18px 18px; }
+.progress-question-types article { display: grid; grid-template-columns: minmax(0, 1fr) 90px 42px; align-items: center; gap: 12px; padding: 13px 0; border-bottom: 1px solid var(--border-subtle); }
+.progress-question-types article > div:first-child { display: grid; gap: 3px; }
+.progress-question-types article span { color: var(--text-secondary); font-size: 10px; }
+.progress-question-types article b { text-align: right; }
+.progress-question-types .progress-skill-track { grid-column: auto; }
+@media (max-width: 980px) { .progress-summary { grid-template-columns: repeat(2, 1fr); } .progress-grid { grid-template-columns: 1fr; } }

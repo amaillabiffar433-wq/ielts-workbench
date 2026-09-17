@@ -34,12 +34,16 @@ import type {
   SaveWritingDraftInput,
   SessionSnapshot,
   WorkspaceBackupSummary,
+  ObsidianExportResult,
   WorkspaceSummary,
   WritingDraft,
   WritingVersion,
   SaveVocabularyItemInput,
   UpdateVocabularyItemInput,
   VocabularyItem,
+  ReviewItem,
+  ReviewRating,
+  SaveReviewItemInput,
 } from "./LearningRepository";
 import {
   BootstrapStateSchema,
@@ -51,6 +55,9 @@ import {
   SaveVocabularyItemInputSchema,
   UpdateVocabularyItemInputSchema,
   VocabularyItemSchema,
+  ReviewItemSchema,
+  ReviewRatingSchema,
+  SaveReviewItemInputSchema,
   deriveRecentSessionId,
   sortRecentSessionSummaries,
 } from "./LearningRepository";
@@ -64,6 +71,7 @@ export interface InMemoryLearningRepositoryOptions {
   readonly drafts?: readonly WritingDraft[];
   readonly writingVersions?: readonly WritingVersion[];
   readonly vocabularyItems?: readonly VocabularyItem[];
+  readonly reviewItems?: readonly ReviewItem[];
   readonly packFolders?: Readonly<Record<string, IELTSPack>>;
   readonly media?: Readonly<Record<string, Uint8Array<ArrayBufferLike>>>;
   readonly now?: () => Date;
@@ -80,6 +88,7 @@ export interface InMemoryRepositorySnapshot {
   readonly drafts: readonly WritingDraft[];
   readonly writingVersions: readonly WritingVersion[];
   readonly vocabularyItems?: readonly VocabularyItem[];
+  readonly reviewItems?: readonly ReviewItem[];
 }
 
 export interface InMemoryRepositoryStateStore {
@@ -126,7 +135,7 @@ function toSessionSummary(session: SessionSnapshot): PracticeSessionSummary {
     startedAt,
     updatedAt,
     ...(session.submittedAt === undefined ? {} : { submittedAt: session.submittedAt }),
-    elapsedSeconds: 0,
+    elapsedSeconds: session.elapsedSeconds ?? 0,
   };
 }
 
@@ -151,6 +160,7 @@ export class InMemoryLearningRepository implements LearningRepository {
   private readonly drafts = new Map<string, WritingDraft>();
   private readonly writingVersions = new Map<string, WritingVersion[]>();
   private readonly vocabularyItems = new Map<string, VocabularyItem>();
+  private readonly reviewItems = new Map<string, ReviewItem>();
   private readonly packFolders = new Map<string, IELTSPack>();
   private readonly media = new Map<string, Uint8Array<ArrayBuffer>>();
   private readonly now: () => Date;
@@ -191,6 +201,10 @@ export class InMemoryLearningRepository implements LearningRepository {
     for (const item of options.vocabularyItems ?? []) {
       const parsed = VocabularyItemSchema.parse(item);
       this.vocabularyItems.set(parsed.id, deepFreeze(cloneJson(parsed)));
+    }
+    for (const item of options.reviewItems ?? []) {
+      const parsed = ReviewItemSchema.parse(item);
+      this.reviewItems.set(parsed.id, deepFreeze(cloneJson(parsed)));
     }
     for (const [folder, packInput] of Object.entries(options.packFolders ?? {})) {
       this.packFolders.set(normalizeFolderKey(folder), parseIeltsPack(cloneJson(packInput)));
@@ -233,6 +247,10 @@ export class InMemoryLearningRepository implements LearningRepository {
       for (const item of snapshot.vocabularyItems ?? []) {
         const parsed = VocabularyItemSchema.parse(item);
         this.vocabularyItems.set(parsed.id, deepFreeze(cloneJson(parsed)));
+      }
+      for (const item of snapshot.reviewItems ?? []) {
+        const parsed = ReviewItemSchema.parse(item);
+        this.reviewItems.set(parsed.id, deepFreeze(cloneJson(parsed)));
       }
     })();
     await this.hydrationPromise;
@@ -304,6 +322,17 @@ export class InMemoryLearningRepository implements LearningRepository {
 
   async restoreWorkspaceBackup(_backupPath: string, destinationParent: string): Promise<BootstrapState> {
     return this.initializeWorkspace(`${destinationParent.trim().replace(/[\\/]+$/u, "")}\\IELTS-Workbench-Restored-memory`);
+  }
+
+  async exportObsidianDailyBrief(vaultPath: string, date: string, markdown: string): Promise<ObsidianExportResult> {
+    if (!vaultPath.trim() || !/^\d{4}-\d{2}-\d{2}$/u.test(date) || !markdown.trim()) throw new Error("Invalid Obsidian export input");
+    return {
+      path: `${vaultPath.replace(/[\\/]+$/u, "")}\\IELTS\\${date}.md`,
+      backupPath: null,
+      previousSha256: null,
+      sha256: "0".repeat(64),
+      changed: true,
+    };
   }
 
   async listInstalledPacks(): Promise<InstalledPackSummary[]> {
@@ -644,6 +673,81 @@ export class InMemoryLearningRepository implements LearningRepository {
     await this.persist();
   }
 
+  async listReviewItems(): Promise<ReviewItem[]> {
+    await this.ensureHydrated();
+    return [...this.reviewItems.values()]
+      .map((item) => cloneJson(item))
+      .sort((left, right) => left.dueAt.localeCompare(right.dueAt) || left.id.localeCompare(right.id));
+  }
+
+  async saveReviewItem(input: SaveReviewItemInput): Promise<ReviewItem> {
+    await this.ensureHydrated();
+    const validated = SaveReviewItemInputSchema.parse(input);
+    if (validated.sourceSessionId && !this.sessions.has(validated.sourceSessionId)) {
+      throw new Error("The source session does not exist.");
+    }
+    if (validated.sourceKind === "vocabulary") {
+      if (!validated.vocabularyId || !this.vocabularyItems.has(validated.vocabularyId)) {
+        throw new Error("The vocabulary item does not exist.");
+      }
+    } else {
+      const pack = validated.packId ? this.packs.get(validated.packId) : undefined;
+      const module = pack?.modules.find((candidate) => candidate.testId === validated.testId && candidate.type === validated.moduleType);
+      const questionExists = module && module.type !== "writing" && module.sections.some((section) => (
+        section.questionGroups.some((group) => group.questions.some((question) => question.id === validated.questionId))
+      ));
+      if (!questionExists) throw new Error("The review question does not exist in the installed pack.");
+    }
+    const existing = [...this.reviewItems.values()].find((item) => (
+      item.sourceKind === validated.sourceKind
+      && item.packId === validated.packId
+      && item.testId === validated.testId
+      && item.moduleType === validated.moduleType
+      && item.questionId === validated.questionId
+      && item.vocabularyId === validated.vocabularyId
+    ));
+    const now = this.now().toISOString();
+    const item = ReviewItemSchema.parse({
+      ...validated,
+      id: existing?.id ?? validated.id ?? this.idFactory(),
+      intervalDays: existing?.intervalDays ?? 0,
+      repetitions: existing?.repetitions ?? 0,
+      dueAt: existing && existing.dueAt < now ? existing.dueAt : now,
+      ...(existing?.lastReviewedAt ? { lastReviewedAt: existing.lastReviewedAt } : {}),
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+    });
+    this.reviewItems.set(item.id, deepFreeze(cloneJson(item)));
+    await this.persist();
+    return deepFreeze(cloneJson(item));
+  }
+
+  async gradeReviewItem(itemId: string, rating: ReviewRating): Promise<ReviewItem> {
+    await this.ensureHydrated();
+    const id = StableIdSchema.parse(itemId);
+    const validatedRating = ReviewRatingSchema.parse(rating);
+    const current = this.reviewItems.get(id);
+    if (!current) throw new Error("The review item does not exist.");
+    const intervalDays = validatedRating === "again" || validatedRating === "hard" ? 1
+      : validatedRating === "good"
+        ? [1, 3, 7, 14][Math.min(current.repetitions, 3)]
+        : [3, 7, 14][Math.min(current.repetitions, 2)];
+    const reviewedAt = this.now();
+    const dueAt = new Date(reviewedAt);
+    dueAt.setDate(dueAt.getDate() + intervalDays);
+    const item = ReviewItemSchema.parse({
+      ...current,
+      intervalDays,
+      repetitions: validatedRating === "again" ? 0 : current.repetitions + 1,
+      dueAt: dueAt.toISOString(),
+      lastReviewedAt: reviewedAt.toISOString(),
+      updatedAt: reviewedAt.toISOString(),
+    });
+    this.reviewItems.set(id, deepFreeze(cloneJson(item)));
+    await this.persist();
+    return deepFreeze(cloneJson(item));
+  }
+
   async getSetting(key: string): Promise<string | null> {
     await this.ensureHydrated();
     return this.settings.get(key) ?? null;
@@ -724,6 +828,7 @@ export class InMemoryLearningRepository implements LearningRepository {
       drafts: [...this.drafts.values()].map((draft) => cloneJson(draft)),
       writingVersions: [...this.writingVersions.values()].flat().map((version) => cloneJson(version)),
       vocabularyItems: [...this.vocabularyItems.values()].map((item) => cloneJson(item)),
+      reviewItems: [...this.reviewItems.values()].map((item) => cloneJson(item)),
     });
   }
 }

@@ -23,6 +23,8 @@ export function buildPracticeRoute(
   options: {
     readonly identity?: PracticeRouteIdentity | null;
     readonly mode?: PracticeMode;
+    readonly audioStartMs?: number;
+    readonly sourceQuestionId?: string;
   } = {},
 ): string {
   const mode = options.mode ?? "study";
@@ -32,6 +34,11 @@ export function buildPracticeRoute(
     search.set("testId", options.identity.testId);
   }
   if (options.identity || mode === "exam") search.set("mode", mode);
+  if (options.audioStartMs !== undefined && Number.isSafeInteger(options.audioStartMs) && options.audioStartMs >= 0) {
+    search.set("tMs", String(options.audioStartMs));
+  }
+  const sourceQuestionId = StableIdSchema.safeParse(options.sourceQuestionId);
+  if (sourceQuestionId.success) search.set("sourceQuestionId", sourceQuestionId.data);
   const query = search.toString();
   return `/practice/${moduleType}${query ? `?${query}` : ""}`;
 }

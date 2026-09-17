@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent } from "react";
 import type { VisualSource } from "../../domain/pack";
 import { useWorkbenchStore } from "../../stores/workbenchStore";
+import { confirmAction } from "../../infrastructure/window/windowClose";
 import type { PdfDocumentHandle } from "./documentSource";
 import { replaceDraftOptions, touchStructuredDraft, type StructuredImportDraft, type SupportedImportQuestionType } from "./structuredImportModel";
 import { addQuickQuestions, appendVisual, cropFromPoints, fullPageCrop, type PdfCrop } from "./visualImportModel";
@@ -180,10 +181,10 @@ export function PdfRegionEditor({ draft, documentHandle, onChange, onPendingSave
         </select></label>
         <button type="button" disabled={!targetGroup} onClick={() => { try { onChange(addQuickQuestions(draft, target, questionRange, questionType)); setMessage("作答框已创建。请在题组设置共享选项、字数限制及答案 Key。"); } catch (error) { setMessage(String(error)); } }}>创建题组作答框</button>
       </div>
-      <div className="pdf-actions"><label>批量选项字母<input value={optionRange} onChange={(event) => setOptionRange(event.target.value)} /></label><button type="button" disabled={!targetGroup} onClick={() => {
+      <div className="pdf-actions"><label>批量选项字母<input value={optionRange} onChange={(event) => setOptionRange(event.target.value)} /></label><button type="button" disabled={!targetGroup} onClick={async () => {
         const match = /^\s*([A-Z])\s*[-–—]\s*([A-Z])\s*$/u.exec(optionRange.toUpperCase());
         if (!match || match[2] <= match[1]) { setMessage("请输入如 A-J 的连续选项字母范围。"); return; }
-        if (targetGroup!.sharedOptions.length && !window.confirm("替换该题组现有共享选项？请核对选项和答案映射。")) return;
+        if (targetGroup!.sharedOptions.length && !(await confirmAction("替换该题组现有共享选项？请核对选项和答案映射。"))) return;
         const labels = Array.from({ length: match[2].charCodeAt(0) - match[1].charCodeAt(0) + 1 }, (_, index) => String.fromCharCode(match[1].charCodeAt(0) + index));
         onChange(touchStructuredDraft(draft, { passages: draft.passages.map((passage) => ({ ...passage, questionGroups: passage.questionGroups.map((group) => group.id === target ? { ...group, sharedOptions: replaceDraftOptions(group.sharedOptions, labels.map((label) => `${label} ${label} (see original context)`).join("\n")) } : group) })) }));
         setMessage("题组共享选项已生成；原图中的具体选项文字需保持可见。");

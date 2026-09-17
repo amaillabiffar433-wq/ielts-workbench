@@ -29,6 +29,11 @@ const MIGRATIONS: &[Migration] = &[
         name: "vocabulary_context",
         sql: include_str!("../../migrations/0004_vocabulary_context.sql"),
     },
+    Migration {
+        version: 5,
+        name: "review_schedule",
+        sql: include_str!("../../migrations/0005_review_schedule.sql"),
+    },
 ];
 
 pub fn run(connection: &mut Connection) -> Result<()> {
@@ -103,6 +108,8 @@ mod tests {
             "writing_drafts",
             "writing_versions",
             "vocabulary_items",
+            "review_items",
+            "review_events",
             "ai_runs",
         ] {
             let exists: i64 = connection

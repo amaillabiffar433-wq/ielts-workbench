@@ -13,21 +13,25 @@
   max-width: 1600px;
   height: var(--topbar-height);
   align-items: center;
-  gap: 42px;
+  gap: 34px;
   margin: 0 auto;
   color: #e6e4e6;
 }
-.top-navigation__brand { display: flex; width: 150px; flex: 0 0 150px; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.top-navigation__brand { display: flex; width: 164px; flex: 0 0 164px; align-items: center; gap: 8px; font-size: 12px; font-weight: 650; letter-spacing: 0.01em; white-space: nowrap; }
 .top-navigation__brand svg { color: #c38d8b; }
-.top-navigation__links { display: flex; height: 100%; gap: 26px; align-items: center; }
-.top-navigation__link { position: relative; display: inline-flex; height: 100%; align-items: center; color: #b5b3bd; text-decoration: none; font-size: 13px; transition: color 140ms ease; }
+.top-navigation__links { display: flex; height: 100%; gap: 8px; align-items: center; }
+.top-navigation__link { position: relative; display: inline-flex; height: 36px; align-items: center; gap: 7px; padding: 0 10px; border-radius: 8px; color: #b5b3bd; text-decoration: none; font-size: 13px; transition: color 140ms ease, background 140ms ease; }
 .top-navigation__link:hover, .top-navigation__link.active { color: #fff8f5; }
-.top-navigation__link.active::after { position: absolute; right: 0; bottom: 10px; left: 0; height: 2px; background: #b76667; content: ""; }
+.top-navigation__link:hover { background: rgb(255 255 255 / 6%); }
+.top-navigation__link.active { background: rgb(255 255 255 / 9%); }
+.top-navigation__link.active::after { position: absolute; right: 10px; bottom: 2px; left: 10px; height: 2px; border-radius: 2px; background: #c97876; content: ""; }
 .top-navigation__unavailable { color: #97939e; cursor: help; font-size: 13px; }
 .top-navigation__utilities { display: flex; gap: 8px; align-items: center; margin-left: auto; }
 .top-navigation__utility { display: inline-flex; height: 32px; min-width: 32px; padding: 0 8px; align-items: center; justify-content: center; gap: 6px; border: 0; border-radius: 7px; background: transparent; color: #cfccd2; font-size: 12px; text-decoration: none; transition: background 140ms ease; }
 .top-navigation__utility:hover, .top-navigation__utility.active { background: rgb(255 255 255 / 9%); color: white; }
 .top-navigation__exam { font-size: 12px; color: #d9b7b7; }
+.top-navigation__offline { display: inline-flex; align-items: center; gap: 7px; color: #aaa7b0; font-size: 11px; white-space: nowrap; }
+.top-navigation__offline > span { width: 7px; height: 7px; border: 1px solid #86ad98; border-radius: 50%; background: #5f8e72; box-shadow: 0 0 0 3px rgb(95 142 114 / 15%); }
 .app-shell__main {
   position: relative;
   width: 100%;
@@ -43,14 +47,14 @@
 }
 .app-shell:has(.reading-workbench--focus) { grid-template-rows: minmax(0, 1fr); padding: 12px; }
 .app-shell:has(.reading-workbench--focus) .top-navigation { display: none; }
-.ai-drawer-backdrop { position: fixed; inset: 0; z-index: 40; border: 0; background: rgb(18 19 23 / 25%); }
-.ai-drawer { position: fixed; top: 0; right: 0; z-index: 41; display: flex; width: min(390px, 92vw); height: 100%; flex-direction: column; border-left: 1px solid var(--border-subtle); background: var(--surface-panel); box-shadow: var(--shadow-float); }
-.ai-drawer__header { display: flex; height: var(--topbar-height); align-items: center; justify-content: space-between; padding: 0 16px 0 20px; border-bottom: 1px solid var(--border-subtle); }
-.ai-drawer__body { display: grid; gap: 20px; padding: 22px; }
-.ai-drawer__body h2, .ai-drawer__body p { margin: 0; }
-.ai-context-card { padding: 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-raised); }
-.ai-context-card ul { padding-left: 20px; margin: 10px 0 0; color: var(--text-secondary); line-height: 1.7; }
 @media (max-width: 1400px) {
   .app-shell { padding: 0 24px 16px; }
   .top-navigation { gap: 28px; }
+}
+
+@media (max-width: 1120px) {
+  .top-navigation__brand { width: auto; flex-basis: auto; }
+  .top-navigation__link { padding-inline: 8px; }
+  .top-navigation__link svg { display: none; }
+  .top-navigation__offline { display: none; }
 }

@@ -46,3 +46,9 @@ export async function pickRestoreDestinationDirectory(): Promise<string | null> 
   const selected = await open({ directory: true, multiple: false, title: "选择恢复目标父目录（将新建独立工作区）" });
   return typeof selected === "string" ? selected : null;
 }
+
+export async function pickObsidianVaultDirectory(): Promise<string | null> {
+  if (!isTauri()) return null;
+  const selected = await open({ directory: true, multiple: false, title: "Choose your Obsidian vault" });
+  return typeof selected === "string" ? selected : null;
+}

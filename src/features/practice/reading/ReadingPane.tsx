@@ -27,17 +27,17 @@ import {
 import { paneInstanceId, paneShowsQuestions, type PaneSide } from "./readingPaneIdentity";
 
 const paneOptions = [
-  { value: "passage" as const, label: "文章" },
-  { value: "questions" as const, label: "题目" },
-  { value: "whole" as const, label: "整套" },
+  { value: "passage" as const, label: "Passage" },
+  { value: "questions" as const, label: "Questions" },
+  { value: "whole" as const, label: "Whole test" },
 ];
 
 const questionScopeOptions: ReadonlyArray<{ value: ReadingQuestionScope; label: string }> = [
-  { value: "all", label: "全部" },
-  { value: "passage", label: "按 Passage" },
-  { value: "group", label: "题组" },
-  { value: "range", label: "题段" },
-  { value: "single", label: "单题" },
+  { value: "all", label: "All" },
+  { value: "passage", label: "By passage" },
+  { value: "group", label: "Question group" },
+  { value: "range", label: "Question range" },
+  { value: "single", label: "Single question" },
 ];
 
 function QuestionGroups({
@@ -71,12 +71,12 @@ function QuestionGroups({
     <div className="reading-questions">
       <div className="reading-questions__intro">
         <span>{questionSelectionLabel(questionSelection, entries, module)}</span>
-        <p>题组说明和共享作答上下文会随所选题目保留；筛选不会删除其他答案。</p>
+        <p>Group instructions and shared answer context stay with the selected questions; filtering never deletes other answers.</p>
       </div>
       {selectionResult.error ? (
         <div className="reading-selection-error" role="alert">{selectionResult.error}</div>
       ) : groups.length === 0 ? (
-        <div className="empty-state reading-questions__empty">当前范围没有可显示的题目。</div>
+        <div className="empty-state reading-questions__empty">No questions are available in this range.</div>
       ) : groups.map((selectedGroup, groupIndex) => {
         const contextBlocks = selectedGroup.group.contextBlocks ?? [];
         const boundQuestionIds = boundQuestionIdsFromContext(contextBlocks);
@@ -146,7 +146,7 @@ function QuestionGroups({
                 if (!entry) return null;
                 return editable
                   ? renderQuestion(entry, true)
-                  : <span className="question-context__answer-placeholder">Question {question.displayNumber} · 当前筛选中只读</span>;
+                  : <span className="question-context__answer-placeholder">Question {question.displayNumber} · read-only in this filter</span>;
               }}
             />
             {selectedGroup.entries

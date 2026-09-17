@@ -188,11 +188,11 @@ describe("ReadingPage shared panes and question navigation", () => {
     fireEvent.click(option);
     await waitFor(() => expect(option).toBeChecked());
     const savedAnswers = workbenchStore.getState().answers;
-    fireEvent.click(screen.getByRole("button", { name: "单 Pane" }));
+    fireEvent.click(screen.getByRole("button", { name: "Single pane" }));
     expect(group).toHaveAttribute("data-visible-pane", "left");
     fireEvent.click(screen.getByRole("button", { name: "Pane B" }));
     expect(group).toHaveAttribute("data-visible-pane", "right");
-    fireEvent.click(screen.getByRole("button", { name: "双 Pane" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dual pane" }));
     expect(group).toHaveAttribute("data-visible-pane", "both");
     expect(document.querySelector('[data-pane-scroll="left"]')).toBe(left);
     expect(document.querySelector('[data-pane-scroll="right"]')).toBe(right);
@@ -205,8 +205,8 @@ describe("ReadingPage shared panes and question navigation", () => {
     const question = firstSingleChoiceQuestion();
     renderReading();
     await screen.findByTestId("reading-split-workspace");
-    fireEvent.click(screen.getByRole("button", { name: "单 Pane" }));
-    fireEvent.click(screen.getByRole("button", { name: `跳到第 ${question.number} 题，未答，右窗格` }));
+    fireEvent.click(screen.getByRole("button", { name: "Single pane" }));
+    fireEvent.click(screen.getByRole("button", { name: `Go to question ${question.number}, unanswered, right pane` }));
     await waitFor(() => {
       expect(document.getElementById("reading-split-workspace")).toHaveAttribute("data-visible-pane", "right");
       expect(document.activeElement).toBe(document.getElementById(questionContainerId("right-pane", question.id)));
@@ -219,9 +219,9 @@ describe("ReadingPage shared panes and question navigation", () => {
     const pane = document.querySelector('[data-pane-scroll="left"]');
     const loadSetting = vi.mocked(workbenchStore.getState().loadSetting);
     const calls = loadSetting.mock.calls.filter(([key]) => key === readingViewStateSettingKey(session.sessionId)).length;
-    fireEvent.click(screen.getByRole("button", { name: "专注" }));
+    fireEvent.click(screen.getByRole("button", { name: "Focus" }));
     await act(async () => { workbenchStore.setState({ session: { ...session, elapsedSeconds: 10 } }); });
-    expect(screen.getByRole("button", { name: "退出专注" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Exit focus" })).toBeInTheDocument();
     expect(document.querySelector('[data-pane-scroll="left"]')).toBe(pane);
     expect(loadSetting.mock.calls.filter(([key]) => key === readingViewStateSettingKey(session.sessionId))).toHaveLength(calls);
   });
@@ -231,13 +231,13 @@ describe("ReadingPage shared panes and question navigation", () => {
     await screen.findByTestId("reading-split-workspace");
     const saveSetting = workbenchStore.getState().saveSetting;
     expect(saveSetting).not.toHaveBeenCalledWith("appearance.readingFontSize", expect.anything());
-    fireEvent.click(screen.getByRole("button", { name: "字体" }));
-    fireEvent.change(screen.getByLabelText(/正文字号/u), { target: { value: "20" } });
+    fireEvent.click(screen.getByRole("button", { name: "Type" }));
+    fireEvent.change(screen.getByLabelText(/Reading size/u), { target: { value: "20" } });
     expect(saveSetting).toHaveBeenCalledWith("appearance.readingFontSize", "20");
     expect(document.documentElement.style.getPropertyValue("--font-size-reading")).toBe("20px");
-    fireEvent.click(screen.getByRole("button", { name: "专注" }));
+    fireEvent.click(screen.getByRole("button", { name: "Focus" }));
     expect(document.querySelector(".reading-workbench--focus")).not.toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "退出专注" }));
+    fireEvent.click(screen.getByRole("button", { name: "Exit focus" }));
     expect(document.querySelector(".reading-workbench--focus")).toBeNull();
     expect(workbenchStore.getState().session?.sessionId).toBe(session.sessionId);
     document.documentElement.style.removeProperty("--font-size-reading");
@@ -267,7 +267,7 @@ describe("ReadingPage shared panes and question navigation", () => {
     expect(rightTarget).toHaveAttribute("tabindex", "-1");
 
     const navigationButton = screen.getByRole("button", {
-      name: `跳到第 ${question.number} 题，未答，右窗格`,
+      name: `Go to question ${question.number}, unanswered, right pane`,
     });
     expect(navigationButton).toHaveAttribute("aria-controls", rightId);
     fireEvent.click(navigationButton);
@@ -287,7 +287,7 @@ describe("ReadingPage shared panes and question navigation", () => {
     const rightId = questionContainerId("right-pane", question.id);
     expect(document.getElementById(rightId)).toBeNull();
     const navigationButton = screen.getByRole("button", {
-      name: `跳到第 ${question.number} 题，未答，右窗格`,
+      name: `Go to question ${question.number}, unanswered, right pane`,
     });
     expect(navigationButton).toHaveAttribute("aria-controls", rightId);
     fireEvent.click(navigationButton);
@@ -309,9 +309,9 @@ describe("ReadingPage shared panes and question navigation", () => {
     renderReading();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "无法恢复阅读 Session：workspace database is unavailable",
+      "Unable to restore the Reading session: workspace database is unavailable",
     );
-    fireEvent.click(screen.getByRole("button", { name: "重试" }));
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByTestId("reading-split-workspace")).toBeInTheDocument();
     expect(ensureSession).toHaveBeenCalledTimes(2);

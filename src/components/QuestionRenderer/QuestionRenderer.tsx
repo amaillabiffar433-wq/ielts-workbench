@@ -19,7 +19,7 @@ export type QuestionRendererProps = {
 };
 
 function CorrectAnswer({ question }: { question: Question }) {
-  return <p className="question__answer-key">参考答案：{displayQuestionCorrectAnswer(question)}</p>;
+  return <p className="question__answer-key">Answer: {displayQuestionCorrectAnswer(question)}</p>;
 }
 
 export function QuestionRenderer({
@@ -54,7 +54,7 @@ export function QuestionRenderer({
         <span className="question__body">
           <span className="sr-only" id={legendId}>{question.prompt}</span>
           <span className="question__text-answer">
-            <label className="sr-only" htmlFor={answerId}>第 {displayNumber} 题答案</label>
+            <label className="sr-only" htmlFor={answerId}>Answer for question {displayNumber}</label>
             <input
               aria-describedby={question.maxWords ? limitId : undefined}
               className="input"
@@ -72,11 +72,11 @@ export function QuestionRenderer({
         </span>
         {onToggleFlag && (
           <button
-            aria-label={`${flagged ? "取消" : "标记"}第 ${displayNumber} 题稍后复查`}
+            aria-label={`${flagged ? "Remove review flag from" : "Flag"} question ${displayNumber} for review`}
             aria-pressed={flagged}
             className="question__flag"
             onClick={onToggleFlag}
-            title={flagged ? "取消稍后复查" : "标记为稍后复查"}
+            title={flagged ? "Remove review flag" : "Flag for review"}
             type="button"
           ><Flag aria-hidden="true" size={13} /></button>
         )}
@@ -96,11 +96,11 @@ export function QuestionRenderer({
         <div className="question__number" aria-hidden="true">{question.type === "multiple-choice" ? questionNumberLabel(question) : displayNumber}</div>
         {onToggleFlag && (
           <button
-            aria-label={`${flagged ? "取消" : "标记"}第 ${displayNumber} 题稍后复查`}
+            aria-label={`${flagged ? "Remove review flag from" : "Flag"} question ${displayNumber} for review`}
             aria-pressed={flagged}
             className="question__flag"
             onClick={onToggleFlag}
-            title={flagged ? "取消稍后复查" : "标记为稍后复查"}
+            title={flagged ? "Remove review flag" : "Flag for review"}
             type="button"
           ><Flag aria-hidden="true" size={13} /></button>
         )}
@@ -109,7 +109,7 @@ export function QuestionRenderer({
         <p className="question__prompt" id={legendId}>{question.prompt}</p>
         {question.type === "single-choice" && (
           <fieldset aria-labelledby={legendId} className="question__options" disabled={disabled}>
-            <legend className="sr-only">选择一个答案</legend>
+            <legend className="sr-only">Choose one answer</legend>
             {question.options.map((option) => (
               <label key={option.id}>
                 <input
@@ -129,7 +129,7 @@ export function QuestionRenderer({
           const selected = Array.isArray(answer) ? [...answer] : answer ? [answer] : [];
           return (
             <fieldset aria-labelledby={legendId} className="question__options" disabled={disabled}>
-              <legend className="question__selection-limit">请选择 {question.selectionCount} 项（按题包契约{question.scoringMode === "per-correct-option" ? "逐项计分" : "整组计分"}）</legend>
+              <legend className="question__selection-limit">Choose {question.selectionCount} options ({question.scoringMode === "per-correct-option" ? "scored per correct option" : "scored as a set"})</legend>
               {question.options.map((option) => {
                 const checked = selected.includes(option.id);
                 return (
@@ -146,13 +146,13 @@ export function QuestionRenderer({
                   </label>
                 );
               })}
-              <span className="question__limit">已选 {selected.length}/{question.selectionCount}</span>
+              <span className="question__limit">Selected {selected.length}/{question.selectionCount}</span>
             </fieldset>
           );
         })()}
         {question.type === "true-false-not-given" && (
           <fieldset aria-labelledby={legendId} className="question__options question__options--horizontal" disabled={disabled}>
-            <legend className="sr-only">选择 True、False 或 Not Given</legend>
+            <legend className="sr-only">Choose True, False, or Not Given</legend>
             {[
               ["true", "True"],
               ["false", "False"],
@@ -173,7 +173,7 @@ export function QuestionRenderer({
         )}
         {question.type === "yes-no-not-given" && (
           <fieldset aria-labelledby={legendId} className="question__options question__options--horizontal" disabled={disabled}>
-            <legend className="sr-only">选择 Yes、No 或 Not Given</legend>
+            <legend className="sr-only">Choose Yes, No, or Not Given</legend>
             {[["yes", "Yes"], ["no", "No"], ["not-given", "Not Given"]].map(([value, label]) => (
               <label key={value}>
                 <input
@@ -190,20 +190,20 @@ export function QuestionRenderer({
         )}
         {question.type === "matching" && (
           <label className="question__matching">
-            <span>匹配选项</span>
+            <span>Match</span>
             <select
-              aria-label={`第 ${displayNumber} 题匹配选项`}
+              aria-label={`Matching option for question ${displayNumber}`}
               className="select"
               disabled={disabled}
               onChange={(event) => onAnswer(question.id, event.target.value)}
               value={Array.isArray(answer) ? answer[0] ?? "" : answer}
             >
-              <option value="">请选择</option>
+              <option value="">Choose</option>
               {question.options.map((option) => (
                 <option disabled={disabledOptionIds.has(option.id)} key={option.id} value={option.id}>{option.label} · {option.text}</option>
               ))}
             </select>
-            <span className="question__limit">{question.allowOptionReuse ? "该题组允许重复使用选项" : "该题组每个选项只能使用一次"}</span>
+            <span className="question__limit">{question.allowOptionReuse ? "Options may be reused in this group" : "Each option may be used once in this group"}</span>
           </label>
         )}
         {(question.type === "short-answer" || question.type === "fill-blank") && (
@@ -213,21 +213,21 @@ export function QuestionRenderer({
                 {question.sentence.replace("{{blank}}", (typeof answer === "string" ? answer : answer.join(" ")) || "________")}
               </p>
             )}
-            <label className="sr-only" htmlFor={`${domPrefix}-answer`}>第 {displayNumber} 题答案</label>
+            <label className="sr-only" htmlFor={`${domPrefix}-answer`}>Answer for question {displayNumber}</label>
             <input
               aria-describedby={question.maxWords ? `${domPrefix}-limit` : undefined}
               className="input"
               disabled={disabled}
               id={`${domPrefix}-answer`}
               onChange={(event) => onAnswer(question.id, event.target.value)}
-              placeholder="输入答案"
+              placeholder="Enter answer"
               spellCheck={false}
               type="text"
               value={Array.isArray(answer) ? answer.join(" ") : answer}
             />
             {question.maxWords && (
               <span className="question__limit" id={`${domPrefix}-limit`}>
-                不超过 {question.maxWords} 个单词
+                No more than {question.maxWords} word{question.maxWords === 1 ? "" : "s"}
               </span>
             )}
           </div>
