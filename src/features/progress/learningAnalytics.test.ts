@@ -26,6 +26,20 @@ const snapshot: SessionSnapshot = {
 };
 
 describe("learning analytics", () => {
+  it("uses measured daily intervals without assigning a multi-day session total to today", () => {
+    const result=buildLearningAnalytics([originalDemoPack],[submitted],new Map([[snapshot.sessionId,snapshot]]),new Date("2026-09-17T12:00:00"),{"2026-09-17":17});
+    expect(result.todaySeconds).toBe(17);
+    expect(result.elapsedSeconds).toBe(120);
+    expect(result.recentDays.at(-1)?.elapsedSeconds).toBe(17);
+  });
+  it("separates retakes from first-attempt accuracy while retaining time", () => {
+    const retry = { ...submitted, sessionId: "retry-session", startedAt: "2026-09-18T00:00:00.000Z", updatedAt: "2026-09-18T01:00:00.000Z" };
+    const result = buildLearningAnalytics([originalDemoPack], [retry, submitted], new Map([[snapshot.sessionId, snapshot], [retry.sessionId, { ...snapshot, sessionId: retry.sessionId }]]));
+    expect(result.retakes).toBe(1);
+    expect(result.elapsedSeconds).toBe(240);
+    expect(result.scorablePoints).toBe(6);
+    expect(result.earnedPoints).toBe(1);
+  });
   it("derives time, accuracy, mistakes, activity, and module totals only from durable data", () => {
     const writing: PracticeSessionSummary = {
       sessionId: "analytics-writing-session",

@@ -12,7 +12,7 @@ export async function pickWorkspaceDirectory(): Promise<string | null> {
   const selected = await open({
     directory: true,
     multiple: false,
-    title: "选择 IELTS Workbench 学习工作区",
+    title: "选择 Luma 学习工作区",
   });
   return typeof selected === "string" ? selected : null;
 }

@@ -144,6 +144,16 @@ describe("ReadingPage multi-passage selection", () => {
     vi.restoreAllMocks();
   });
 
+  it("opens a section entry with its passage and the matching question group", async () => {
+    render(<MemoryRouter initialEntries={[`/practice/reading?packId=${originalMultiPassagePack.manifest.id}&testId=${testId}&mode=study&sourceSectionId=northbridge-passage-02`]}><ReadingPage /></MemoryRouter>);
+    await screen.findByTestId("reading-split-workspace");
+    await waitFor(() => expect(screen.getByLabelText("左窗格 Passage")).toHaveValue("northbridge-passage-02"));
+    expect(screen.getByLabelText("右窗格题目范围类型")).toHaveValue("passage");
+    expect(screen.getByLabelText("右窗格题目 Passage")).toHaveValue("northbridge-passage-02");
+    expect(screen.getByText("Which condition can stop crossings even at a safe water level?")).toBeInTheDocument();
+    expect(screen.queryByText("The offline guide records the names of all volunteers.")).not.toBeInTheDocument();
+  });
+
   it("shows non-first passages and all/passage question selection", async () => {
     renderReading();
     await screen.findByTestId("reading-split-workspace");

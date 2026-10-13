@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { Focus, Maximize, Type, X } from "lucide-react";
 import { SegmentedControl } from "../../../components/common/SegmentedControl";
 import { toggleWindowFullscreen } from "../../../infrastructure/window/windowPresentation";
@@ -6,7 +7,7 @@ import { useWorkbenchStore } from "../../../stores/workbenchStore";
 import type { PaneSide } from "./readingPaneIdentity";
 
 /** Pure presentation shell. Canonical Pane selections and practice data stay in ReadingWorkbench. */
-export function ReadingWorkspace({ toolbar, panes, navigator, visiblePane, onVisiblePaneChange, answered, total }: {
+export function ReadingWorkspace({ toolbar, panes, navigator, visiblePane, onVisiblePaneChange, answered, total, passageTabs }: {
   toolbar: ReactNode;
   panes: ReactNode;
   navigator: ReactNode;
@@ -14,10 +15,11 @@ export function ReadingWorkspace({ toolbar, panes, navigator, visiblePane, onVis
   onVisiblePaneChange: (side: PaneSide | null) => void;
   answered: number;
   total: number;
+  passageTabs?: ReactNode;
 }) {
   const [focused, setFocused] = useState(false);
   const [fontOpen, setFontOpen] = useState(false);
-  const [fontSize, setFontSize] = useState(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--font-size-reading")) || 17);
+  const [fontSize, setFontSize] = useState(() => parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--font-size-reading")) || 18);
   const [presentationError, setPresentationError] = useState<string | null>(null);
   const annotations = useWorkbenchStore((state) => state.annotations);
   const sessionId = useWorkbenchStore((state) => state.session?.sessionId);
@@ -27,6 +29,7 @@ export function ReadingWorkspace({ toolbar, panes, navigator, visiblePane, onVis
   return (
     <div className={`reading-workbench${focused ? " reading-workbench--focus" : ""}`}>
       {toolbar}
+      {passageTabs}
       <div className="reading-display-toolbar" aria-label="Reading display tools">
         <SegmentedControl label="Pane layout" value={visiblePane ? "single" : "dual"}
           options={[{ value: "single", label: "Single pane" }, { value: "dual", label: "Dual pane" }]}
@@ -36,11 +39,12 @@ export function ReadingWorkspace({ toolbar, panes, navigator, visiblePane, onVis
           onChange={onVisiblePaneChange} />}
         <span className="reading-display-toolbar__hint">{visiblePane ? "The hidden pane keeps its selection and data" : "Independent selection and scrolling · drag the divider to resize"}</span>
         <div className="practice-toolbar__spacer" />
+        <Link className="button button--ghost" to="/vocabulary">Vocabulary</Link>
         <label className="reading-progress"><span>{answered} / {total}</span><progress aria-label="Answer progress" max={Math.max(1, total)} value={answered} /></label>
         <button className="button button--ghost" aria-pressed={focused} onClick={() => setFocused(!focused)} type="button"><Focus aria-hidden="true" size={15} />{focused ? "Exit focus" : "Focus"}</button>
         <div className="reading-font-control">
           <button aria-expanded={fontOpen} className="button button--ghost" onClick={() => {
-            if (!fontOpen) setFontSize(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--font-size-reading")) || 17);
+            if (!fontOpen) setFontSize(parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--font-size-reading")) || 18);
             setFontOpen(!fontOpen);
           }} type="button"><Type aria-hidden="true" size={15} />Type</button>
           {fontOpen && <div className="reading-font-popover" role="group" aria-label="Reading typography settings">

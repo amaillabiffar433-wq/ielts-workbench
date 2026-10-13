@@ -125,6 +125,8 @@ describe("ListeningPage Exam playback policy", () => {
     expect(screen.getByRole("button", { name: "Back 5 seconds" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "Forward 5 seconds" })).toBeEnabled();
     expect(screen.getByRole("combobox", { name: "Playback speed" })).toHaveValue("1");
+    expect(screen.queryByText(/No verified transcript was supplied/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Show transcript" }));
     expect(screen.getByText(/No verified transcript was supplied/)).toBeInTheDocument();
 
     audio.currentTime = 5;

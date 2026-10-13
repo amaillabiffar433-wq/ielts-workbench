@@ -1,5 +1,5 @@
 import { useMemo, useState, type MouseEvent, type ReactNode } from "react";
-import { BookPlus, Highlighter, MessageSquareText, Underline, X } from "lucide-react";
+import { BookPlus, Eye, EyeOff, Highlighter, MessageSquareText, Underline, X } from "lucide-react";
 import type { ContentBlock } from "../../domain/pack";
 import {
   createTextAnchor,
@@ -59,10 +59,12 @@ function AnnotatedBlock({
   block,
   annotations,
   onDelete,
+  showVisual,
 }: {
   block: ContentBlock;
   annotations: readonly DisplayAnnotation[];
   onDelete: (annotationId: string) => void;
+  showVisual: boolean;
 }) {
   const blockAnnotations = useMemo(
     () => annotations.filter((annotation) => annotation.anchor.blockId === block.id),
@@ -78,7 +80,7 @@ function AnnotatedBlock({
   );
   return (
     <>
-      {block.visual && <VisualBlock visual={block.visual} />}
+      {block.visual && showVisual && <VisualBlock visual={block.visual} />}
       <BlockElement blockId={block.id} kind={block.kind}>
         {segments.map((segment) => {
           if (segment.annotationIds.length === 0) {
@@ -137,6 +139,8 @@ export function TextDocument({
   const [message, setMessage] = useState("Select text within one paragraph to add an annotation.");
   const [selectionPoint, setSelectionPoint] = useState<{ readonly x: number; readonly y: number } | null>(null);
   const [vocabularySaveState, setVocabularySaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [showVisuals, setShowVisuals] = useState(false);
+  const visualCount = blocks.filter((block) => Boolean(block.visual)).length;
 
   const captureSelection = (event: MouseEvent<HTMLElement>) => {
     if (readOnly) return;
@@ -272,6 +276,16 @@ export function TextDocument({
             />
           </label>
           <span aria-live="polite" className="annotation-toolbar__message">{message}</span>
+          {visualCount > 0 && (
+            <button
+              className="text-document__source-toggle"
+              onClick={() => setShowVisuals((value) => !value)}
+              type="button"
+            >
+              {showVisuals ? <EyeOff aria-hidden="true" size={14} /> : <Eye aria-hidden="true" size={14} />}
+              {showVisuals ? "Hide original scans" : `Show original scans (${visualCount})`}
+            </button>
+          )}
         </div>
       )}
       <div className="text-document__content">
@@ -281,6 +295,7 @@ export function TextDocument({
             block={block}
             key={block.id}
             onDelete={onDeleteAnnotation}
+            showVisual={showVisuals}
           />
         ))}
       </div>

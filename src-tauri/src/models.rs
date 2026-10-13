@@ -191,6 +191,8 @@ pub struct SaveVocabularyItemInput {
     pub id: Option<String>,
     pub term: String,
     pub normalized_term: String,
+    #[serde(default = "default_vocabulary_entry_kind")]
+    pub entry_kind: String,
     pub sentence: String,
     #[serde(default)]
     pub context_before: String,
@@ -216,6 +218,10 @@ fn default_vocabulary_learning_state() -> String {
     "new".to_string()
 }
 
+fn default_vocabulary_entry_kind() -> String {
+    "word".to_string()
+}
+
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct UpdateVocabularyItemInput {
@@ -230,6 +236,7 @@ pub struct VocabularyItemRecord {
     pub id: String,
     pub term: String,
     pub normalized_term: String,
+    pub entry_kind: String,
     pub sentence: String,
     pub context_before: String,
     pub context_after: String,

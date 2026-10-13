@@ -7,6 +7,7 @@ const item: VocabularyItem = {
   id: "vocabulary-one",
   term: "discrepancy",
   normalizedTerm: "discrepancy",
+  entryKind: "word",
   sentence: "Researchers noticed a discrepancy in the records.",
   contextBefore: "noticed a ",
   contextAfter: " in the records",
@@ -28,7 +29,7 @@ const item: VocabularyItem = {
 describe("vocabulary export", () => {
   it("keeps the original context and source in Markdown", () => {
     const output = formatVocabularyExport([item], "markdown");
-    expect(output).toContain("# IELTS Vocabulary");
+    expect(output).toContain("# English Learning Notebook");
     expect(output).toContain("## Cambridge IELTS 17 Academic / Test 2 / Reading Passage 1");
     expect(output).toContain("### discrepancy");
     expect(output).toContain(item.sentence);

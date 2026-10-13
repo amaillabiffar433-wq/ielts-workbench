@@ -257,7 +257,7 @@ impl PackModuleV1 {
     fn has_supported_schema_version(&self) -> bool {
         match self {
             Self::Reading(module) => matches!(module.schema_version, 1 | 2 | 3 | 4),
-            Self::Listening(module) => module.schema_version == 1,
+            Self::Listening(module) => matches!(module.schema_version, 1 | 2),
             Self::Writing(module) => module.schema_version == 1,
         }
     }
@@ -392,6 +392,8 @@ struct ListeningSectionV1 {
     content_blocks: Vec<ContentBlockV1>,
     #[serde(default)]
     transcript_cues: Vec<TranscriptCueV1>,
+    #[serde(default)]
+    transcript_text: Option<String>,
     question_groups: Vec<QuestionGroupV1>,
 }
 
@@ -1462,6 +1464,7 @@ fn selected_module_media_references_are_valid(
         }),
         PackModuleV1::Listening(listening) => {
             media_by_id.get(listening.audio_asset_id.as_str()) == Some(&MediaKind::Audio)
+                && listening.sections.iter().all(|section| section.question_groups.iter().all(|group| group.context_blocks.iter().flatten().all(|block| block.visual().is_none_or(|visual| media_by_id.get(visual.asset_id.as_str()) == Some(&MediaKind::Image)))))
         }
         PackModuleV1::Writing(writing) => writing.sections.iter().all(|section| {
             section.tasks.iter().all(|task| {
@@ -2145,6 +2148,7 @@ fn validate_module_schema(
                 }
                 validate_listening_section(
                     section,
+                    listening.schema_version >= 2,
                     &format!("{file_path}#sections[{section_index}]"),
                     stable_ids,
                     errors,
@@ -2208,11 +2212,15 @@ fn validate_reading_section(
 
 fn validate_listening_section(
     section: &ListeningSectionV1,
+    extended: bool,
     path: &str,
     stable_ids: &mut StableIdRegistry,
     errors: &mut Vec<ValidationIssue>,
 ) {
     validate_section_identity(&section.id, &section.title, path, stable_ids, errors);
+    if section.transcript_text.as_ref().is_some_and(|text| text.trim().is_empty() || text.chars().count() > 100000) {
+        errors.push(issue("INVALID_TRANSCRIPT_TEXT", "Transcript text must contain 1 to 100000 characters.", Some(path)));
+    }
     if section.start_ms > MAX_SAFE_JSON_INTEGER
         || section
             .end_ms
@@ -2277,8 +2285,8 @@ fn validate_listening_section(
         &section.question_groups,
         path,
         false,
-        false,
-        false,
+        extended,
+        extended,
         stable_ids,
         errors,
     );
@@ -3118,6 +3126,13 @@ fn validate_pack_relationships(
     for module in modules {
         match module {
             PackModuleV1::Listening(listening) => {
+                for section in &listening.sections {
+                    for visual in section.question_groups.iter().flat_map(|group| group.context_blocks.iter().flatten()).filter_map(|block| block.visual()) {
+                        if media_by_id.get(visual.asset_id.as_str()) != Some(&MediaKind::Image) {
+                            errors.push(issue("INVALID_IMAGE_ASSET_REFERENCE", "Listening context must reference a declared image asset.", Some("modules/listening.json")));
+                        }
+                    }
+                }
                 if media_by_id.get(listening.audio_asset_id.as_str()) != Some(&MediaKind::Audio) {
                     errors.push(issue(
                         "INVALID_AUDIO_ASSET_REFERENCE",

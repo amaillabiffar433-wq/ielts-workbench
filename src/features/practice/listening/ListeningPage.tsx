@@ -12,6 +12,8 @@ import { usePracticeRoutePack } from "../usePracticeRoutePack";
 import { derivePracticeElapsed, formatPracticeTime } from "../practiceTimer";
 import { decodeWaveform } from "./audioWaveform";
 import { StudyAudioControls } from "./StudyAudioControls";
+import { QuestionGroupContext } from "../../../components/QuestionGroupContext/QuestionGroupContext";
+import { boundQuestionIdsFromContext } from "../../../components/QuestionGroupContext/questionGroupContextModel";
 import "./ListeningPage.css";
 
 type ListeningMode = "study" | "exam";
@@ -106,6 +108,7 @@ export function ListeningPage() {
   const [duration, setDuration] = useState(0);
   const [waveform, setWaveform] = useState<readonly number[]>([]);
   const [clozeMode, setClozeMode] = useState(false);
+  const [transcriptVisible, setTranscriptVisible] = useState(false);
   const [revealedCloze, setRevealedCloze] = useState<ReadonlySet<string>>(new Set());
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [examPlaybackEnded, setExamPlaybackEnded] = useState(false);
@@ -144,6 +147,7 @@ export function ListeningPage() {
     && session.status === "in-progress";
   const mode: ListeningMode = activeListeningExamLock ? "exam" : requestedMode;
   const sessionId = session?.sessionId;
+  useEffect(() => { setTranscriptVisible(false); }, [sessionId]);
   const persistedElapsedSeconds = session?.elapsedSeconds ?? 0;
   const sessionStartedAt = session?.startedAt;
 
@@ -155,7 +159,17 @@ export function ListeningPage() {
   );
   const media = activePack?.manifest.mediaAssets.find((asset) => asset.id === module?.audioAssetId && asset.type === "audio");
   const section = module?.sections[sectionIndex] ?? module?.sections[0];
-  const questions: readonly Question[] = section?.questionGroups.flatMap((group) => group.questions) ?? [];
+  useEffect(()=>{
+    if(!module||!sessionId)return;
+    let active=true;
+    const linked=searchParams.get("sourceSectionId");
+    void loadSetting(`listening.section.${sessionId}`).then(saved=>{
+      if(!active)return;
+      const index=module.sections.findIndex(candidate=>candidate.id===(linked??saved));
+      setSectionIndex(Math.max(0,index));
+    }).catch(()=>{if(active)setAudioError("Unable to restore the selected section.");});
+    return()=>{active=false;};
+  },[module,sessionId,loadSetting,searchParams]);
   const transcriptCues = section?.transcriptCues ?? [];
   const allQuestionEntries = module?.sections.flatMap((candidate) => candidate.questionGroups.flatMap((group) => group.questions.map((question) => ({ question, sourceStartMs: candidate.startMs })))) ?? [];
   const allQuestions: readonly Question[] = allQuestionEntries.map((entry) => entry.question);
@@ -403,6 +417,7 @@ export function ListeningPage() {
           )}
         </div>
         <SaveStatus state={saveState} />
+        {saveState === "error" && <button className="button" type="button" onClick={() => { void flushPendingSaves().catch(() => undefined); }}>Retry save</button>}
         <span aria-label={`Practice time ${formatPracticeTime(elapsedSeconds)}`} className="practice-timer" role="timer"><Clock3 aria-hidden="true" size={15} />{formatPracticeTime(elapsedSeconds)}</span>
       </header>
       {audioError && <div className="error-banner listening-media-message">Could not read local audio: {audioError}</div>}
@@ -415,7 +430,7 @@ export function ListeningPage() {
               aria-current={index === sectionIndex ? "step" : undefined}
               className={index === sectionIndex ? "is-active" : undefined}
               key={candidate.id}
-              onClick={() => setSectionIndex(index)}
+              onClick={() => {setSectionIndex(index);if(sessionId)void saveSetting(`listening.section.${sessionId}`,candidate.id).catch(()=>setAudioError("Unable to save the selected section."));}}
               type="button"
             >
               <span>{index + 1}</span>
@@ -423,7 +438,8 @@ export function ListeningPage() {
             </button>
           ))}
         </aside>
-        <div className={`listening-content${mode === "study" && preferences.transcript ? " has-transcript" : ""}`}>
+        {mode === "study" && <div className="listening-transcript-toggle"><button className="button button--ghost" type="button" aria-expanded={transcriptVisible} onClick={() => setTranscriptVisible(value => !value)}>{transcriptVisible ? "Hide transcript" : "Show transcript"}</button></div>}
+        <div className={`listening-content${mode === "study" && transcriptVisible ? " has-transcript" : ""}`}>
           <main className="listening-questions">
           <header>
             <div className="listening-questions__heading-row">
@@ -477,11 +493,17 @@ export function ListeningPage() {
           {submitError && <div className="error-banner" role="alert">Session was saved, but Review preparation could not finish: {submitError}. You can retry safely.</div>}
           {sessionLoading || !session ? (
             <div className="app-loading"><div className="app-loading__panel"><span className="spinner" /><span>Restoring Listening answers…</span></div></div>
-          ) : questions.map((question) => {
+          ) : section?.questionGroups.map((group) => <section className="listening-question-group" key={group.id}>
+            <h2>{group.title}</h2><p>{group.instructions}</p>
+            <QuestionGroupContext blocks={group.contextBlocks ?? []} annotations={[]} questions={group.questions.map((q) => ({id: q.id, displayNumber: q.number, prompt: q.prompt}))} editableQuestionIds={new Set(group.questions.map(q => q.id))} renderAnswerSlot={(q) => {
+              const question = group.questions.find(candidate => candidate.id === q.id);
+              return question ? <QuestionRenderer question={question} inline instanceId="listening-pane" answer={answers[answerKey(session.sessionId,q.id)]?.value} onAnswer={(id,value) => void answerQuestion(session.sessionId,id,value)} flagged={questionFlags.has(q.id)} onToggleFlag={() => void toggleQuestionFlag(session.sessionId,q.id)} /> : null;
+            }} instanceId={`listening-${group.id}`} />
+            {group.questions.filter(q => !boundQuestionIdsFromContext(group.contextBlocks ?? []).has(q.id)).map((question) => {
             const value = answers[answerKey(session.sessionId, question.id)]?.value;
             return (
               <QuestionRenderer
-                answer={typeof value === "string" ? value : value?.join(", ")}
+                answer={value}
                 flagged={questionFlags.has(question.id)}
                 instanceId="listening-pane"
                 key={question.id}
@@ -490,19 +512,19 @@ export function ListeningPage() {
                 question={question}
               />
             );
-          })}
+          })}</section>)}
           </main>
-          {mode === "study" && preferences.transcript && (
+          {mode === "study" && transcriptVisible && (
             <aside className="listening-transcript" aria-label="Verified transcript">
               <header>
-                <div><FileText aria-hidden="true" size={17} /><div><strong>Transcript</strong><span>{transcriptCues.length ? `${transcriptCues.length} timed cue${transcriptCues.length === 1 ? "" : "s"}` : "Not available in this pack"}</span></div></div>
+                <div><FileText aria-hidden="true" size={17} /><div><strong>Transcript</strong><span>{transcriptCues.length ? `${transcriptCues.length} timed cue${transcriptCues.length === 1 ? "" : "s"}` : section?.transcriptText ? "Source text · manual position" : "Not available in this pack"}</span></div></div>
                 <button aria-pressed={clozeMode} className="button button--icon" disabled={!preferences.cloze || !transcriptCues.some((cue) => cue.clozeAnswers.length > 0)} onClick={() => { setClozeMode((value) => !value); setRevealedCloze(new Set()); }} title="Toggle cloze practice" type="button">
                   {clozeMode ? <Eye aria-hidden="true" size={15} /> : <EyeOff aria-hidden="true" size={15} />}
                   <span className="sr-only">{clozeMode ? "Show transcript" : "Start cloze practice"}</span>
                 </button>
               </header>
-              {transcriptCues.length === 0 ? (
-                <div className="listening-transcript__empty"><Lock aria-hidden="true" size={20} /><p>No verified transcript was supplied by this local pack. IELTS Workbench will not synthesize or scrape one.</p></div>
+              {section?.transcriptText && transcriptCues.length === 0 ? <div className="listening-transcript__plain">{section.transcriptText}</div> : transcriptCues.length === 0 ? (
+                <div className="listening-transcript__empty"><Lock aria-hidden="true" size={20} /><p>No verified transcript was supplied by this local pack. Luma will not synthesize or scrape one.</p></div>
               ) : (
                 <div className="listening-transcript__cues">{transcriptCues.map((cue) => {
                   const active = currentTime * 1_000 >= cue.startMs && (cue.endMs === undefined || currentTime * 1_000 < cue.endMs);

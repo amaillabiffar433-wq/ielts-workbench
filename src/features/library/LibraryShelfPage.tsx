@@ -26,9 +26,12 @@ import type {
 } from "../../infrastructure/repositories/LearningRepository";
 import { sortRecentSessionSummaries } from "../../infrastructure/repositories/LearningRepository";
 import { useWorkbenchStore } from "../../stores/workbenchStore";
-import { buildPracticeRoute, type PracticeModuleType } from "../practice/practiceRoute";
+import type { PracticeModuleType } from "../practice/practiceRoute";
 import { findRecentResumableSession, getModuleProgressStatus } from "./libraryProgress";
 import { groupLibraryBooks, type BookEntry } from "./libraryBooks";
+import { moduleReadiness } from "./moduleReadiness";
+import { PracticeStartDialog } from "./PracticeStartDialog";
+import { speakingRepository, type SpeakingTopic } from "../../infrastructure/repositories/SpeakingRepository";
 import "./library.css";
 
 type AvailableModule = Extract<PackModule, { type: PracticeModuleType }>;
@@ -77,7 +80,16 @@ function testsForBook(book: BookEntry): TestEntry[] {
     });
   });
   return [...tests.entries()]
-    .map(([key, value]) => ({ key, ...value }))
+    .map(([key, value]) => {
+      const candidates=value.candidates.filter(candidate=>{
+        const sameSkill=value.candidates.filter(other=>other.module.type===candidate.module.type);
+        const verified=sameSkill.filter(other=>moduleReadiness(other.pack,other.module).startsWith("Ready")||(other.module.type==="writing"&&other.pack.modules.some(module=>moduleReadiness(other.pack,module).startsWith("Ready"))));
+        if(verified.length===0)return true;
+        const preferred=[...verified].sort((a,b)=>b.pack.manifest.createdAt.localeCompare(a.pack.manifest.createdAt))[0];
+        return candidate===preferred;
+      });
+      return {key,title:value.title,candidates};
+    })
     .sort((left, right) => {
       const leftNumber = Number(left.title.match(/\d+/u)?.[0] ?? Number.MAX_SAFE_INTEGER);
       const rightNumber = Number(right.title.match(/\d+/u)?.[0] ?? Number.MAX_SAFE_INTEGER);
@@ -155,7 +167,7 @@ function BookCover({ book, repository }: { readonly book: BookEntry; readonly re
   if (url && !failed) return <img alt={`${book.title} cover`} className="book-cover__image" src={url} />;
   return (
     <div aria-label={`${book.title} fallback cover`} className={`book-cover__fallback${book.cambridgeNumber ? "" : " book-cover__fallback--local"}`} role="img">
-      <span>{book.cambridgeNumber ? "CAMBRIDGE" : "IELTS WORKBENCH"}</span>
+      <span>{book.cambridgeNumber ? "CAMBRIDGE" : "LUMA"}</span>
       <strong>{book.cambridgeNumber ?? "PRACTICE"}</strong>
       <small>{book.cambridgeNumber ? (/general/iu.test(book.title) ? "GENERAL TRAINING" : "ACADEMIC") : "LOCAL MATERIAL"}</small>
     </div>
@@ -173,12 +185,14 @@ function SectionRows({ candidate, recentSessions, scores, onOpen }: {
   readonly candidate: ModuleCandidate;
   readonly recentSessions: readonly PracticeSessionSummary[];
   readonly scores: Readonly<Record<string, SessionScore>>;
-  readonly onOpen: (candidate: ModuleCandidate) => void;
+  readonly onOpen: (candidate: ModuleCandidate, sectionId?: string) => void;
 }) {
   const session = latestModuleSession(recentSessions, candidate);
   const score = scores[sessionKey(candidate.pack.manifest.id, candidate.testId, candidate.module.type)];
   const status = getModuleProgressStatus(recentSessions, candidate.pack.manifest.id, candidate.testId, candidate.module.type);
   return <div className="library-section-list">
+    <p className="library-readiness">{moduleReadiness(candidate.pack, candidate.module)}</p>
+    <button className="button" onClick={() => onOpen(candidate)} type="button">Full test · {candidate.module.type}</button>
     {candidate.module.sections.map((section, index) => {
       const questions = "questionGroups" in section
         ? section.questionGroups.flatMap((group) => group.questions)
@@ -186,7 +200,7 @@ function SectionRows({ candidate, recentSessions, scores, onOpen }: {
       const passageLabel = candidate.module.type === "reading"
         ? `Passage ${index + 1}`
         : candidate.module.type === "listening" ? `Section ${index + 1}` : `Writing ${index + 1}`;
-      return <button className="library-section-row" key={section.id} onClick={() => onOpen(candidate)} type="button">
+      return <button className="library-section-row" key={section.id} onClick={() => onOpen(candidate,section.id)} type="button">
         <span className={`library-progress-dot library-progress-dot--${status}`} />
         <span className="library-section-row__identity"><small>{passageLabel} · {questionRange(questions)}</small><strong>{section.title}</strong></span>
         <span className="library-section-row__progress">{completionCopy(session, score)}</span>
@@ -216,6 +230,9 @@ export function LibraryShelfPage() {
   const [selectedTestKey, setSelectedTestKey] = useState<string | null>(null);
   const [scores, setScores] = useState<Readonly<Record<string, SessionScore>>>({});
   const [recentSnapshot, setRecentSnapshot] = useState<SessionSnapshot | null>(null);
+  const [practiceStart,setPracticeStart]=useState<{candidate:ModuleCandidate;sectionId?:string}|null>(null);
+  const [speakingTopics,setSpeakingTopics]=useState<SpeakingTopic[]>([]);
+  useEffect(()=>{void speakingRepository.topics().then(setSpeakingTopics).catch(()=>setSpeakingTopics([]));},[]);
 
   useEffect(() => {
     let active = true;
@@ -287,9 +304,7 @@ export function LibraryShelfPage() {
     if (selectedBook && selectedBookTests.length > 0 && !selectedTest) setSelectedTestKey(selectedBookTests[0].key);
   }, [selectedBook, selectedBookTests, selectedTest]);
 
-  const openCandidate = (candidate: ModuleCandidate) => navigate(buildPracticeRoute(candidate.module.type, {
-    identity: { packId: candidate.pack.manifest.id, testId: candidate.testId }, mode: "study",
-  }));
+  const openCandidate = (candidate: ModuleCandidate,sectionId?:string) => setPracticeStart({candidate,sectionId});
 
   const refresh = async () => {
     clearError();
@@ -309,12 +324,17 @@ export function LibraryShelfPage() {
     ({ pack, module }) => pack.manifest.id === recentSession.packId && module.testId === recentSession.testId && module.type === recentSession.moduleType,
   ) : undefined;
   const recentQuestions = recentCandidate ? moduleQuestions(recentCandidate.module) : [];
-  const answeredCount = recentSnapshot?.answers.filter((answer) => answerIsPresent(answer.value)).length ?? 0;
+  const answeredCount = recentQuestions.reduce((sum,q)=>{const value=recentSnapshot?.answers.find(a=>a.questionId===q.id)?.value;return sum+(!answerIsPresent(value)?0:q.type==="multiple-choice"&&Array.isArray(value)?Math.min(value.length,1+q.additionalNumbers.length):1);},0);
+  const recentQuestionCount=recentQuestions.reduce((sum,q)=>sum+(q.type==="multiple-choice"?1+q.additionalNumbers.length:1),0);
   const recentSection = recentCandidate?.module.sections[0];
   const submittedSessions = recentSessions.filter((session) => session.status === "submitted");
 
   return <main className="page library-page">
+    {practiceStart && <PracticeStartDialog pack={practiceStart.candidate.pack} module={practiceStart.candidate.module} initialSectionId={practiceStart.sectionId} recent={latestModuleSession(recentSessions,practiceStart.candidate)} onClose={()=>setPracticeStart(null)}/>}
     <PageHeader actions={<div className="library-header-actions">
+      <Link className="button" to="/library/references">Reference materials</Link>
+      <Link className="button" to="/practice/speaking">Speaking topics</Link>
+      <Link className="button" to="/review">Review</Link>
       <button className="button" disabled={refreshing} onClick={refresh} type="button"><RefreshCw aria-hidden="true" className={refreshing ? "is-spinning" : ""} size={16} />{refreshing ? "Refreshing…" : "Refresh"}</button>
       <Link className="button button--primary" to="/import"><FileInput aria-hidden="true" size={16} />Import sources</Link>
     </div>} description="Choose a book, test, and skill. Source packs remain read-only; answers, marks, and vocabulary are stored separately." title="Library" />
@@ -326,7 +346,7 @@ export function LibraryShelfPage() {
       {recentSession && recentCandidate ? <div className="continue-study-row">
         <span className="recent-session-row__icon"><Clock3 aria-hidden="true" size={19} /></span>
         <div className="recent-session-row__copy"><strong>{recentCandidate.pack.manifest.title}</strong><span>{moduleMeta[recentCandidate.module.type].label} · {recentSection?.title ?? recentSession.testId}</span></div>
-        {recentQuestions.length > 0 && <span className="continue-study-row__count">{answeredCount} / {recentQuestions.length}</span>}
+        {recentQuestions.length > 0 && <span className="continue-study-row__count">{answeredCount} / {recentQuestionCount}</span>}
         <button className="button button--primary" onClick={() => openCandidate({ pack: recentCandidate.pack, testId: recentSession.testId!, testTitle: recentSession.testId!, module: recentCandidate.module })} type="button"><Play aria-hidden="true" size={15} />Resume</button>
       </div> : <div className="recent-empty"><Clock3 aria-hidden="true" size={18} />No unfinished session. Choose a book from the shelf to begin.</div>}
     </section>
@@ -345,6 +365,10 @@ export function LibraryShelfPage() {
               const candidates = moduleType === "speaking" ? [] : selectedTest.candidates.filter((candidate) => candidate.module.type === moduleType);
               const meta = moduleType === "speaking" ? { label: "Speaking", icon: Mic2 } : moduleMeta[moduleType];
               const Icon = meta.icon;
+              if(moduleType==="speaking") {
+                const topics=speakingTopics.filter(topic=>topic.sourceVersion===`Cambridge IELTS ${selectedBook.cambridgeNumber} Academic`&&topic.title.includes(`· ${selectedTest.title} ·`));
+                return <section className="library-module" key="speaking"><div className="library-module__heading"><Mic2 aria-hidden="true" size={18}/><h3>Speaking</h3></div>{topics.length?<Link className="button" to={`/practice/speaking?topics=${topics.map(t=>t.id).join(",")}`}>Open {topics.length} source topic cards</Link>:<p>No structured speaking topics for this test. <Link to="/practice/speaking">Browse speaking collections</Link></p>}</section>;
+              }
               return <section className={`library-module ${candidates.length === 0 ? "is-unavailable" : ""}`} key={moduleType}><div className="library-module__heading"><Icon aria-hidden="true" size={18} /><h3>{meta.label}</h3>{candidates.length === 0 && <span>Not installed</span>}</div>{candidates.map((candidate) => <SectionRows candidate={candidate} key={`${candidate.pack.manifest.id}:${candidate.module.id}`} onOpen={openCandidate} recentSessions={recentSessions} scores={scores} />)}</section>;
             })}</div>}
           </section>}

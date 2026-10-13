@@ -23,11 +23,11 @@ export type ContextQuestionDescriptor = {
 };
 
 const annotationStyles: ReadonlyArray<{ style: AnnotationStyle; label: string }> = [
-  { style: "highlight-yellow", label: "黄色" },
-  { style: "highlight-green", label: "绿色" },
-  { style: "highlight-blue", label: "蓝色" },
-  { style: "highlight-pink", label: "粉色" },
-  { style: "underline", label: "下划线" },
+  { style: "highlight-yellow", label: "Yellow" },
+  { style: "highlight-green", label: "Green" },
+  { style: "highlight-blue", label: "Blue" },
+  { style: "highlight-pink", label: "Pink" },
+  { style: "underline", label: "Underline" },
 ];
 
 function offsetInside(root: HTMLElement, node: Node, offset: number): number {
@@ -78,11 +78,11 @@ function ContextText({
         const primary = active.at(-1);
         return (
           <button
-            aria-label={`标记文字“${segment.text}”；点击删除`}
+            aria-label={`Annotated “${segment.text}”; click to remove`}
             className={["text-annotation", ...new Set(active.map((annotation) => `text-annotation--${annotation.style}`))].join(" ")}
             key={`${segment.startOffset}-${segment.endOffset}-${segment.annotationIds.join("-")}`}
             onClick={async () => {
-              if (primary && onDeleteAnnotation && await confirmAction(`删除标记“${primary.anchor.quote}”？`)) {
+              if (primary && onDeleteAnnotation && await confirmAction(`Remove annotation “${primary.anchor.quote}”?`)) {
                 onDeleteAnnotation(primary.id);
               }
             }}
@@ -94,7 +94,7 @@ function ContextText({
       })}
       {unresolvedAnnotationIds.length > 0 && (
         <span className="question-context__anchor-warning" role="status">
-          {unresolvedAnnotationIds.length} 个旧标记无法安全定位。
+          {unresolvedAnnotationIds.length} previous annotations could not be located.
         </span>
       )}
     </span>
@@ -123,7 +123,7 @@ export function QuestionGroupContext({
   readonly instanceId: string;
 }) {
   const [pendingAnchor, setPendingAnchor] = useState<TextAnchor | null>(null);
-  const [message, setMessage] = useState("可在同一段落、列表项或单元格内选择文字。");
+  const [message, setMessage] = useState("Select text within one paragraph or cell.");
   const questionById = useMemo(
     () => new Map(questions.map((question) => [question.id, question])),
     [questions],
@@ -146,7 +146,7 @@ export function QuestionGroupContext({
     const endBlock = contextTextElement(selection.focusNode);
     if (!startBlock || !endBlock || startBlock !== endBlock) {
       setPendingAnchor(null);
-      setMessage("一次标记只能位于同一个稳定上下文块内；跨单元格选择暂不支持。");
+      setMessage("Select within one paragraph or cell.");
       return;
     }
     const blockId = startBlock.dataset.contextTextBlockId;
@@ -158,20 +158,20 @@ export function QuestionGroupContext({
     try {
       const anchor = createTextAnchor(blockId, text, start, end);
       setPendingAnchor(anchor);
-      setMessage(`已选中“${anchor.quote}”。请选择标记样式。`);
+      setMessage(`Selected “${anchor.quote}”. Choose a style.`);
     } catch {
       setPendingAnchor(null);
-      setMessage("没有捕获到可保存的文字选择。");
+      setMessage("No text selection was captured.");
     }
   };
 
   const createAnnotation = (style: AnnotationStyle) => {
     if (!pendingAnchor || !onCreateAnnotation) {
-      setMessage("请先选择同一个上下文块中的文字。");
+      setMessage("Select text within one paragraph first.");
       return;
     }
     onCreateAnnotation({ anchor: pendingAnchor, style });
-    setMessage(`已保存“${pendingAnchor.quote}”的标记。`);
+    setMessage(`Annotation saved.`);
     setPendingAnchor(null);
     window.getSelection()?.removeAllRanges();
   };
@@ -191,10 +191,10 @@ export function QuestionGroupContext({
     <section className="question-context" data-context-instance-id={instanceId} onMouseUp={captureSelection}>
       {!readOnly && onCreateAnnotation && (
         <div className="question-context__annotation-toolbar" onMouseUp={(event) => event.stopPropagation()}>
-          <div aria-label="上下文文字标记样式" role="group">
+          <div aria-label="Context annotation styles" role="group">
             {annotationStyles.map(({ style, label }) => (
               <button
-                aria-label={`添加${label}${style === "underline" ? "标记" : "高亮"}`}
+                aria-label={`Add ${label} annotation`}
                 className={`annotation-style annotation-style--${style}`}
                 key={style}
                 onClick={() => createAnnotation(style)}
@@ -210,7 +210,10 @@ export function QuestionGroupContext({
       )}
       <div className="question-context__blocks">
         {blocks.map((block) => {
-          if ("assetId" in block) return <div key={block.id}><VisualBlock visual={block} />{block.ocrText && <details><summary>已校对文字 / OCR（可标记）</summary>{renderText(block.id, block.ocrText)}</details>}</div>;
+          if ("assetId" in block) {
+            const visual = <VisualBlock visual={block} />;
+            return <div key={block.id}>{blocks.some((candidate) => candidate.type === "completion") ? <details><summary>View original page</summary>{visual}</details> : visual}{block.ocrText && <details><summary>Source text / OCR</summary>{renderText(block.id, block.ocrText)}</details>}</div>;
+          }
           if (block.type === "paragraph") {
             return <p className="question-context__paragraph" key={block.id}>{renderText(block.id, block.text)}</p>;
           }
@@ -232,7 +235,7 @@ export function QuestionGroupContext({
                     const question = questionById.get(part.questionId);
                     return question
                       ? <span className="question-context__completion-answer" key={part.id}>{renderAnswerSlot(question, editableQuestionIds.has(question.id))}</span>
-                      : <span className="question-context__invalid-reference" key={part.id}>无效题目引用</span>;
+                      : <span className="question-context__invalid-reference" key={part.id}>Invalid question reference</span>;
                   })}
                 </div>
               </section>
@@ -263,7 +266,7 @@ export function QuestionGroupContext({
                         {question
                           ? renderAnswerSlot(question, editableQuestionIds.has(question.id))
                           : cell.questionId
-                            ? <span className="question-context__invalid-reference">无效题目引用</span>
+                            ? <span className="question-context__invalid-reference">Invalid question reference</span>
                             : null}
                       </Cell>
                     );

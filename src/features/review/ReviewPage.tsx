@@ -262,7 +262,7 @@ export function ReviewPage() {
   if (packError || !reviewPack) {
     return (
       <div className="page review-page">
-        <PageHeader title="Session results" description="The exact pack for this session is unavailable, so IELTS Workbench will not score against another source." />
+        <PageHeader title="Session results" description="The exact pack for this session is unavailable, so Luma will not score against another source." />
         <div className="error-banner" role="alert">
           {packError ?? "Could not load the pack for this session."}
           <button className="button" onClick={() => setPackAttempt(null)} type="button">Retry</button>

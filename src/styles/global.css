@@ -13,7 +13,7 @@ body,
 }
 
 body {
-  min-width: 1280px;
+  min-width: 0;
   overflow: hidden;
   background: var(--surface-canvas);
   color: var(--text-primary);
@@ -148,11 +148,13 @@ a {
   border-color: var(--accent);
   background: var(--accent);
   color: #fff;
+  font-weight: 650;
 }
 
 .button--primary:hover:not(:disabled) {
   border-color: var(--accent-strong);
   background: var(--accent-strong);
+  box-shadow: 0 1px 4px rgb(79 70 229 / 25%);
 }
 
 .button--danger {
@@ -178,7 +180,7 @@ a {
 }
 
 .icon-button:hover {
-  border-color: var(--border-subtle);
+  border-color: var(--accent-soft);
   background: var(--surface-hover);
   color: var(--text-primary);
 }
@@ -233,7 +235,7 @@ a {
 .status-badge--success {
   border-color: color-mix(in srgb, var(--success), transparent 65%);
   background: var(--accent-soft);
-  color: var(--success);
+  color: var(--accent-strong);
 }
 
 .status-badge--warning {

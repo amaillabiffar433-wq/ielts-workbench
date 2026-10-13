@@ -53,7 +53,15 @@ pub fn export_daily_brief(
         ));
     }
 
-    let ielts_dir = vault.join("IELTS");
+    let existing_english_tree = vault.join("课程学习").join("英语学习").join("雅思");
+    let ielts_dir = if existing_english_tree.is_dir() {
+        let mut path = vault.clone();
+        for part in ["课程学习", "英语学习", "雅思"] {
+            path.push(part);
+            reject_link_or_reparse(&path, "existing English learning folder")?;
+        }
+        existing_english_tree
+    } else { vault.join("IELTS") };
     if ielts_dir.exists() {
         reject_link_or_reparse(&ielts_dir, "Obsidian IELTS folder")?;
         if !ielts_dir.is_dir() {
@@ -217,5 +225,19 @@ mod tests {
         let vault = tempfile::tempdir().unwrap();
         assert!(export_daily_brief(workspace.path(), vault.path().to_str().unwrap(), "17-09-2026", "valid").is_err());
         assert!(export_daily_brief(workspace.path(), vault.path().to_str().unwrap(), "2026-09-17", START_MARKER).is_err());
+    }
+
+    #[test]
+    fn reuses_existing_english_tree_and_is_idempotent() {
+        let workspace = tempfile::tempdir().unwrap();
+        let vault = tempfile::tempdir().unwrap();
+        let directory = vault.path().join("课程学习").join("英语学习").join("雅思");
+        fs::create_dir_all(&directory).unwrap();
+        let first = export_daily_brief(workspace.path(), vault.path().to_str().unwrap(), "2026-09-19", "date: 2026-09-19\nPractice source").unwrap();
+        let second = export_daily_brief(workspace.path(), vault.path().to_str().unwrap(), "2026-09-19", "date: 2026-09-19\nPractice source").unwrap();
+        assert!(Path::new(&first.path).starts_with(fs::canonicalize(&directory).unwrap()));
+        assert!(!vault.path().join("IELTS").exists());
+        assert!(!second.changed);
+        assert_eq!(first.sha256, second.sha256);
     }
 }

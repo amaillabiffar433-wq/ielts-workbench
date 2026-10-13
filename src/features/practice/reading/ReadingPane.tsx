@@ -225,6 +225,7 @@ export function ReadingPane({
       onSaveVocabulary={(selection: VocabularyTextSelection) => repository.saveVocabularyItem({
         term: selection.term,
         normalizedTerm: selection.normalizedTerm,
+        entryKind: selection.term.trim().includes(" ") ? "phrase" : "word",
         sentence: selection.sentence,
         contextBefore: selection.contextBefore,
         contextAfter: selection.contextAfter,

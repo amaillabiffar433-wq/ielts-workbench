@@ -60,7 +60,7 @@ export function createDefaultReadingViewState(module: ReadingModule): ReadingVie
   const lastQuestionNumber = entries.at(-1)?.displayNumber ?? firstQuestionNumber;
   const base = {
     passageId: firstSectionId,
-    questionScope: "all" as const,
+    questionScope: "passage" as const,
     questionPassageId: firstSectionId,
     questionGroupId: entries[0]?.group.id ?? "",
     rangeStart: firstQuestionNumber,

@@ -9,6 +9,8 @@ export interface BookEntry {
 }
 
 function bookIdentity(pack: IELTSPack) {
+  const collection=pack.manifest.id.match(/^luma-writing-([a-f0-9]{12})-prompt-\d+-v\d+$/u);
+  if(collection)return {key:`writing-${collection[1]}`,title:pack.manifest.title.replace(/\s*·\s*Prompt\s+\d+$/iu,""),cambridgeNumber:undefined};
   const importedBookTitle = pack.manifest.importMetadata?.bookTitle?.trim();
   const candidate = importedBookTitle || pack.manifest.title.replace(/\s*[·-]\s*Test\s+\d+.*$/iu, "").trim();
   const match = candidate.match(/Cambridge\s+IELTS\s+(\d+)/iu);

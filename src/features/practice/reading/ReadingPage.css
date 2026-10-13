@@ -421,3 +421,14 @@
     display: none;
   }
 }
+.reading-passage-tabs { display: flex; gap: 4px; padding: 0 20px; border-bottom: 1px solid var(--border-subtle); }
+.reading-passage-tabs button { display: flex; gap: 12px; align-items: center; padding: 9px 16px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-secondary); }
+.reading-passage-tabs button[aria-selected="true"] { color: var(--text-primary); border-bottom-color: var(--text-primary); font-weight: 650; }
+.reading-passage-tabs small { font-size: 11px; }
+@media (max-width: 1150px) {
+  .practice-toolbar { gap: 8px; padding: 6px 12px; flex-wrap: wrap; }
+  .practice-toolbar__identity { min-width: 140px; }
+  .practice-toolbar__identity strong, .practice-toolbar__identity span { max-width: 190px; }
+  .reading-display-toolbar__hint { display: none; }
+  .reading-notes { display: none; }
+}

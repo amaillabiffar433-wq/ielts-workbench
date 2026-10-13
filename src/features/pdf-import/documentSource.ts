@@ -26,6 +26,7 @@ export interface PdfDocumentHandle {
 
 export interface DocumentSourceAdapter {
   selectSource?(): Promise<PdfBinarySource | null>;
+  archiveSource?(source: PdfBinarySource): Promise<void>;
   open(source: PdfBinarySource): Promise<PdfDocumentHandle>;
 }
 

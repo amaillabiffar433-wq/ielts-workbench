@@ -133,10 +133,14 @@ export interface SaveAnnotationInput {
 export const VocabularyLearningStateSchema = z.enum(["new", "learning", "familiar", "mastered"]);
 export type VocabularyLearningState = z.infer<typeof VocabularyLearningStateSchema>;
 
+export const VocabularyEntryKindSchema = z.enum(["word", "phrase", "sentence", "note"]);
+export type VocabularyEntryKind = z.infer<typeof VocabularyEntryKindSchema>;
+
 export const VocabularyItemSchema = z.object({
   id: StableIdSchema,
   term: z.string().trim().min(1).max(160),
   normalizedTerm: z.string().trim().min(1).max(160),
+  entryKind: VocabularyEntryKindSchema.default("word"),
   sentence: z.string().max(4_000),
   contextBefore: z.string().max(1_000),
   contextAfter: z.string().max(1_000),

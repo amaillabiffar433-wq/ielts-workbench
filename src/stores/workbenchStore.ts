@@ -17,6 +17,8 @@ import type {
 } from "../infrastructure/repositories/LearningRepository";
 import { createLearningRepository } from "../infrastructure/repositories/runtime";
 import type { SaveState } from "../components/common/SaveStatus";
+import { queueCompletedSessionSync } from "../features/settings/obsidianSessionSync";
+import { localIsoDate } from "../features/settings/obsidianDailyBrief";
 
 export type BootstrapPhase = "idle" | "loading" | "ready" | "error";
 
@@ -87,6 +89,8 @@ function parseQuestionFlags(value: string | null): ReadonlySet<string> {
 export function createWorkbenchStore(repository: LearningRepository): StoreApi<WorkbenchState> {
   const answerSaveQueues = new Map<string, Promise<AnswerRecord>>();
   const answerRevisions = new Map<string, number>();
+  const unsavedAnswers = new Map<string, AnswerRecord>();
+  const failedAnswers = new Set<string>();
   const sessionLoadPromises = new Map<string, Promise<SessionSnapshot>>();
   let activePackLoadRevision = 0;
   let activeSessionLoadRevision = 0;
@@ -132,7 +136,7 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     initializeWorkspace: async (path) => {
       set({ bootstrapPhase: "loading", error: null });
       try {
-        await Promise.all([...answerSaveQueues.values()]);
+        await get().flushPendingSaves();
         const bootstrap = await repository.initializeWorkspace(path);
         const firstPack = bootstrap.installedPacks[0];
         const revision = activePackLoadRevision + 1;
@@ -155,14 +159,14 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     },
 
     createWorkspaceBackup: async (destinationParent) => {
-      await Promise.all([...answerSaveQueues.values()]);
+      await get().flushPendingSaves();
       return repository.createWorkspaceBackup(destinationParent);
     },
 
     restoreWorkspaceBackup: async (backupPath, destinationParent) => {
       set({ bootstrapPhase: "loading", error: null });
       try {
-        await Promise.all([...answerSaveQueues.values()]);
+        await get().flushPendingSaves();
         const bootstrap = await repository.restoreWorkspaceBackup(backupPath, destinationParent);
         const firstPack = bootstrap.installedPacks[0];
         const activePack = firstPack ? await repository.loadPack(firstPack.id) : null;
@@ -208,6 +212,7 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     },
 
     ensureSession: async (input) => {
+      await get().flushPendingSaves();
       const revision = activeSessionLoadRevision + 1;
       activeSessionLoadRevision = revision;
       const settingKey = `activeSession.${input.packId}.${input.testId}.${input.moduleType}.${input.mode}`;
@@ -259,6 +264,7 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     },
 
     loadHistoricalSession: async (sessionId) => {
+      await get().flushPendingSaves();
       const revision = activeSessionLoadRevision + 1;
       activeSessionLoadRevision = revision;
       try {
@@ -286,6 +292,7 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     },
 
     startNewSession: async (input) => {
+      await get().flushPendingSaves();
       const session = await repository.createSession({ ...input, sessionId: undefined });
       const settingKey = `activeSession.${input.packId}.${input.testId}.${input.moduleType}.${input.mode}`;
       await repository.setSetting(settingKey, session.sessionId);
@@ -296,8 +303,9 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     submitSession: async (sessionId) => {
       if (get().session?.sessionId === sessionId) set({ saveState: "saving", error: null });
       try {
-        await Promise.all([...answerSaveQueues.values()]);
+        await get().flushPendingSaves();
         const session = await repository.submitSession(sessionId);
+        void queueCompletedSessionSync(repository, localIsoDate(new Date(session.submittedAt ?? session.updatedAt ?? Date.now())));
         if (get().session?.sessionId === sessionId) {
           set({
             session,
@@ -344,7 +352,9 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
     },
 
     flushPendingSaves: async () => {
-      await Promise.all([...answerSaveQueues.values()]);
+      await Promise.allSettled([...answerSaveQueues.values()]);
+      await Promise.all([...unsavedAnswers.values()].map((answer) => get().answerQuestion(answer.sessionId, answer.questionId, answer.value)));
+      if (unsavedAnswers.size > 0) throw new Error("Answers are still unsaved. Retry saving before leaving or submitting.");
     },
 
     answerQuestion: async (sessionId, questionId, value) => {
@@ -359,6 +369,7 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
         value,
         updatedAt: new Date().toISOString(),
       };
+      unsavedAnswers.set(key, optimistic);
       set((state) => ({ answers: { ...state.answers, [key]: optimistic }, saveState: "saving", error: null }));
       const earlierSave = answerSaveQueues.get(key);
       const waitForEarlierSave = earlierSave
@@ -371,16 +382,14 @@ export function createWorkbenchStore(repository: LearningRepository): StoreApi<W
       try {
         const saved = await savePromise;
         if (answerRevisions.get(key) === revision) {
-          set((state) => ({ answers: { ...state.answers, [key]: saved }, saveState: "saved" }));
+          unsavedAnswers.delete(key);
+          failedAnswers.delete(key);
+          set((state) => ({ answers: { ...state.answers, [key]: saved }, saveState: failedAnswers.size ? "error" : unsavedAnswers.size === 0 ? "saved" : "saving", ...(unsavedAnswers.size === 0 ? {error:null} : {}) }));
         }
       } catch (error) {
         if (answerRevisions.get(key) === revision) {
-          set((state) => {
-            const answers = { ...state.answers };
-            if (previous) answers[key] = previous;
-            else delete answers[key];
-            return { answers, saveState: "error", error: errorMessage(error) };
-          });
+          failedAnswers.add(key);
+          set({ saveState: "error", error: `Your typed answers are kept in this window. ${errorMessage(error)}` });
         }
       } finally {
         if (answerSaveQueues.get(key) === savePromise) {

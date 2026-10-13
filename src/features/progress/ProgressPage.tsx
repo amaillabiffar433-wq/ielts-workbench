@@ -3,11 +3,17 @@ import { PageHeader } from "../../components/common/PageHeader";
 import { formatStudyDuration } from "./learningAnalytics";
 import { useLearningAnalytics } from "./useLearningAnalytics";
 import "./progress.css";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { speakingRepository, type SpeakingSession } from "../../infrastructure/repositories/SpeakingRepository";
 
 const moduleLabels = { listening: "Listening", reading: "Reading", writing: "Writing" } as const;
 
 export function ProgressPage() {
   const { analytics, loading, error } = useLearningAnalytics();
+  const [speaking,setSpeaking]=useState<SpeakingSession[]>([]);
+  const [speakingError,setSpeakingError]=useState(false);
+  useEffect(()=>{void speakingRepository.sessions().then(setSpeaking).catch(()=>setSpeakingError(true));},[]);
   const accuracy = analytics.scorablePoints > 0 ? Math.round((analytics.earnedPoints / analytics.scorablePoints) * 100) : null;
   const maxDaily = Math.max(1, ...analytics.recentDays.map((day) => day.elapsedSeconds));
   const scoredTypes = analytics.byQuestionType.map((item) => ({ ...item, accuracy: Math.round((item.earnedPoints / item.scorablePoints) * 100) }));
@@ -17,7 +23,9 @@ export function ProgressPage() {
 
   return <main className="page progress-page">
     <PageHeader description="Measured from durable sessions in this workspace. No estimates and no cloud data." title="Progress" />
+    <p className="progress-method">Accuracy uses the first submitted attempt per test, skill and mode. {analytics.retakes} repeat attempt(s) are counted in practice time, separately from accuracy.</p>
     {error && <div className="error-banner" role="alert">Unable to calculate progress: {error}</div>}
+    <section className="progress-card"><h2>Speaking practice</h2>{speakingError?<p role="alert">Speaking records could not be read.</p>:<p>{speaking.filter(s=>s.status==="completed").length} completed · {speaking.filter(s=>s.status==="in-progress").length} in progress · {formatStudyDuration(speaking.reduce((sum,s)=>sum+s.elapsedSeconds,0))} timed practice. <Link to="/practice/speaking">Open topics and recordings</Link></p>}<small>Speaking time and completion are shown separately from the objective practice statistics below.</small></section>
 
     <section aria-label="Progress summary" className="progress-summary">
       <article><Clock3 aria-hidden="true" size={18} /><span>Total focus</span><strong>{loading ? "—" : formatStudyDuration(analytics.elapsedSeconds)}</strong></article>

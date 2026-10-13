@@ -196,12 +196,27 @@ pub fn update_session_elapsed(
     }
     require_in_progress_session(connection, session_id)?;
     let updated_at = now_iso();
-    connection.execute(
+    let transaction = connection.unchecked_transaction()?;
+    let previous = get_session(&transaction, session_id)?.ok_or(rusqlite::Error::QueryReturnedNoRows)?;
+    let increment = elapsed_seconds.saturating_sub(previous.elapsed_seconds);
+    transaction.execute(
         "UPDATE practice_sessions
          SET elapsed_seconds = MAX(elapsed_seconds, ?2), updated_at = ?3
          WHERE id = ?1 AND status = 'in-progress'",
         params![session_id, elapsed_seconds as i64, updated_at],
     )?;
+    // Record short active timer intervals only. Historic totals and exam time
+    // accrued while the app was closed are never invented as today's focus.
+    if increment > 0 && increment <= 60 {
+        let mut days = get_setting(&transaction, "activity.dailySeconds")?
+            .map(|record| record.value).unwrap_or_else(|| serde_json::json!({}));
+        if !days.is_object() { days = serde_json::json!({}); }
+        let day = chrono::Local::now().format("%Y-%m-%d").to_string();
+        let total = days.get(&day).and_then(Value::as_u64).unwrap_or(0);
+        days[day] = serde_json::json!(total.saturating_add(increment));
+        set_setting(&transaction, "activity.dailySeconds", days)?;
+    }
+    transaction.commit()?;
     get_session(connection, session_id)?.ok_or_else(|| {
         BackendError::Database(rusqlite::Error::QueryReturnedNoRows)
     })
@@ -497,7 +512,7 @@ pub fn list_writing_versions(
 
 pub fn list_vocabulary_items(connection: &Connection) -> Result<Vec<VocabularyItemRecord>> {
     let mut statement = connection.prepare(
-        "SELECT id, term, normalized_term, sentence, context_before, context_after,
+        "SELECT id, term, normalized_term, entry_kind, sentence, context_before, context_after,
                 source_pack_id, source_test_id, source_module, source_block_id,
                 source_book_title, source_test_title, source_section_id, source_section_title,
                 source_question_id, source_question_number, note, learning_state, created_at, updated_at
@@ -544,17 +559,18 @@ pub fn save_vocabulary_item(
     let timestamp = now_iso();
     connection.execute(
         "INSERT INTO vocabulary_items(
-            id, term, normalized_term, source_pack_id, source_test_id, source_module,
+            id, term, normalized_term, entry_kind, source_pack_id, source_test_id, source_module,
             source_block_id, context, learning_state, created_at, updated_at,
             source_book_title, source_test_title, source_section_id, source_section_title,
             source_question_id, source_question_number, sentence, context_before, context_after, note
          ) VALUES (
-            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?10,
-            ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11,
+            ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21
          )
          ON CONFLICT(id) DO UPDATE SET
             term = excluded.term,
             normalized_term = excluded.normalized_term,
+            entry_kind = excluded.entry_kind,
             source_pack_id = excluded.source_pack_id,
             source_test_id = excluded.source_test_id,
             source_module = excluded.source_module,
@@ -575,6 +591,7 @@ pub fn save_vocabulary_item(
             id,
             input.term,
             input.normalized_term,
+            input.entry_kind,
             input.source_pack_id,
             input.source_test_id,
             input.source_module,
@@ -792,7 +809,7 @@ fn validate_review_input(input: &SaveReviewItemInput) -> Result<()> {
 
 fn get_vocabulary_item(connection: &Connection, item_id: &str) -> Result<Option<VocabularyItemRecord>> {
     connection.query_row(
-        "SELECT id, term, normalized_term, sentence, context_before, context_after,
+        "SELECT id, term, normalized_term, entry_kind, sentence, context_before, context_after,
                 source_pack_id, source_test_id, source_module, source_block_id,
                 source_book_title, source_test_title, source_section_id, source_section_title,
                 source_question_id, source_question_number, note, learning_state, created_at, updated_at
@@ -809,6 +826,9 @@ fn validate_vocabulary_input(input: &SaveVocabularyItemInput) -> Result<()> {
     }
     if input.normalized_term.trim().is_empty() || input.normalized_term.chars().count() > MAX_VOCABULARY_TERM_CHARS {
         return Err(BackendError::InvalidInput("Normalized vocabulary term is empty or too long.".to_string()));
+    }
+    if !matches!(input.entry_kind.as_str(), "word" | "phrase" | "sentence" | "note") {
+        return Err(BackendError::InvalidInput("Unsupported vocabulary entry kind.".to_string()));
     }
     if input.sentence.chars().count() > MAX_VOCABULARY_SENTENCE_CHARS
         || input.context_before.chars().count() > MAX_VOCABULARY_CONTEXT_CHARS
@@ -1182,23 +1202,24 @@ fn vocabulary_item_from_row(row: &Row<'_>) -> rusqlite::Result<VocabularyItemRec
         id: row.get(0)?,
         term: row.get(1)?,
         normalized_term: row.get(2)?,
-        sentence: row.get(3)?,
-        context_before: row.get(4)?,
-        context_after: row.get(5)?,
-        source_pack_id: row.get(6)?,
-        source_test_id: row.get(7)?,
-        source_module: row.get(8)?,
-        source_block_id: row.get(9)?,
-        source_book_title: row.get(10)?,
-        source_test_title: row.get(11)?,
-        source_section_id: row.get(12)?,
-        source_section_title: row.get(13)?,
-        source_question_id: row.get(14)?,
-        source_question_number: row.get::<_, Option<i64>>(15)?.map(|value| value.max(0) as u32),
-        note: row.get(16)?,
-        learning_state: row.get(17)?,
-        created_at: row.get(18)?,
-        updated_at: row.get(19)?,
+        entry_kind: row.get(3)?,
+        sentence: row.get(4)?,
+        context_before: row.get(5)?,
+        context_after: row.get(6)?,
+        source_pack_id: row.get(7)?,
+        source_test_id: row.get(8)?,
+        source_module: row.get(9)?,
+        source_block_id: row.get(10)?,
+        source_book_title: row.get(11)?,
+        source_test_title: row.get(12)?,
+        source_section_id: row.get(13)?,
+        source_section_title: row.get(14)?,
+        source_question_id: row.get(15)?,
+        source_question_number: row.get::<_, Option<i64>>(16)?.map(|value| value.max(0) as u32),
+        note: row.get(17)?,
+        learning_state: row.get(18)?,
+        created_at: row.get(19)?,
+        updated_at: row.get(20)?,
     })
 }
 
@@ -1392,6 +1413,7 @@ mod tests {
             id: Some("vocabulary-1".into()),
             term: "Scrolls".into(),
             normalized_term: "scrolls".into(),
+            entry_kind: "word".into(),
             sentence: "The scrolls remained in Jerusalem.".into(),
             context_before: "The ".into(),
             context_after: " remained".into(),
@@ -1428,6 +1450,7 @@ mod tests {
             id: Some("review-vocabulary".into()),
             term: "interval".into(),
             normalized_term: "interval".into(),
+            entry_kind: "word".into(),
             sentence: "The interval is explicit.".into(),
             context_before: "The ".into(),
             context_after: " is explicit.".into(),

@@ -1,4 +1,25 @@
 .vocabulary-page { display: flex; min-height: 0; flex-direction: column; gap: 14px; }
+.notebook-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.notebook-tabs { display: flex; flex-wrap: wrap; gap: 4px; border-bottom: 1px solid var(--border-subtle); }
+.notebook-tabs button { display: inline-flex; min-height: 34px; align-items: center; gap: 7px; padding: 5px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--text-muted); font-size: 12px; }
+.notebook-tabs button:hover, .notebook-tabs button.is-current { border-bottom-color: var(--accent); color: var(--text-primary); }
+.notebook-tabs small { min-width: 18px; padding: 1px 5px; border-radius: 10px; background: var(--surface-raised); color: var(--text-muted); font-size: 10px; }
+.notebook-composer, .notebook-mistakes { display: grid; gap: 16px; padding: 18px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-panel); }
+.notebook-composer h2, .notebook-mistakes h2 { margin: 4px 0 3px; font-family: var(--font-reading); font-size: 22px; }
+.notebook-composer p, .notebook-mistakes p { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.55; }
+.notebook-composer__fields { display: grid; grid-template-columns: minmax(150px, .4fr) minmax(220px, 1fr) minmax(220px, 1fr); gap: 12px; }
+.notebook-composer__fields label { display: grid; gap: 6px; color: var(--text-muted); font-size: 11px; font-weight: 650; }
+.notebook-composer__fields textarea { min-height: 70px; padding: 8px; border: 1px solid var(--border-subtle); border-radius: 7px; background: var(--surface-canvas); color: var(--text-primary); font: inherit; resize: vertical; }
+.notebook-composer__wide { grid-column: span 1; }
+.notebook-composer__actions { display: flex; justify-content: flex-end; gap: 8px; }
+.eyebrow { color: var(--accent); font-size: 10px; font-weight: 750; letter-spacing: .12em; }
+.notebook-kind-badge { display: inline-flex; width: fit-content; padding: 2px 6px; border: 1px solid var(--border-subtle); border-radius: 999px; background: var(--surface-raised); color: var(--text-muted); font-size: 9px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.vocabulary-row__term { align-items: flex-start; }
+.vocabulary-row__term .notebook-kind-badge { margin-bottom: 2px; }
+.notebook-mistakes__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.notebook-mistake-row { display: grid; grid-template-columns: 125px minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 12px 0; border-top: 1px solid var(--border-subtle); }
+.notebook-mistake-row div { display: grid; gap: 3px; }
+.notebook-mistake-row small { color: var(--text-muted); font-size: 11px; }
 .vocabulary-toolbar { display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-panel); }
 .vocabulary-search { display: flex; min-width: 240px; flex: 1; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: 7px; background: var(--surface-canvas); }
 .vocabulary-search input { width: 100%; min-height: 34px; border: 0; outline: 0; background: transparent; color: var(--text-primary); }
@@ -6,6 +27,10 @@
 .vocabulary-export { display: inline-flex; align-items: center; gap: 3px; }
 .vocabulary-export button { min-height: 30px; padding: 3px 7px; border: 1px solid var(--border-subtle); border-radius: 6px; background: transparent; color: var(--text-secondary); font-size: 11px; }
 .vocabulary-message { color: var(--success); font-size: 12px; }
+.vocabulary-sources { grid-column: 1 / -1; display: grid; gap: 12px; }
+.vocabulary-sources > div { padding-bottom: 10px; border-bottom: 1px solid var(--border-subtle); }
+.vocabulary-sources p { line-height: 1.6; margin: 4px 0; }
+.vocabulary-sources small { color: var(--text-secondary); }
 .vocabulary-list { min-height: 0; overflow: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-md); background: var(--surface-panel); }
 .vocabulary-list__header,
 .vocabulary-row__summary { display: grid; grid-template-columns: 42px minmax(120px, .8fr) minmax(220px, 2fr) minmax(190px, 1.3fr) 145px 110px 34px; align-items: center; gap: 10px; }
@@ -35,4 +60,12 @@
   .vocabulary-row__summary { grid-template-columns: 34px minmax(110px, .7fr) minmax(180px, 1.5fr) 110px 34px; }
   .vocabulary-row__source, .vocabulary-row time { display: none; }
   .vocabulary-toolbar { flex-wrap: wrap; }
+}
+
+@media (max-width: 820px) {
+  .notebook-composer__fields { grid-template-columns: 1fr; }
+  .notebook-composer__wide { grid-column: auto; }
+  .notebook-mistakes__heading { flex-direction: column; }
+  .notebook-mistake-row { grid-template-columns: 1fr auto; }
+  .notebook-mistake-row .notebook-kind-badge { grid-column: 1 / -1; }
 }

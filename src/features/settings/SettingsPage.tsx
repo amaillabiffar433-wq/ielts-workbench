@@ -6,7 +6,8 @@ import { pickBackupDestinationDirectory, pickObsidianVaultDirectory, pickRestore
 import { useWorkbenchStore } from "../../stores/workbenchStore";
 import { confirmAction } from "../../infrastructure/window/windowClose";
 import { useLearningAnalytics } from "../progress/useLearningAnalytics";
-import { buildObsidianDailyBrief, localIsoDate } from "./obsidianDailyBrief";
+import { localIsoDate } from "./obsidianDailyBrief";
+import { syncObsidianSessions } from "./obsidianSessionSync";
 import "./SettingsPage.css";
 
 type Theme = "light" | "dark" | "system";
@@ -19,11 +20,10 @@ export function SettingsPage() {
   const saveSetting = useWorkbenchStore((state) => state.saveSetting);
   const createWorkspaceBackup = useWorkbenchStore((state) => state.createWorkspaceBackup);
   const restoreWorkspaceBackup = useWorkbenchStore((state) => state.restoreWorkspaceBackup);
-  const exportObsidianDailyBrief = useWorkbenchStore((state) => state.exportObsidianDailyBrief);
   const repository = useWorkbenchStore((state) => state.repository);
-  const { analytics, loading: analyticsLoading } = useLearningAnalytics();
+  const { loading: analyticsLoading } = useLearningAnalytics();
   const [theme, setTheme] = useState<Theme>("light");
-  const [fontSize, setFontSize] = useState(17);
+  const [fontSize, setFontSize] = useState(18);
   const [lineHeight, setLineHeight] = useState(1.78);
   const [switching, setSwitching] = useState(false);
   const [backupBusy, setBackupBusy] = useState(false);
@@ -39,7 +39,7 @@ export function SettingsPage() {
       loadSetting("listening.waveform"), loadSetting("listening.skipButtons"), loadSetting("listening.transcript"), loadSetting("listening.cloze"), loadSetting("listening.audioMistakeLinks"),
     ]).then(([savedTheme, savedFontSize, savedLineHeight, savedObsidianVault, waveform, skipButtons, transcript, cloze, audioMistakeLinks]) => {
         const nextTheme = savedTheme === "dark" || savedTheme === "system" ? savedTheme : "light";
-        const nextFontSize = Number(savedFontSize) || 17;
+        const nextFontSize = Number(savedFontSize) || 18;
         const nextLineHeight = Number(savedLineHeight) || 1.78;
         setTheme(nextTheme);
         setFontSize(nextFontSize);
@@ -91,8 +91,8 @@ export function SettingsPage() {
         <header><FileOutput aria-hidden="true" size={19} /><div><h2>Obsidian daily brief</h2><p>Explicit, local export with managed-block backup and SHA-256 verification</p></div></header>
         <div className="workspace-details workspace-details--obsidian">
           <div><span>Vault</span><strong>{obsidianVault || "Not configured"}</strong></div>
-          <div><span>Destination</span><strong>{obsidianVault ? `${obsidianVault}\\IELTS\\${localIsoDate()}.md` : "IELTS/YYYY-MM-DD.md inside the selected vault"}</strong></div>
-          <p className="obsidian-details__boundary">Only the IELTS Workbench marker block is updated. Existing note text is preserved, and changed files are backed up inside the learning workspace before replacement.</p>
+          <div><span>Destination</span><strong>{obsidianVault ? `Existing IELTS study folder / ${localIsoDate()}.md; exact path appears after sync` : "Choose your existing study vault"}</strong></div>
+          <p className="obsidian-details__boundary">Only the Luma marker block is updated. Existing note text is preserved, and changed files are backed up inside the learning workspace before replacement.</p>
           <div className="pdf-actions">
             <button className="button" disabled={obsidianBusy} onClick={async () => {
               const selected = await pickObsidianVaultDirectory();
@@ -104,18 +104,11 @@ export function SettingsPage() {
             <button className="button button--primary" disabled={!obsidianVault || obsidianBusy || analyticsLoading} onClick={async () => {
               setObsidianBusy(true); setObsidianMessage(null);
               try {
-                const now = new Date();
-                const reviewItems = await repository.listReviewItems();
-                const due = reviewItems.filter((item) => Date.parse(item.dueAt) <= now.getTime()).length;
-                const date = localIsoDate(now);
-                const result = await exportObsidianDailyBrief(obsidianVault, date, buildObsidianDailyBrief(analytics, due, date));
-                setObsidianMessage(result.changed
-                  ? `Exported: ${result.path} · SHA-256 ${result.sha256}${result.backupPath ? ` · Previous note backed up to ${result.backupPath}` : ""}`
-                  : `Already current: ${result.path} · SHA-256 ${result.sha256}`);
+                setObsidianMessage(await syncObsidianSessions(repository,localIsoDate()));
               } catch (error) {
                 setObsidianMessage(`Export failed without changing the note: ${error instanceof Error ? error.message : String(error)}`);
               } finally { setObsidianBusy(false); }
-            }} type="button">{obsidianBusy ? "Exporting…" : "Export today’s brief"}</button>
+            }} type="button">{obsidianBusy ? "Syncing…" : "Sync today / retry pending"}</button>
           </div>
           {obsidianMessage && <p aria-live="polite" className="workspace-backup-message">{obsidianMessage}</p>}
         </div>

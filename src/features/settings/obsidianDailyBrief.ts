@@ -21,9 +21,9 @@ export function buildObsidianDailyBrief(analytics: LearningAnalytics, dueReviewC
   });
   return [
     `date: ${date}`,
-    "source: IELTS Workbench local workspace",
+    "source: Luma local workspace",
     "",
-    "## IELTS Workbench",
+    "## Luma",
     `- Focus today: ${duration(analytics.todaySeconds)}`,
     `- Completed sessions, all time: ${analytics.completed}`,
     `- Objective accuracy, all time: ${accuracy}`,

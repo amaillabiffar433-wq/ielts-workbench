@@ -8,7 +8,7 @@ import type {
   PdfDocumentHandle,
 } from "./documentSource";
 
-export type TauriPdfInvoke = (command: string) => Promise<unknown>;
+export type TauriPdfInvoke = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 
 const SelectedPdfPayloadSchema = z.object({
   fileName: z.string().trim().min(1),
@@ -31,6 +31,14 @@ function decodeBase64(value: string): Uint8Array<ArrayBuffer> {
     bytes[index] = binary.charCodeAt(index);
   }
   return bytes;
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+    binary += String.fromCharCode(...bytes.subarray(offset, Math.min(offset + 0x8000, bytes.length)));
+  }
+  return globalThis.btoa(binary);
 }
 
 /**
@@ -76,5 +84,13 @@ export class TauriPdfSourceAdapter implements DocumentSourceAdapter {
 
   async open(source: PdfBinarySource): Promise<PdfDocumentHandle> {
     return this.parser.open(source);
+  }
+
+  async archiveSource(source: PdfBinarySource): Promise<void> {
+    const bytes = new Uint8Array(await source.readBytes());
+    await this.invokeCommand("archive_reference_material", {
+      fileName: source.name,
+      base64: encodeBase64(bytes),
+    });
   }
 }

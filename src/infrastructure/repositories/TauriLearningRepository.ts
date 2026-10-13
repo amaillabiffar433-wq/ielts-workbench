@@ -65,6 +65,19 @@ import {
 
 export type TauriInvoke = <T>(command: string, args?: Record<string, unknown>) => Promise<T>;
 
+// Rust Option fields arrive as null; keep domain inputs strict and normalize only
+// the known optional IPC fields. Required nulls and unknown fields still fail.
+function nativeOptionalFields(value: unknown, keys: readonly string[]): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const record = { ...value } as Record<string, unknown>;
+  for (const key of keys) if (record[key] === null) delete record[key];
+  return record;
+}
+const NativeVocabularyItemSchema = z.preprocess(value => nativeOptionalFields(value, [
+  "sourcePackId", "sourceTestId", "sourceModule", "sourceBlockId", "sourceBookTitle",
+  "sourceTestTitle", "sourceSectionId", "sourceSectionTitle", "sourceQuestionId", "sourceQuestionNumber",
+]), VocabularyItemSchema);
+
 const RawBootstrapStateSchema = z.object({
   configured: z.boolean(),
   available: z.boolean(),
@@ -557,21 +570,21 @@ export class TauriLearningRepository implements LearningRepository {
   }
 
   async listVocabularyItems(): Promise<VocabularyItem[]> {
-    return z.array(VocabularyItemSchema).parse(
+    return z.array(NativeVocabularyItemSchema).parse(
       await this.invokeCommand("list_vocabulary_items"),
     );
   }
 
   async saveVocabularyItem(input: SaveVocabularyItemInput): Promise<VocabularyItem> {
     const validated = SaveVocabularyItemInputSchema.parse(input);
-    return VocabularyItemSchema.parse(
+    return NativeVocabularyItemSchema.parse(
       await this.invokeCommand("save_vocabulary_item", { input: validated }),
     );
   }
 
   async updateVocabularyItem(input: UpdateVocabularyItemInput): Promise<VocabularyItem> {
     const validated = UpdateVocabularyItemInputSchema.parse(input);
-    return VocabularyItemSchema.parse(
+    return NativeVocabularyItemSchema.parse(
       await this.invokeCommand("update_vocabulary_item", { input: validated }),
     );
   }

@@ -288,6 +288,13 @@ export function PdfImportPage({ adapter = createDefaultAdapter() }: PdfImportPag
     if (!validation.valid) return;
     setBusy(true);
     try {
+      if (adapter.archiveSource) {
+        try {
+          await adapter.archiveSource(source);
+        } catch (archiveError) {
+          setWarning(`The original PDF could not be archived in Reference materials. Text extraction can continue, but keep your original file: ${errorMessage(archiveError)}`);
+        }
+      }
       const nextDocument = await adapter.open(source);
       const previousDocument = documentHandleRef.current;
       documentHandleRef.current = nextDocument;

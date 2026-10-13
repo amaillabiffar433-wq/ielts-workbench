@@ -4,7 +4,7 @@ import { buildObsidianDailyBrief, localIsoDate } from "./obsidianDailyBrief";
 describe("Obsidian daily brief", () => {
   it("labels all-time and today metrics without inventing writing scores", () => {
     const result = buildObsidianDailyBrief({
-      sessions: 2, completed: 1, elapsedSeconds: 1_800, todaySeconds: 600,
+      sessions: 2, completed: 1, elapsedSeconds: 1_800, todaySeconds: 600, retakes: 0,
       earnedPoints: 7, scorablePoints: 10, mistakes: 3, activeDays: 1, streakDays: 1,
       recentDays: [],
       byQuestionType: [],

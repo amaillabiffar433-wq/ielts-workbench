@@ -39,6 +39,7 @@ export interface LearningAnalytics {
   readonly mistakes: number;
   readonly activeDays: number;
   readonly streakDays: number;
+  readonly retakes: number;
   readonly byModule: readonly ModuleAnalytics[];
   readonly recentDays: readonly DailyActivity[];
   readonly byQuestionType: readonly QuestionTypeAnalytics[];
@@ -68,6 +69,7 @@ export function buildLearningAnalytics(
   summaries: readonly PracticeSessionSummary[],
   snapshots: ReadonlyMap<string, SessionSnapshot>,
   now = new Date(),
+  measuredDailySeconds?: Readonly<Record<string, number>>,
 ): LearningAnalytics {
   const packById = new Map(packs.map((pack) => [pack.manifest.id, pack]));
   const modules: AnalyticsModule[] = ["listening", "reading", "writing"];
@@ -85,8 +87,10 @@ export function buildLearningAnalytics(
   let earnedPoints = 0;
   let scorablePoints = 0;
   let mistakes = 0;
+  let retakes = 0;
+  const scoredIdentities = new Set<string>();
 
-  summaries.forEach((summary) => {
+  [...summaries].sort((a, b) => a.startedAt.localeCompare(b.startedAt) || a.sessionId.localeCompare(b.sessionId)).forEach((summary) => {
     const moduleType = summary.moduleType;
     if (moduleType) {
       const total = moduleTotals.get(moduleType)!;
@@ -103,6 +107,9 @@ export function buildLearningAnalytics(
     const snapshot = snapshots.get(summary.sessionId);
     const module = sessionModule(packById, summary);
     if (!snapshot || !module || module.type === "writing") return;
+    const identity = `${summary.packId}:${summary.testId}:${summary.moduleType}:${summary.mode}`;
+    if (scoredIdentities.has(identity)) { retakes += 1; return; }
+    scoredIdentities.add(identity);
     const answers = new Map(snapshot.answers.map((answer) => [answer.questionId, answer.value]));
     moduleQuestions(module).forEach((question) => {
       const score = scoreQuestion(question, answers.get(question.id));
@@ -140,17 +147,19 @@ export function buildLearningAnalytics(
     sessions: summaries.length,
     completed: summaries.filter((summary) => summary.status === "submitted").length,
     elapsedSeconds: summaries.reduce((total, summary) => total + summary.elapsedSeconds, 0),
-    todaySeconds: summaries.filter((summary) => localDateKey(summary.updatedAt) === todayKey).reduce((total, summary) => total + summary.elapsedSeconds, 0),
+    todaySeconds: measuredDailySeconds ? measuredDailySeconds[todayKey] ?? 0 : summaries.filter((summary) => localDateKey(summary.updatedAt) === todayKey).reduce((total, summary) => total + summary.elapsedSeconds, 0),
     earnedPoints,
     scorablePoints,
     mistakes,
     activeDays: activeDateKeys.size,
     streakDays,
+    retakes,
     byModule: modules.map((moduleType) => ({ moduleType, ...moduleTotals.get(moduleType)! })),
     recentDays: dayKeys.map((key) => ({
       key,
       label: new Date(`${key}T12:00:00`).toLocaleDateString("en-US", { weekday: "short" }),
       ...daily.get(key)!,
+      ...(measuredDailySeconds ? {elapsedSeconds: measuredDailySeconds[key] ?? 0} : {}),
     })),
     byQuestionType: [...questionTypes.entries()]
       .map(([questionType, totals]) => ({ questionType, ...totals }))

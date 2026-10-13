@@ -3,13 +3,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { AnnotationRecord } from "../../../infrastructure/repositories/LearningRepository";
 import { workbenchStore } from "../../../stores/workbenchStore";
 import { ReadingWorkspace } from "./ReadingWorkspace";
+import { MemoryRouter } from "react-router-dom";
 
 const fullscreen = vi.hoisted(() => vi.fn());
 vi.mock("../../../infrastructure/window/windowPresentation", () => ({ toggleWindowFullscreen: fullscreen }));
 const originalState = workbenchStore.getState();
 function renderWorkspace() {
-  return render(<ReadingWorkspace toolbar={<header>Reading</header>} panes={<div>Passage</div>}
-    navigator={<footer>Answer sheet</footer>} visiblePane={null} onVisiblePaneChange={vi.fn()} answered={3} total={40} />);
+  return render(<MemoryRouter><ReadingWorkspace toolbar={<header>Reading</header>} panes={<div>Passage</div>}
+    navigator={<footer>Answer sheet</footer>} visiblePane={null} onVisiblePaneChange={vi.fn()} answered={3} total={40} /></MemoryRouter>);
 }
 function note(id: string, sessionId: string, text: string): AnnotationRecord {
   return { id, sessionId, note: text, style: "highlight-yellow", createdAt: "2026-09-12T00:00:00.000Z", updatedAt: "2026-09-12T00:00:00.000Z",

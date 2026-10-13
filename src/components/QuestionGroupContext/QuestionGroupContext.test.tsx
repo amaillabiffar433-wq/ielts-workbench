@@ -72,8 +72,8 @@ describe("QuestionGroupContext", () => {
     const matchingCells = screen.getAllByRole("cell").filter((cell) => cell.textContent?.includes("Shared phrase"));
     expect(matchingCells).toHaveLength(1);
     const rowHeader = screen.getByRole("rowheader", { name: /Shared phrase/u });
-    expect(within(rowHeader).getByRole("button", { name: /标记文字/u })).toHaveTextContent("Shared");
-    expect(within(matchingCells[0]).queryByRole("button", { name: /标记文字/u })).not.toBeInTheDocument();
+    expect(within(rowHeader).getByRole("button", { name: /Annotated/u })).toHaveTextContent("Shared");
+    expect(within(matchingCells[0]).queryByRole("button", { name: /Annotated/u })).not.toBeInTheDocument();
   });
 
   it("renders summary and notes answer slots from stable questionId bindings", () => {

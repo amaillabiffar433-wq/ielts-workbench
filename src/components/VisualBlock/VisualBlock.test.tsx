@@ -19,7 +19,7 @@ describe("visual content in independent panes", () => {
     const visual = { type: "snapshot" as const, assetId: asset.id, altText: "Original context", sourcePage: 2 };
     const { unmount } = render(<DraftImageContext.Provider value="test-draft"><div data-testid="left"><VisualBlock visual={visual} /></div><div data-testid="right"><VisualBlock visual={visual} /></div></DraftImageContext.Provider>);
     await waitFor(() => expect(screen.getAllByRole("img")).toHaveLength(2));
-    await userEvent.click(within(screen.getByTestId("left")).getByRole("button", { name: "放大原图" }));
+    await userEvent.click(within(screen.getByTestId("left")).getByRole("button", { name: "Zoom in" }));
     expect(within(screen.getByTestId("left")).getByRole("img")).toHaveStyle({ width: "150%" });
     expect(within(screen.getByTestId("right")).getByRole("img")).toHaveStyle({ width: "100%" });
     expect(document.querySelectorAll("[id]")).toHaveLength(0);
@@ -29,6 +29,6 @@ describe("visual content in independent panes", () => {
   it("reports missing files rather than silently hiding a broken visual context", async () => {
     workbenchStore.setState({ repository: new InMemoryLearningRepository() });
     render(<DraftImageContext.Provider value="test-draft"><VisualBlock visual={{ type: "figure", assetId: "missing-image", altText: "Map" }} /></DraftImageContext.Provider>);
-    expect(await screen.findByRole("alert")).toHaveTextContent("图片读取失败");
+    expect(await screen.findByRole("alert")).toHaveTextContent("Unable to read this workspace image");
   });
 });

@@ -14,6 +14,19 @@ function mockInvoke(responses: Readonly<Record<string, unknown>>): TauriInvoke {
 }
 
 describe("TauriLearningRepository", () => {
+  it("loads and updates a native vocabulary selection without an associated question", async () => {
+    const word = { id:"word-one", term:"evidence", normalizedTerm:"evidence", sentence:"Check the evidence.", contextBefore:"Check the ",contextAfter:".", sourcePackId:"pack-one",sourceTestId:"test-one",sourceModule:"reading",sourceBlockId:"block-one",sourceBookTitle:"Original source",sourceTestTitle:"Test 1",sourceSectionId:"passage-one",sourceSectionTitle:"Passage 1",sourceQuestionId:null,sourceQuestionNumber:null,note:"",learningState:"new",createdAt:"2026-09-19T08:00:00.000Z",updatedAt:"2026-09-19T08:00:00.000Z" };
+    const repository = new TauriLearningRepository(mockInvoke({list_vocabulary_items:[word],save_vocabulary_item:word,update_vocabulary_item:{...word,learningState:"mastered"}}));
+    const [loaded] = await repository.listVocabularyItems();
+    expect(loaded.sourceQuestionId).toBeUndefined();
+    expect(loaded.sourceQuestionNumber).toBeUndefined();
+    expect(loaded.sourceBlockId).toBe("block-one");
+    const input = Object.fromEntries(Object.entries(loaded).filter(([key]) => !["id","createdAt","updatedAt"].includes(key))) as Parameters<typeof repository.saveVocabularyItem>[0];
+    await expect(repository.saveVocabularyItem(input)).resolves.toMatchObject({id:"word-one"});
+    await expect(repository.updateVocabularyItem({id:loaded.id,note:"",learningState:"mastered"})).resolves.toMatchObject({learningState:"mastered"});
+    const invalid = new TauriLearningRepository(mockInvoke({list_vocabulary_items:[{...word,term:null}]}));
+    await expect(invalid.listVocabularyItems()).rejects.toThrow();
+  });
   it("normalizes an unconfigured native bootstrap without querying workspace data", async () => {
     const baseInvoke = mockInvoke({
       get_bootstrap_state: {

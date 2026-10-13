@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "IELTS Workbench",
+  "productName": "Luma",
   "version": "0.1.0",
   "identifier": "com.ieltsworkbench.desktop",
   "build": {
@@ -13,10 +13,10 @@
     "windows": [
       {
         "label": "main",
-        "title": "IELTS Workbench",
+        "title": "Luma",
         "width": 1280,
         "height": 800,
-        "minWidth": 1280,
+        "minWidth": 960,
         "minHeight": 640,
         "resizable": true,
         "fullscreen": false,

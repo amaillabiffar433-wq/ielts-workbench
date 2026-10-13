@@ -27,7 +27,7 @@ describe("confirmAction", () => {
 
     await expect(confirmAction("Continue?")).resolves.toBe(false);
     expect(tauriHarness.confirm).toHaveBeenCalledWith("Continue?", {
-      title: "IELTS Workbench",
+      title: "Luma",
       kind: "warning",
     });
   });

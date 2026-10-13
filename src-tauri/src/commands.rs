@@ -25,6 +25,28 @@ type CommandResult<T> = std::result::Result<T, CommandError>;
 const MAX_SELECTED_PDF_BYTES: u64 = 64 * 1024 * 1024;
 
 #[tauri::command]
+pub fn list_reference_materials(state: State<'_, AppBackend>) -> CommandResult<Vec<crate::reference_materials::ReferenceMaterial>> {
+    let (workspace, _) = state.workspace_and_database()?;
+    crate::reference_materials::list(workspace.root()).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn open_reference_material(state: State<'_, AppBackend>, id: String) -> CommandResult<()> {
+    let (workspace, _) = state.workspace_and_database()?;
+    crate::reference_materials::open(workspace.root(), &id).map_err(Into::into)
+}
+
+#[tauri::command]
+pub fn archive_reference_material(
+    state: State<'_, AppBackend>,
+    file_name: String,
+    base64: String,
+) -> CommandResult<crate::reference_materials::ReferenceMaterial> {
+    let (workspace, _) = state.workspace_and_database()?;
+    crate::reference_materials::archive(workspace.root(), &file_name, &base64).map_err(Into::into)
+}
+
+#[tauri::command]
 pub fn export_obsidian_daily_brief(
     state: State<'_, AppBackend>,
     vault_path: String,

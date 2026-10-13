@@ -309,3 +309,7 @@
   .listening-questions { overflow-y: visible; }
   .listening-transcript { max-height: 360px; border-top: 1px solid var(--border-subtle); border-left: 0; }
 }
+.listening-transcript__plain { white-space: pre-wrap; padding: 20px; font-size: 15px; line-height: 1.8; }
+.listening-question-group { margin: 24px 0; }
+.listening-question-group > h2 { font-size: 18px; }
+.listening-question-group > p { font-size: 14px; line-height: 1.7; }

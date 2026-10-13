@@ -105,6 +105,23 @@
   white-space: nowrap;
 }
 
+.text-document__source-toggle {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  margin-left: auto;
+  background: var(--surface-raised);
+  color: var(--text-secondary);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.text-document__source-toggle:hover { border-color: var(--border-strong); color: var(--text-primary); }
+
 .text-document__content {
   max-width: 800px;
   padding: 28px clamp(24px, 5vw, 58px) 80px;

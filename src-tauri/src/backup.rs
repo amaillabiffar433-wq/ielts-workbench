@@ -25,7 +25,7 @@ use crate::{
 const BACKUP_SCHEMA_VERSION: u32 = 1;
 const BACKUP_MANIFEST_FILE: &str = "backup-manifest.json";
 const BACKUP_DATABASE_FILE: &str = "database.sqlite3";
-const BACKED_UP_DIRECTORIES: [&str; 3] = ["packs", "imports", "themes"];
+const BACKED_UP_DIRECTORIES: [&str; 6] = ["packs", "imports", "themes", "library-assets", "speaking-materials", "speaking-recordings"];
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -70,10 +70,18 @@ pub fn create_workspace_backup(
         sync_file(&database_destination)?;
 
         for directory in BACKED_UP_DIRECTORIES {
-            copy_tree_for_backup(workspace.root(), &workspace.root().join(directory), &destination)?;
+            if workspace.root().join(directory).exists() {
+                copy_tree_for_backup(workspace.root(), &workspace.root().join(directory), &destination)?;
+            }
         }
 
         let mut paths = vec![PathBuf::from(BACKUP_DATABASE_FILE)];
+        if workspace.root().join("speaking.sqlite3").exists() {
+            let speaking = crate::speaking::database(workspace.root())?;
+            speaking.backup(MAIN_DB, destination.join("speaking.sqlite3"), None)?;
+            sync_file(&destination.join("speaking.sqlite3"))?;
+            paths.push(PathBuf::from("speaking.sqlite3"));
+        }
         for directory in BACKED_UP_DIRECTORIES {
             let copied_root = destination.join(directory);
             if copied_root.is_dir() {
@@ -184,7 +192,7 @@ fn validate_manifest(root: &Path, manifest: &BackupManifest) -> Result<()> {
     for file in &manifest.files {
         let relative = validate_relative_path(&file.path)?;
         let first = relative.components().next().and_then(|component| component.as_os_str().to_str()).unwrap_or_default();
-        if file.path != BACKUP_DATABASE_FILE && !BACKED_UP_DIRECTORIES.contains(&first) {
+        if file.path != BACKUP_DATABASE_FILE && file.path != "speaking.sqlite3" && !BACKED_UP_DIRECTORIES.contains(&first) {
             return Err(BackendError::Security("The backup manifest contains an unsupported destination path.".to_string()));
         }
         if !paths.insert(file.path.as_str()) {
@@ -289,6 +297,10 @@ mod tests {
         let workspace = Workspace::initialize(source_root.to_str().unwrap()).unwrap();
         storage::initialize_database(&workspace.database_path()).unwrap();
         fs::write(workspace.root().join("imports").join("draft.txt"), b"draft").unwrap();
+        fs::create_dir(workspace.root().join("library-assets")).unwrap();
+        fs::write(workspace.root().join("library-assets/reference.txt"), b"reference preserved").unwrap();
+        let speaking=crate::speaking::database(workspace.root()).unwrap();
+        speaking.execute("INSERT INTO speaking_favorites(topic_id,created_at) VALUES('original-topic','2026-09-19T00:00:00Z')",[]).unwrap();
         let connection = storage::open_database(&workspace.database_path()).unwrap();
         connection.execute("INSERT INTO app_settings(key, value_json, updated_at) VALUES ('proof', '\"kept\"', '2026-09-09T00:00:00.000Z')", []).unwrap();
         let exports = temp.path().join("exports");
@@ -301,6 +313,8 @@ mod tests {
         let restored_connection = storage::open_database(&restored.database_path()).unwrap();
         let proof: String = restored_connection.query_row("SELECT value_json FROM app_settings WHERE key = 'proof'", [], |row| row.get(0)).unwrap();
         assert_eq!(proof, "\"kept\"");
+        assert_eq!(fs::read(restored.root().join("library-assets/reference.txt")).unwrap(),b"reference preserved");
+        assert_eq!(crate::speaking::favorites(restored.root()).unwrap(),vec!["original-topic"]);
     }
 
     #[test]

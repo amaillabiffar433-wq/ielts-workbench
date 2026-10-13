@@ -1,5 +1,9 @@
 # IELTS Workbench 数据格式
 
+## Luma 2026-09-19 extension
+
+Listening module `schemaVersion: 2` enables shared matching, multiple-choice and structured/visual question context. V1 restrictions are unchanged. Sections may carry optional `transcriptText` (1–100000 characters) for an untimed source transcript; the app displays it only in Study. No timestamp is inferred from text. Manifest v1, workspace paths, internal application identifier and installed historical packs stay compatible. See ADR 0006.
+
 本文定义当前实现采用的工作区、`IELTSPack v1`、练习状态和 SQLite 持久化契约。规范性前端校验器位于 `src/domain/pack/schemas.ts`，规范性可执行数据库结构位于 `src-tauri/migrations/`；三处若出现分歧，应先修复分歧再发布题包。
 
 ## 1. 通用约定

@@ -1,5 +1,19 @@
 # IELTS Workbench 执行计划
 
+## 2026-09-19: Luma completion and private library delivery
+
+Authoritative checkout: `D:\Projects\雅思or算法软件项目`, baseline `e641e42`; worktree clean before this task. Batch evidence: `delivery/luma-20260919-01` (ignored: private content and local database snapshots). Existing C: checkout is not modified.
+
+1. [done] Verified authoritative repository, online SQLite backups, formal migration 3 to 5 and record continuity; formal bootstrap and desktop checkpoint are live.
+2. [done] Four genuine C17 Academic Reading/Listening tests (320 scoring units), 8 Writing tasks; native full submissions and restart checkpoint in isolated data.
+3. [done/in progress] Cream Luma UI, inline completion, save retry, vocabulary sources, real progress and Obsidian. Current gates: frontend 265 passed, Rust 43 passed; native vocabulary/Obsidian/database-lock retry passed. Additional GUI checks continue.
+4. [done] SOURCE_ROOT reverified against the latest user correction: `D:\downloads\雅思` is Explorer “下载/雅思”; `D:\下载\雅思` is absent. Exactly three subdirectories. 889 files recursively inventoried/copied/hashed; 32 Reading drafts, 1101 unscored units, and full reference copies retained. No original has been deleted.
+5. [in progress; revised by user] Reconcile all three categories against installed records; implement Speaking Parts 1-3, favorites, timer, durable completion and optional recording; extract Writing prompts/charts while retaining essays/handouts as resources. Add visible Library skill/resource entries. Apply latest transcript-hidden default and Vocabulary search/navigation preferences. Speaking uses its own migrated SQLite file in the selected workspace so the already-running version remains compatible.
+6. [in progress; revised by user] Source objects are being privately uploaded/read-back verified. Add actual three-category remote directory hierarchy, revalidate exact file mappings, and extend standardized backup after Speaking/Writing imports. Retain incomplete/unverified originals; deletion gates remain mandatory and narrower than the previous draft.
+7. [in progress] Native end-to-end acceptance, source-unavailable offline restart/read/play/submit/resume, final packaged version in a new D:\Apps\Luma\versions directory and shortcut switch without terminating the formal user window. Update per-category reports and exact cleanup results.
+
+No remote push, framework upgrade, source-file deletion before gate verification, or fabricated content/answer keys. Keep existing immutable packs and historical session identities.
+
 ## 2026-09-17：IELTS Personal Operating System 产品级重构
 
 本轮唯一源码工作副本为 `D:\Projects\雅思or算法软件项目`，分支 `codex/product-os-rebuild`。开始实现前已创建完整 Git bundle、工作树 patch 与逐文件副本备份：`D:\IELTS-Workbench-Backups\20260917-090322-pre-product-os-rebuild-complete`；原有 2026-09-16 P0 工作先通过 242 项前端测试、lint、Vite build 与 38 项 Rust 测试，再以 `f085806` 建立可回退检查点。`D:\downloads\雅思`、DDDD 安装器、用户工作区与 Obsidian 库均按只读源处理，任何学习记录写入必须经过独立实现与定点验证。

@@ -33,6 +33,20 @@ async function readyStore() {
   return { store, session };
 }
 
+it("keeps typed answers on save failure and blocks submission until retry succeeds", async () => {
+  const { store, session } = await readyStore();
+  const save = vi.spyOn(store.getState().repository, "saveAnswer").mockRejectedValue(new Error("disk unavailable"));
+  await store.getState().answerQuestion(session.sessionId, "demo-reading-q01", "true");
+  expect(store.getState().answers[answerKey(session.sessionId, "demo-reading-q01")].value).toBe("true");
+  expect(store.getState().saveState).toBe("error");
+  await expect(store.getState().submitSession(session.sessionId)).rejects.toThrow("unsaved");
+  expect(store.getState().session?.status).toBe("in-progress");
+  save.mockRestore();
+  await store.getState().flushPendingSaves();
+  expect(store.getState().saveState).toBe("saved");
+  expect((await store.getState().repository.loadSession(session.sessionId))?.answers[0].value).toBe("true");
+});
+
 function packWithIdentity(packId: string, testId: string): IELTSPack {
   return {
     ...originalDemoPack,

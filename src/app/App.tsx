@@ -6,6 +6,7 @@ import { ImportCenterPage } from "../features/import-center/ImportCenterPage";
 import { PdfImportPage } from "../features/pdf-import/PdfImportPage";
 import { HomePage } from "../features/home/HomePage";
 import { LibraryShelfPage } from "../features/library/LibraryShelfPage";
+import { ReferenceLibraryPage } from "../features/library/ReferenceLibraryPage";
 import { OnboardingPage } from "../features/onboarding/OnboardingPage";
 import { ListeningPage } from "../features/practice/listening/ListeningPage";
 import { ReadingPage } from "../features/practice/reading/ReadingPage";
@@ -14,6 +15,7 @@ import { ReviewPage } from "../features/review/ReviewPage";
 import { ProgressPage } from "../features/progress/ProgressPage";
 import { SettingsPage } from "../features/settings/SettingsPage";
 import { VocabularyPage } from "../features/vocabulary/VocabularyPage";
+import { SpeakingPage } from "../features/speaking/SpeakingPage";
 import { useWorkbenchStore } from "../stores/workbenchStore";
 
 function AppearanceHydrator() {
@@ -80,6 +82,8 @@ export function App() {
         <Route element={<WorkspaceGate />}>
           <Route element={<HomePage />} path="/home" />
           <Route element={<LibraryShelfPage />} path="/library" />
+          <Route element={<ReferenceLibraryPage />} path="/library/references" />
+          <Route element={<SpeakingPage />} path="/practice/speaking" />
           <Route element={<ImportCenterPage />} path="/import" />
           <Route element={<PdfImportPage />} path="/import/pdf" />
           <Route element={<ReadingPage />} path="/practice/reading" />

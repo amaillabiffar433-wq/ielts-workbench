@@ -1,10 +1,11 @@
-import { BarChart3, BookOpenText, House, LibraryBig, RotateCcw, Settings2 } from "lucide-react";
+import { BarChart3, BookOpenText, House, LibraryBig, NotebookPen, RotateCcw, Settings2 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 const navigation = [
-  { to: "/home", label: "Home", icon: House },
+  { to: "/home", label: "Dashboard", icon: House },
   { to: "/library", label: "Library", icon: LibraryBig },
-  { to: "/review?view=queue", label: "Review", icon: RotateCcw },
+  { to: "/vocabulary", label: "Vocabulary", icon: NotebookPen },
+  { to: "/review", label: "Review", icon: RotateCcw },
   { to: "/progress", label: "Progress", icon: BarChart3 },
   { to: "/settings", label: "Settings", icon: Settings2 },
 ] as const;
@@ -16,7 +17,7 @@ export function TopNavigation({ examLock, examMode, examRoute }: {
 }) {
   return (
     <header className="top-navigation">
-      <div className="top-navigation__brand"><BookOpenText aria-hidden="true" size={20} /><span>IELTS Workbench</span></div>
+      <div className="top-navigation__brand"><BookOpenText aria-hidden="true" size={20} /><span>Luma</span></div>
       <nav aria-label="Primary navigation" className="top-navigation__links">
         {examLock ? <NavLink className="top-navigation__link active" to={examRoute}>Exam</NavLink>
           : navigation.map(({ to, label, icon: Icon }) => (

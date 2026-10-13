@@ -571,6 +571,7 @@ export const ListeningSectionSchema = z
     endMs: z.number().int().positive().optional(),
     contentBlocks: z.array(ContentBlockSchema).default([]),
     transcriptCues: z.array(TranscriptCueSchema).default([]),
+    transcriptText: z.string().trim().min(1).max(100000).optional(),
     questionGroups: z.array(QuestionGroupSchema).min(1),
   })
   .strict()
@@ -612,7 +613,7 @@ export const ListeningSectionSchema = z
 
 export const ListeningModuleSchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.union([z.literal(1), z.literal(2)]),
     ...moduleIdentityShape,
     type: z.literal("listening"),
     audioAssetId: StableIdSchema,
@@ -623,7 +624,7 @@ export const ListeningModuleSchema = z
     module.sections.forEach((section, sectionIndex) => {
       section.questionGroups.forEach((group, groupIndex) => {
         group.questions.forEach((question, questionIndex) => {
-          if (["multiple-choice", "yes-no-not-given", "matching"].includes(question.type)) {
+          if (module.schemaVersion === 1 && ["multiple-choice", "yes-no-not-given", "matching"].includes(question.type)) {
             context.addIssue({
               code: "custom",
               path: ["sections", sectionIndex, "questionGroups", groupIndex, "questions", questionIndex, "type"],
@@ -631,7 +632,7 @@ export const ListeningModuleSchema = z
             });
           }
         });
-        if (group.contextBlocks !== undefined) {
+        if (module.schemaVersion === 1 && group.contextBlocks !== undefined) {
           context.addIssue({
             code: "custom",
             path: ["sections", sectionIndex, "questionGroups", groupIndex, "contextBlocks"],
@@ -903,7 +904,7 @@ const IELTSPackStrictSchema = z
 
     const mediaById = new Map(pack.manifest.mediaAssets.map((asset) => [asset.id, asset]));
     pack.modules.forEach((module, moduleIndex) => {
-      if (module.type === "reading") {
+      if (module.type === "reading" || module.type === "listening") {
         module.sections.forEach((section, sectionIndex) => {
           const visuals = [...section.contentBlocks.flatMap((block) => block.visual ? [block.visual] : []),
             ...section.questionGroups.flatMap((group) => (group.contextBlocks ?? []).filter((block) => "assetId" in block))];
@@ -1012,7 +1013,7 @@ const IELTSPackStrictSchema = z
               ],
             ),
           );
-          if (module.type === "reading" && module.schemaVersion >= 2) {
+          if ((module.type === "reading" || module.type === "listening") && module.schemaVersion >= 2) {
             (group.contextBlocks ?? []).forEach((block, blockIndex) => {
               const blockPath = [
                 "modules", moduleIndex, "sections", sectionIndex,

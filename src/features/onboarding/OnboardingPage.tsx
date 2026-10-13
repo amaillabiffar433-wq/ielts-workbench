@@ -81,7 +81,7 @@ export function OnboardingPage() {
     <main className="page onboarding-page">
       <PageHeader
         title="设置学习工作区"
-        description="IELTS Workbench 把题包、音频、作文和主数据库保存在你明确选择的本地目录。核心练习默认离线。"
+        description="Luma 把题包、音频、作文和主数据库保存在你明确选择的本地目录。核心练习默认离线。"
       />
 
       {!desktop && (

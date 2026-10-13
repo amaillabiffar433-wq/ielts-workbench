@@ -39,6 +39,11 @@ export function WritingPage() {
   const repository = useWorkbenchStore((state) => state.repository);
   const ensureSession = useWorkbenchStore((state) => state.ensureSession);
   const submitSession = useWorkbenchStore((state) => state.submitSession);
+  const updateSessionElapsed = useWorkbenchStore((state) => state.updateSessionElapsed);
+  const [timerRunning, setTimerRunning] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+  const elapsedRef = useRef(0);
+  const lastTimerSession = useRef<string | undefined>(undefined);
   const readPackMedia = useWorkbenchStore((state) => state.readPackMedia);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [content, setContent] = useState("");
@@ -80,6 +85,25 @@ export function WritingPage() {
     && session.moduleType === "writing"
     && session.mode === mode,
   );
+
+  const writingSessionId = sessionMatchesRoute ? session?.sessionId : undefined;
+  const writingSessionStatus = session?.status;
+  const persistedSeconds = session?.elapsedSeconds ?? 0;
+  useEffect(() => {
+    if(lastTimerSession.current===writingSessionId)return;
+    lastTimerSession.current=writingSessionId;
+    elapsedRef.current = persistedSeconds;
+    setElapsed(elapsedRef.current);
+    setTimerRunning(false);
+  }, [writingSessionId,persistedSeconds]);
+  useEffect(() => { elapsedRef.current=Math.max(elapsedRef.current,persistedSeconds); }, [persistedSeconds]);
+  useEffect(() => {
+    if (!writingSessionId || !timerRunning || writingSessionStatus !== "in-progress") return;
+    let previous=Date.now();let ticks=0;
+    const persist=()=>updateSessionElapsed(writingSessionId,elapsedRef.current).catch(()=>setError("Timer could not be saved. Retry by pausing and restarting the timer."));
+    const timer=window.setInterval(()=>{const now=Date.now();const delta=Math.floor((now-previous)/1000);previous=now;if(delta>0&&delta<=3){elapsedRef.current+=delta;setElapsed(elapsedRef.current);if(++ticks%5===0)void persist();}},1000);
+    return ()=>{window.clearInterval(timer);void persist();};
+  }, [writingSessionId,writingSessionStatus,timerRunning,updateSessionElapsed]);
 
   const persistDraftSnapshot = useCallback((snapshot: DraftSnapshot): Promise<void> => {
     const operation = writeQueueRef.current.then(async () => {
@@ -289,6 +313,7 @@ export function WritingPage() {
       };
       await saveDraftSnapshot(snapshot);
       const version = await repository.createWritingVersion({ sessionId: session.sessionId, taskId: task.id, content, reason });
+      await updateSessionElapsed(session.sessionId,elapsedRef.current);
       setVersions((current) => [version, ...current.filter((candidate) => candidate.id !== version.id)]);
       if (reason === "submitted") {
         await submitSession(session.sessionId);
@@ -367,6 +392,8 @@ export function WritingPage() {
           ))}
         </nav>
         <div className="practice-toolbar__spacer" />
+        <output aria-label="Writing elapsed">{Math.floor(elapsed/60)}:{String(elapsed%60).padStart(2,"0")}</output>
+        <button className="button" type="button" disabled={session?.status !== "in-progress"} onClick={()=>setTimerRunning(value=>!value)}>{timerRunning?"Pause timer":"Start timer"}</button>
         <SaveStatus state={saveState} />
         <button className="button" disabled={saveState === "saving"} onClick={() => void createVersion("manual")} type="button"><Save aria-hidden="true" size={15} /> 保存版本</button>
         <button
@@ -393,7 +420,7 @@ export function WritingPage() {
               <figcaption>{imageAsset.alt}</figcaption>
             </figure>
           ) : (
-            <div className="writing-prompt__note">此任务不需要图片。所有示例题目均为本项目原创。</div>
+            <div className="writing-prompt__note">{activePack?.manifest.sourceLabel} Writing is self-assessed; reference essays are not a single correct answer.</div>
           )}
           <div className="writing-version-list">
             <h2><FileClock aria-hidden="true" size={16} /> 版本历史</h2>

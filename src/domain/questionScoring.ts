@@ -10,7 +10,7 @@ export type QuestionScore = {
 };
 
 function normalizedText(value: string, caseSensitive = false): string {
-  const compact = value.trim().replace(/\s+/gu, " ");
+  const compact = value.normalize("NFKC").replace(/[‘’]/gu, "'").trim().replace(/\s+/gu, " ");
   return caseSensitive ? compact : compact.toLocaleLowerCase();
 }
 
@@ -41,7 +41,12 @@ export function scoreQuestion(
   if (!answerIsPresent(answer)) return { status: "unanswered", earnedPoints: 0, scorablePoints: question.points };
 
   if (question.type === "multiple-choice") {
-    const selected = new Set(Array.isArray(answer) ? answer : [answer]);
+    const selections = Array.isArray(answer) ? answer : [answer];
+    const selected = new Set(selections);
+    if (selected.size !== selections.length || selected.size > question.selectionCount
+      || [...selected].some((id) => !question.options.some((option) => option.id === id))) {
+      return { status: "incorrect", earnedPoints: 0, scorablePoints: question.points };
+    }
     const correct = new Set(question.correctOptionIds);
     const exact = selected.size === correct.size && [...selected].every((id) => correct.has(id));
     if (question.scoringMode === "exact-set") {
@@ -67,6 +72,10 @@ export function scoreQuestion(
   if (question.type === "true-false-not-given" || question.type === "yes-no-not-given") {
     const correct = normalizedText(userAnswer) === normalizedText(question.correctAnswer!);
     return { status: correct ? "correct" : "incorrect", earnedPoints: correct ? question.points : 0, scorablePoints: question.points };
+  }
+  const wordCount = normalizedText(userAnswer).split(/\s+/u).filter(Boolean).length;
+  if (question.maxWords !== undefined && wordCount > question.maxWords) {
+    return { status: "incorrect", earnedPoints: 0, scorablePoints: question.points };
   }
   const correct = question.acceptableAnswers.some((candidate) => (
     normalizedText(candidate, question.caseSensitive) === normalizedText(userAnswer, question.caseSensitive)

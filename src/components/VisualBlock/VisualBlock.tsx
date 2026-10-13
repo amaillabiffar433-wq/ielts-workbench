@@ -19,28 +19,28 @@ export function VisualBlock({ visual }: { readonly visual: VisualSource }) {
     let url: string | undefined;
     const read = async () => {
       const asset = pack?.manifest.mediaAssets.find((candidate) => candidate.id === visual.assetId && candidate.type === "image");
-      if (!draftId && !asset) throw new Error("题包图片引用不存在。");
+      if (!draftId && !asset) throw new Error("The pack image reference is missing.");
       const bytes = draftId ? await repository.readImportImage(draftId, visual.assetId)
         : await repository.readPackMedia(owner, asset!.relativePath);
       if (!alive) return;
       url = URL.createObjectURL(new Blob([bytes], { type: asset?.mimeType ?? "image/png" }));
       setResult({ id: key, url });
     };
-    void read().catch(() => { if (alive) setResult({ id: key, error: "图片读取失败；请检查工作区资源，或在导入器重新截取。" }); });
+    void read().catch(() => { if (alive) setResult({ id: key, error: "Unable to read this workspace image. Check the installed pack." }); });
     return () => { alive = false; if (url) URL.revokeObjectURL(url); };
   }, [draftId, key, owner, pack, repository, visual.assetId]);
   const current = result?.id === key ? result : null;
   return <figure className="visual-block" data-visual-asset-id={visual.assetId}>
     <figcaption>
       <span>{visual.altText}{visual.sourcePage ? ` · PDF p.${visual.sourcePage}` : ""}</span>
-      <button type="button" aria-label="缩小原图" disabled={scale <= 100} onClick={() => setScale((value) => Math.max(100, value - 50))}>−</button>
+      <button type="button" aria-label="Zoom out" disabled={scale <= 100} onClick={() => setScale((value) => Math.max(100, value - 50))}>−</button>
       <output>{scale}%</output>
-      <button type="button" aria-label="放大原图" disabled={scale >= 300} onClick={() => setScale((value) => Math.min(300, value + 50))}>＋</button>
-      <button type="button" onClick={() => setScale(100)}>适应宽度</button>
+      <button type="button" aria-label="Zoom in" disabled={scale >= 300} onClick={() => setScale((value) => Math.min(300, value + 50))}>＋</button>
+      <button type="button" onClick={() => setScale(100)}>Fit width</button>
     </figcaption>
     {current?.error ? <p role="alert">{current.error}</p> : current?.url ?
-      <div className="visual-block__viewport" tabIndex={0} aria-label="原图独立滚动区域">
+      <div className="visual-block__viewport" tabIndex={0} aria-label="Original image scroll region">
         <img alt={visual.altText} src={current.url} style={{ width: `${scale}%` }} />
-      </div> : <p role="status">正在读取工作区图片…</p>}
+      </div> : <p role="status">Loading local image…</p>}
   </figure>;
 }

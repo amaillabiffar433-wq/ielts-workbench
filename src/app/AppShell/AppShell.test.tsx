@@ -41,15 +41,16 @@ describe("AppShell navigation and exam restrictions", () => {
 
   afterEach(cleanup);
 
-  it("uses the five product-level destinations in order", () => {
+  it("uses the six product-level destinations in order", () => {
     renderShell("/library");
     const navigation = screen.getByRole("navigation", { name: "Primary navigation" });
     expect(within(navigation).getAllByRole("link").map((link) => link.textContent)).toEqual([
-      "Home", "Library", "Review", "Progress", "Settings",
+      "Dashboard", "Library", "Vocabulary", "Review", "Progress", "Settings",
     ]);
-    expect(within(navigation).getByRole("link", { name: "Home" })).toHaveAttribute("href", "/home");
+    expect(within(navigation).getByRole("link", { name: "Dashboard" })).toHaveAttribute("href", "/home");
     expect(within(navigation).getByRole("link", { name: "Library" })).toHaveAttribute("aria-current", "page");
-    expect(within(navigation).getByRole("link", { name: "Review" })).toHaveAttribute("href", "/review?view=queue");
+    expect(within(navigation).getByRole("link", { name: "Vocabulary" })).toHaveAttribute("href", "/vocabulary");
+    expect(within(navigation).getByRole("link", { name: "Review" })).toHaveAttribute("href", "/review");
     expect(within(navigation).getByRole("link", { name: "Progress" })).toHaveAttribute("href", "/progress");
     expect(within(navigation).getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     expect(screen.getByText("Local & offline")).toBeInTheDocument();
@@ -83,9 +84,9 @@ describe("AppShell navigation and exam restrictions", () => {
         annotations: [],
       },
     });
-    renderShell("/review");
-    expect(screen.getByRole("link", { name: "Review" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Home" })).toBeInTheDocument();
+    renderShell("/vocabulary");
+    expect(screen.getByRole("link", { name: "Vocabulary" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("link", { name: "Dashboard" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Settings" })).toBeInTheDocument();
   });
 });

@@ -22,7 +22,7 @@ export async function closeCurrentWindow(): Promise<void> {
 
 export async function confirmAction(message: string): Promise<boolean> {
   if (!isTauri()) return window.confirm(message);
-  return confirm(message, { title: "IELTS Workbench", kind: "warning" });
+  return confirm(message, { title: "Luma", kind: "warning" });
 }
 
 export async function confirmDiscardAfterSaveFailure(message: string): Promise<boolean> {

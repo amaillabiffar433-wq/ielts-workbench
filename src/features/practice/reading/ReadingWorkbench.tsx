@@ -137,11 +137,13 @@ export function ReadingWorkbench() {
   );
   const answeredCount = useMemo(() => {
     if (!session) return 0;
-    return questionEntries.filter((entry) => {
+    return questionEntries.reduce((count, entry) => {
       const value = answers[answerKey(session.sessionId, entry.question.id)]?.value;
-      return Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0;
-    }).length;
+      const units = 1 + (entry.question.type === "multiple-choice" ? entry.question.additionalNumbers.length : 0);
+      return count + (Array.isArray(value) ? Math.min(new Set(value).size, units) : typeof value === "string" && value.trim().length > 0 ? 1 : 0);
+    }, 0);
   }, [answers, questionEntries, session]);
+  const totalQuestionUnits = questionEntries.reduce((count, entry) => count + 1 + (entry.question.type === "multiple-choice" ? entry.question.additionalNumbers.length : 0), 0);
   const answeredQuestionIds = useMemo(() => new Set(session ? questionEntries.flatMap((entry) => {
     const value = answers[answerKey(session.sessionId, entry.question.id)]?.value;
     const answered = Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim().length > 0;
@@ -274,6 +276,8 @@ export function ReadingWorkbench() {
       left: { ...current.left, view: "passage", passageId: section.id },
       ...(Number.isInteger(questionNumber) && questionNumber > 0 ? {
         right: { ...current.right, view: "questions", questionScope: "single", singleNumber: questionNumber },
+      } : sectionId && !blockId ? {
+        right: { ...current.right, view: "questions", questionScope: "passage", questionPassageId: section.id },
       } : {}),
     } : current);
     if (questionEntry) {
@@ -351,7 +355,16 @@ export function ReadingWorkbench() {
   }
 
   return (
-    <ReadingWorkspace answered={answeredCount} total={questionEntries.length}
+    <ReadingWorkspace answered={answeredCount} total={totalQuestionUnits}
+      passageTabs={<div className="reading-passage-tabs" role="tablist" aria-label="Reading passages">{module.sections.map((section, index) => {
+        const entries = questionEntries.filter((e) => e.section.id === section.id);
+        const units = entries.reduce((n,e) => n + 1 + (e.question.type === "multiple-choice" ? e.question.additionalNumbers.length : 0),0);
+        const completed = entries.reduce((n,e) => { const v = answers[answerKey(session.sessionId, e.question.id)]?.value; return n + (typeof v === "string" ? Number(v.trim().length > 0) : Math.min(new Set(v ?? []).size,1 + (e.question.type === "multiple-choice" ? e.question.additionalNumbers.length : 0))); },0);
+        return <button key={section.id} type="button" role="tab" aria-selected={viewState.left.passageId === section.id} onClick={() => {
+          updatePane("left", { ...viewState.left, view: "passage", passageId: section.id });
+          updatePane("right", { ...viewState.right, view: "questions", questionScope: "passage", questionPassageId: section.id });
+        }}>Passage {index + 1}<small>{completed}/{units}</small></button>;
+      })}</div>}
       visiblePane={visiblePane} onVisiblePaneChange={setVisiblePane}
       toolbar={
       <header className="practice-toolbar">
@@ -372,6 +385,7 @@ export function ReadingWorkbench() {
         {(viewStateNotice || timer.warning) && <span className="reading-view-notice" role="status">{viewStateNotice ?? timer.warning}</span>}
         <div className="practice-toolbar__spacer" />
         <SaveStatus state={saveState} />
+        {saveState === "error" && <button className="button" type="button" onClick={() => { void flushPendingSaves().catch(() => undefined); }}>Retry save</button>}
         <span aria-label={mode === "exam" ? `Exam time remaining ${timer.label}` : `Practice time ${timer.label}`} className="practice-timer" role="timer">
           <Clock3 aria-hidden="true" size={16} />{timer.label}
         </span>
@@ -379,7 +393,7 @@ export function ReadingWorkbench() {
           className="button button--primary"
           disabled={submitting}
           onClick={async () => {
-            const unanswered = questionEntries.length - answeredCount;
+            const unanswered = totalQuestionUnits - answeredCount;
             if (!(await confirmAction(`Submit and open Results? ${unanswered} unanswered and ${questionFlags.size} flagged question(s) remain.`))) return;
             setSubmitting(true);
             try {
@@ -429,7 +443,7 @@ export function ReadingWorkbench() {
         />}
       navigator={
       <footer className="question-navigator" aria-label="Question navigator">
-        <div className="question-navigator__summary"><ListChecks aria-hidden="true" size={17} />Answered {answeredCount}/{questionEntries.length} · Unanswered {questionEntries.length - answeredCount} · Flagged {questionFlags.size}</div>
+        <div className="question-navigator__summary"><ListChecks aria-hidden="true" size={17} />Answered {answeredCount}/{totalQuestionUnits} · Unanswered {totalQuestionUnits - answeredCount} · Flagged {questionFlags.size}</div>
         <div className="question-navigator__tools">
           <div aria-label="Question filter" className="question-navigator__filters" role="group">
             {([['all', 'All'], ['unanswered', 'Unanswered'], ['flagged', 'Flagged']] as const).map(([value, label]) => (

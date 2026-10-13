@@ -39,4 +39,20 @@ describe("Reading question scoring contracts", () => {
     expect(displayQuestionCorrectAnswer(item)).toBe("未提供标准答案");
     expect(scoreQuestion(item, undefined)).toEqual({ status: "unscored", earnedPoints: 0, scorablePoints: 0 });
   });
+
+  it("enforces word limits without forgiving spelling or plural changes", () => {
+    const item = question({ id: "gap-1", number: 1, type: "short-answer", prompt: "Complete.", maxWords: 1, acceptableAnswers: ["train", "rail service"] });
+    expect(scoreQuestion(item, "  TRAIN  ").status).toBe("correct");
+    expect(scoreQuestion(item, "trains").status).toBe("incorrect");
+    expect(scoreQuestion(item, "rail service").status).toBe("incorrect");
+    expect(scoreQuestion(item, "trian").status).toBe("incorrect");
+  });
+
+  it("never awards points for over-selection, duplicate or unknown option IDs", () => {
+    const item = question({ id: "multi-safe", number: 1, type: "multiple-choice", prompt: "Choose two.", points: 2, selectionCount: 2, additionalNumbers: [2], scoringMode: "per-correct-option", options: [{id: "a", label: "A", text: "One"}, {id: "b", label: "B", text: "Two"}, {id: "c", label: "C", text: "Three"}], correctOptionIds: ["a", "b"] });
+    for (const answer of [["a", "b", "c"], ["a", "a", "b"], ["a", "unknown"]]) {
+      expect(scoreQuestion(item, answer).earnedPoints).toBe(0);
+    }
+    expect(scoreQuestion(item, ["b", "a"]).earnedPoints).toBe(2);
+  });
 });
